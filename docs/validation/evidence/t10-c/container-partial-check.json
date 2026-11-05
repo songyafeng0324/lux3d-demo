@@ -1,0 +1,38 @@
+{
+  "scope": "T10-C game front: walking/collision/HUD on the T10-B frame; no business features",
+  "base": "http://127.0.0.1:5173",
+  "browser": "153.0.8010.12",
+  "viewport": {
+    "width": 640,
+    "height": 400
+  },
+  "dpr": 1,
+  "started": "2026-11-05T07:58:47.316Z",
+  "layout": {
+    "canvas": [
+      0,
+      0,
+      640,
+      400
+    ],
+    "viewport": [
+      640,
+      400
+    ],
+    "scroll": [
+      640,
+      400
+    ]
+  },
+  "measuredFrameMs": 833,
+  "pointerLockAfterEnter": true,
+  "meshesAfterMerge": 9,
+  "surfaceProbe": {
+    "checked": 2774,
+    "mismatches": []
+  },
+  "inputExclusion": "bag, paused, menu and focused input all blocked movement",
+  "pass": false,
+  "failure": "Error: stuck at {\"x\":9.184850993605148e-17,\"y\":0,\"z\":9.949999999999967} → 0,9; state {\"ui\":{\"phase\":\"play\",\"overlay\":null,\"detail\":null},\"enabled\":true,\"locked\":true,\"keys\":[\"KeyW\"],\"yaw\":3.141592653589793}\n    at walkTo (file:///home/claude/harness/scripts/t10-game-browser.mjs:36:70)\n    at async file:///home/claude/harness/scripts/t10-game-browser.mjs:121:9",
+  "finished": "2026-11-05T08:01:19.243Z"
+}

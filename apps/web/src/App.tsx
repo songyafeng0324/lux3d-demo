@@ -2,12 +2,15 @@ import { lazy, Suspense, useCallback, useEffect, useState } from 'react';
 import type { ApiEnvelope, ReadinessData } from '@aholo/contracts';
 
 const SceneLab = lazy(() => import('./scene/SceneLab.js'));
+const Game = lazy(() => import('./game/Game.js'));
+const loading = (text: string, dark = false) => <p style={{ margin: 0, padding: 40, minHeight: '100dvh', background: dark ? '#0f0c0a' : undefined, color: dark ? '#b9ab92' : undefined }}>{text}</p>;
 
 const names = { database: '数据库', storage: '私有文件存储', worker: '后台进程' } as const;
 
 export function App() {
-  if (location.pathname === "/lab/t04") return <Suspense fallback={<p style={{padding:40}}>正在准备古建场景…</p>}><SceneLab /></Suspense>;
-  return <Workbench />;
+  if (location.pathname === "/lab/t04") return <Suspense fallback={loading('正在准备古建场景…')}><SceneLab /></Suspense>;
+  if (location.pathname === '/workbench') return <Workbench />;
+  return <Suspense fallback={loading('正在打开藏宝阁…', true)}><Game /></Suspense>;
 }
 
 function Workbench() {
@@ -40,7 +43,7 @@ function Workbench() {
   return (
     <div className="workbench">
       <header className="topbar">
-        <a className="brand" href="/" aria-label="藏宝阁与个人小屋首页"><span className="seal">藏</span><span>藏宝阁与个人小屋<small>LOCAL WORKSPACE</small></span></a>
+        <a className="brand" href="/workbench" aria-label="本地工作台"><span className="seal">藏</span><span>藏宝阁与个人小屋<small>LOCAL WORKSPACE</small></span></a>
         <span className="local-label"><span />本地开发</span>
       </header>
       <main>
@@ -76,6 +79,7 @@ function Workbench() {
         <section className="next-section" aria-labelledby="next-title">
           <div><p className="eyebrow">NEXT CHAPTER</p><h2 id="next-title">下一步，接入真实体验。</h2></div>
           <p>当前为基础工程阶段。网站生成流程尚未接入，账号、背包、小屋编辑和展陈功能仍待实现。</p>
+          <a href="/" style={{display:"inline-block",marginBottom:8,marginRight:20,color:"#486747"}}>进入藏宝阁（T10-C 全屏参观）→</a>
           <a href="/lab/t04" style={{display:"inline-block",marginBottom:16,color:"#486747"}}>进入 T04 场景交互验证 →</a>
           <div className="next-tags"><span>单图生成</span><span>个人小屋</span><span>公共藏宝阁</span></div>
           {health && <p className="configuration">Lux3D 配置：{health.generation.configured ? '已检测到本地配置，网站任务流程待接入' : '尚未配置'}。当前页面不会提交生成任务。</p>}

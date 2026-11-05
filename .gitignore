@@ -10,3 +10,4 @@ playwright-report/
 
 # Blender auto-backups
 *.blend1
+.tmp-stage/

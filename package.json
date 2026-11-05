@@ -29,7 +29,8 @@
     "probe:lux3d": "node scripts/lux3d-probe.mjs",
     "probe:upload:block": "node scripts/lux3d-block-probe.mjs",
     "test:t04": "node scripts/t04-browser.mjs",
-    "test:t04:input": "node scripts/t04-browser.mjs --input-only"
+    "test:t04:input": "node scripts/t04-browser.mjs --input-only",
+    "test:t10": "node scripts/t10-game-browser.mjs"
   },
   "devDependencies": {
     "typescript": "7.0.2",
