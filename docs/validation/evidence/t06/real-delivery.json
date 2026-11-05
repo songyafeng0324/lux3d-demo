@@ -1,0 +1,48 @@
+{
+  "task_id": "671b3671-173a-458b-b6f8-e657b935388c",
+  "status": "succeeded",
+  "provider_task_id": "4701141",
+  "quote_id": "quote_f65b82a5e0e3403a982a47394c90aa81",
+  "committed_credits": 1,
+  "delivery_receipt": {
+    "bounds": {
+      "max": [
+        0.2739656367622238,
+        1,
+        0.2663731283451352
+      ],
+      "min": [
+        -0.2739656367622238,
+        0,
+        -0.2663731283451352
+      ]
+    },
+    "fileId": "16696eb3-6905-4a48-8cea-85d516ffd2b3",
+    "sha256": "8bfa56e8b1191dfaa0b2f33a5a50f5487afc4b2d5f406fef127b92d753c799f3",
+    "byteSize": 9030232,
+    "rendered": true,
+    "attemptId": "16696eb3-6905-4a48-8cea-85d516ffd2b3",
+    "triangles": 48204,
+    "outputSlot": 0,
+    "verifiedAt": "2026-11-05T08:46:42.535Z",
+    "inputSha256": "035810c0208c98dc3faccab52cf64c3590737bada650255b28f609bc04030ce5",
+    "requestHash": "2d4d691f57179d5bf388a1e7560d13e435b6b1f7da03057f33656c7946eb540a",
+    "normalization": {
+      "scale": 0.9960874223035691,
+      "translation": [
+        0.00016802549362182617,
+        0.5019322633743286,
+        -0.0001710951328277588
+      ]
+    },
+    "providerTaskId": "4701141"
+  },
+  "asset_id": "f4c2533c-2fa8-49b3-8a6f-6a98b7860ab5",
+  "model_file_id": "16696eb3-6905-4a48-8cea-85d516ffd2b3",
+  "byte_size": "9030232",
+  "sha256": "8bfa56e8b1191dfaa0b2f33a5a50f5487afc4b2d5f406fef127b92d753c799f3",
+  "reserve_events": 1,
+  "refund_events": 0,
+  "createdProviderAttempts": 1,
+  "checkedAt": "2026-11-05T08:49:46.592Z"
+}

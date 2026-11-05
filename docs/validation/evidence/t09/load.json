@@ -1,0 +1,46 @@
+{
+  "pass": true,
+  "sessions": 10,
+  "rounds": 20,
+  "requests": 640,
+  "errors": 0,
+  "elapsedMs": 537.68,
+  "latencyMs": {
+    "backpack": {
+      "requests": 200,
+      "p50": 0.67,
+      "p95": 1.74,
+      "max": 5.68
+    },
+    "furniture": {
+      "requests": 10,
+      "p50": 2.28,
+      "p95": 4.57,
+      "max": 4.57
+    },
+    "gallery": {
+      "requests": 200,
+      "p50": 1.35,
+      "p95": 3.47,
+      "max": 6.26
+    },
+    "login": {
+      "requests": 10,
+      "p50": 335.45,
+      "p95": 507.7,
+      "max": 507.7
+    },
+    "room": {
+      "requests": 20,
+      "p50": 0.93,
+      "p95": 4.07,
+      "max": 4.53
+    },
+    "save": {
+      "requests": 200,
+      "p50": 3.99,
+      "p95": 9.03,
+      "max": 10.48
+    }
+  }
+}

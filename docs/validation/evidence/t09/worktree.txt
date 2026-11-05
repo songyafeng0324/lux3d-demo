@@ -1,0 +1,83 @@
+ M AGENTS.md
+ M DESIGN.md
+ M apps/api/AGENTS.md
+ M apps/api/package.json
+ M apps/api/src/app.ts
+ M apps/web/AGENTS.md
+ M apps/web/src/App.tsx
+ M apps/web/src/game/Game.tsx
+ M apps/web/src/game/engine.ts
+ M apps/web/src/game/game.css
+ M apps/worker/AGENTS.md
+ M apps/worker/src/index.ts
+ M docs/README.md
+ M "docs/contracts/Lux3D\346\216\245\345\205\245\345\245\221\347\272\246.md"
+ M "docs/contracts/\346\225\260\346\215\256\344\270\216\346\216\245\345\217\243\345\245\221\347\272\246.md"
+ M "docs/\346\234\254\345\234\260\350\277\220\350\241\214.md"
+ M flow/charter.md
+ M flow/decisions.md
+ M flow/plan.md
+ M "flow/tasks/T06-\350\264\246\345\217\267\350\265\204\344\272\247\344\270\216\347\224\237\346\210\220\351\227\255\347\216\257.md"
+ M "flow/tasks/T07-\345\260\217\345\261\213\344\277\235\345\255\230\344\270\216\345\210\206\344\272\253.md"
+ M "flow/tasks/T08-\346\212\225\347\250\277\345\220\216\345\217\260\344\270\216\345\261\225\351\231\210.md"
+ M "flow/tasks/T09-\346\234\254\345\234\260\345\256\214\346\225\264\351\252\214\346\224\266.md"
+ M "flow/\350\270\251\345\235\221\350\256\260\345\275\225.md"
+ M "flow/\350\277\233\345\261\225.md"
+ M package-lock.json
+ M package.json
+ M packages/contracts/src/index.ts
+ M packages/contracts/src/scene.ts
+ M packages/domain/package.json
+ M packages/domain/src/index.ts
+ M packages/domain/src/lux3d.ts
+ M scripts/backup.mjs
+ M scripts/smoke.mjs
+ M tests/foundation.integration.mjs
+ M tests/lux3d.test.mjs
+?? apps/api/src/business.ts
+?? apps/api/src/curation.ts
+?? apps/api/src/rooms.ts
+?? apps/web/scripts/
+?? apps/web/src/admin/
+?? apps/web/src/game/Backpack.tsx
+?? apps/web/src/game/ModelPreview.tsx
+?? apps/web/src/game/backpack-api.ts
+?? apps/web/src/game/backpack.css
+?? apps/web/src/room/
+?? assets/furniture/
+?? "docs/design/\345\260\217\345\261\213\346\255\243\345\274\217\344\277\235\345\255\230\344\270\216\345\210\206\344\272\253.md"
+?? "docs/reviews/T06\344\273\243\347\240\201\350\257\204\345\256\241.md"
+?? "docs/reviews/T07\344\273\243\347\240\201\350\257\204\345\256\241.md"
+?? "docs/reviews/T08\344\273\243\347\240\201\350\257\204\345\256\241.md"
+?? docs/validation/evidence/t06/
+?? docs/validation/evidence/t07/
+?? docs/validation/evidence/t08/
+?? docs/validation/evidence/t09/
+?? "docs/validation/\345\220\216\345\217\260\345\261\225\351\231\210\351\252\214\350\257\201.md"
+?? "docs/validation/\345\260\217\345\261\213\345\210\206\344\272\253\351\252\214\350\257\201.md"
+?? "docs/validation/\350\264\246\345\217\267\350\265\204\344\272\247\347\224\237\346\210\220\351\252\214\350\257\201.md"
+?? migrations/003_generation_delivery.sql
+?? migrations/004_curation.sql
+?? packages/contracts/src/gallery.ts
+?? packages/contracts/src/room.ts
+?? packages/domain/src/accounts.ts
+?? packages/domain/src/curation.ts
+?? packages/domain/src/generation.ts
+?? packages/domain/src/requests.ts
+?? packages/domain/src/resources.ts
+?? scripts/build-furniture.mjs
+?? scripts/generation-diagnose.mjs
+?? scripts/seed-furniture.mjs
+?? scripts/t06-live-browser.mjs
+?? scripts/t06-live.mjs
+?? scripts/t07-browser.mjs
+?? scripts/t08-browser.mjs
+?? scripts/t08-main-demo.mjs
+?? tests/furniture.integration.mjs
+?? tests/resources.test.mjs
+?? tests/room-geometry.test.mjs
+?? tests/room-save.test.mjs
+?? tests/t06-api.integration.mjs
+?? tests/t06-worker.integration.mjs
+?? tests/t07-room.integration.mjs
+?? tests/t08-curation.integration.mjs

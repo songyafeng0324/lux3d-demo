@@ -1,0 +1,12 @@
+ProductName:		macOS
+ProductVersion:		26.6.2
+BuildVersion:		25G83
+Mac17,2
+34359738368
+Apple M5
+v24.16.0
+11.13.0
+Google Chrome 157.0.8103.38
+33f3a4f79c2cdeed8e6eb86b826b2e21e5bbcdb2
+93b40542f6400286e437a27dd4721dede6da49a781c8e843135890587788b6b5  package-lock.json
+e59f608df1ddb5628cec4633fd536ff7649fa06e84c9a236a685cd5f43e7572f  assets/t10/pavilion-v1.glb

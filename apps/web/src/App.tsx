@@ -3,11 +3,17 @@ import type { ApiEnvelope, ReadinessData } from '@aholo/contracts';
 
 const SceneLab = lazy(() => import('./scene/SceneLab.js'));
 const Game = lazy(() => import('./game/Game.js'));
+const Room = lazy(() => import('./room/Room.js'));
+const Admin = lazy(() => import('./admin/Admin.js'));
 const loading = (text: string, dark = false) => <p style={{ margin: 0, padding: 40, minHeight: '100dvh', background: dark ? '#0f0c0a' : undefined, color: dark ? '#b9ab92' : undefined }}>{text}</p>;
 
 const names = { database: '数据库', storage: '私有文件存储', worker: '后台进程' } as const;
 
 export function App() {
+  if (location.pathname === '/admin') return <Suspense fallback={loading('正在打开管理后台…', true)}><Admin /></Suspense>;
+  if (location.pathname === '/room') return <Suspense fallback={loading('正在打开个人小屋…')}><Room /></Suspense>;
+  const shared = location.pathname.match(/^\/shared\/([^/]+)\/?$/);
+  if (shared) return <Suspense fallback={loading('正在打开分享小屋…')}><Room shareToken={shared[1]} /></Suspense>;
   if (location.pathname === "/lab/t04") return <Suspense fallback={loading('正在准备古建场景…')}><SceneLab /></Suspense>;
   if (location.pathname === '/workbench') return <Workbench />;
   return <Suspense fallback={loading('正在打开藏宝阁…', true)}><Game /></Suspense>;
@@ -49,8 +55,8 @@ function Workbench() {
       <main>
         <section className="intro" aria-labelledby="page-title">
           <p className="eyebrow">从一件藏品，开始一个小世界</p>
-          <h1 id="page-title">本地工作台<span>从基础环境开始。</span></h1>
-          <p className="lead">这里检查本机服务的实际连接状态。生成模型、布置小屋与公共展陈将分阶段接入。</p>
+          <h1 id="page-title">本地工作台<span>查看服务与生成状态。</span></h1>
+          <p className="lead">这里检查本机数据库、私有存储、后台任务与生成入口的实时状态。</p>
         </section>
 
         <section className="status-panel" aria-labelledby="status-title">
@@ -69,7 +75,7 @@ function Workbench() {
                 <span className={`pill ${health?.checks[key] === 'ok' ? 'ok' : ''}`}>
                   {loading ? '检查中' : health?.checks[key] === 'ok' ? '已连接' : health ? '待就绪' : '未连接'}
                 </span>
-                <p>{key === 'database' ? '保存账号、任务和房间记录' : key === 'storage' ? '在本机持久保存图片与模型' : '关闭网页后仍可保持后台进程'}</p>
+                <p>{key === 'database' ? '保存账号、任务和房间记录' : key === 'storage' ? '在本机持久保存图片与模型' : '关闭网页后继续处理生成任务'}</p>
               </article>
             ))}
           </div>
@@ -77,15 +83,16 @@ function Workbench() {
         </section>
 
         <section className="next-section" aria-labelledby="next-title">
-          <div><p className="eyebrow">NEXT CHAPTER</p><h2 id="next-title">下一步，接入真实体验。</h2></div>
-          <p>当前为基础工程阶段。网站生成流程尚未接入，账号、背包、小屋编辑和展陈功能仍待实现。</p>
-          <a href="/" style={{display:"inline-block",marginBottom:8,marginRight:20,color:"#486747"}}>进入藏宝阁（T10-C 全屏参观）→</a>
-          <a href="/lab/t04" style={{display:"inline-block",marginBottom:16,color:"#486747"}}>进入 T04 场景交互验证 →</a>
+          <div><p className="eyebrow">CREATE & COLLECT</p><h2 id="next-title">从图片到个人藏品。</h2></div>
+          <p>账号、额度、图片生成与个人背包已接入。进入藏宝阁后按 B 打开背包，即可登录、提交图片并查看模型；前往个人小屋布置藏品并开启只读分享。投稿审核、30 展位策展与公共展陈已接入；管理员登录 /admin 管理。</p>
+          <a href="/" style={{display:"inline-block",marginBottom:8,marginRight:20,color:"#486747"}}>进入藏宝阁与背包 →</a>
+          <a href="/room" style={{display:"inline-block",marginBottom:16,marginRight:20,color:"#486747"}}>进入个人小屋 →</a>
+          <a href="/admin" style={{display:"inline-block",marginBottom:16,color:"#486747"}}>管理后台 →</a>
           <div className="next-tags"><span>单图生成</span><span>个人小屋</span><span>公共藏宝阁</span></div>
-          {health && <p className="configuration">Lux3D 配置：{health.generation.configured ? '已检测到本地配置，网站任务流程待接入' : '尚未配置'}。当前页面不会提交生成任务。</p>}
+          {health && <p className="configuration">Lux3D 配置：{health.generation.configured ? '已检测到服务端配置' : '尚未配置'}。生成入口：{health.generationReady ? '可用' : '未启用或暂未就绪'}。当前页面仅检查状态，生成请前往背包。</p>}
         </section>
       </main>
-      <footer><span>藏宝阁与个人小屋</span><span>T05 · 本地基础工程</span></footer>
+      <footer><span>藏宝阁与个人小屋</span><span>本地服务与生成状态</span></footer>
     </div>
   );
 }

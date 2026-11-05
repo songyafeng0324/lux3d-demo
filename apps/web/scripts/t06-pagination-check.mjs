@@ -1,0 +1,76 @@
+// UI pagination/polling regression with intercepted APIs; never calls Lux3D.
+import { chromium } from 'playwright';
+import fs from 'node:fs/promises';
+import assert from 'node:assert/strict';
+const browser = await chromium.launch({ channel: 'chrome', headless: true, args: ['--enable-unsafe-swiftshader'] });
+const page = await browser.newPage({ viewport: { width: 1440, height: 900 } });
+const errors = []; page.on('pageerror', error => errors.push(error.message));
+const now = new Date().toISOString();
+const assets = Array.from({ length: 65 }, (_, i) => ({ id: 'asset-' + (i + 1), name: '藏品' + (i + 1), description: '', modelFileId: 'model-1', originalImageId: null, createdAt: now, normalization: {}, bounds: {} }));
+const tasks = Array.from({ length: 65 }, (_, i) => ({ id: 'task-' + (i + 1), status: i === 0 ? 'processing' : 'succeeded', submittedDay: '2026-11-05', createdAt: now, assetId: i === 30 ? 'asset-65' : assets[i].id, errorCode: null }));
+const counts = new Map();
+let generationReady = true;
+await page.route('**/api/v1/**', async route => {
+  const url = new URL(route.request().url()), path = url.pathname.replace('/api/v1', '');
+  counts.set(path + url.search, (counts.get(path + url.search) || 0) + 1);
+  const ok = data => route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ data, requestId: 'qa' }) });
+  if (path === '/health/ready') return ok({ ready: true, generationReady, checkedAt: now, checks: { database: 'ok', storage: 'ok', worker: 'ok' }, generation: { configured: true, stage: generationReady ? 'integrated' : 'disabled' } });
+  if (path === '/me') return ok({ user: { id: 'user-1', username: 'qa_user', nickname: '分页藏家', role: 'user' }, roomId: 'room-1', quota: { day: '2026-11-05', total: 3, used: 1, available: 2 }, activeTask: tasks[0], csrfToken: 'qa-csrf' });
+  if (path === '/assets' || path === '/generation-tasks') {
+    const collection = path === '/assets' ? assets : tasks, offset = Number(url.searchParams.get('cursor') || 0);
+    return ok({ items: collection.slice(offset, offset + 30), nextCursor: offset + 30 < collection.length ? String(offset + 30) : null });
+  }
+  if (path.startsWith('/assets/')) return ok(assets.find(asset => asset.id === path.split('/').at(-1)));
+  if (path === '/files/model-1/content') return route.fulfill({ status: 200, contentType: 'model/gltf-binary', body: await fs.readFile(new URL('../../../assets/t10/pavilion-v1.glb', import.meta.url)) });
+  return route.fulfill({ status: 404, contentType: 'application/json', body: JSON.stringify({ error: { code: 'NOT_FOUND', message: path } }) });
+});
+try {
+  const base = process.env.T06_UI_BASE || 'http://localhost:5173';
+  await page.goto(base);
+  await page.getByRole('button', { name: '进入藏宝阁', exact: true }).click();
+  await page.keyboard.press('KeyB');
+  const bag = page.getByRole('dialog', { name: '背包', exact: true });
+  await page.waitForFunction(() => document.querySelectorAll('.bag-asset-card').length === 30);
+  await bag.getByRole('button', { name: '加载更多藏品' }).click();
+  await page.waitForFunction(() => document.querySelectorAll('.bag-asset-card').length === 60);
+  await bag.locator('.bag-asset-card').nth(30).click();
+  await bag.getByLabel('名称', { exact: true }).waitFor();
+  assert.equal(await bag.getByLabel('名称', { exact: true }).inputValue(), '藏品31');
+  const beforePoll = counts.get('/assets?cursor=30');
+  await page.waitForTimeout(5500);
+  assert.ok(counts.get('/assets?cursor=30') > beforePoll, 'poll must refresh the loaded second page');
+  assert.equal(await bag.getByLabel('名称', { exact: true }).inputValue(), '藏品31', 'poll must preserve selected older asset');
+  await bag.getByRole('button', { name: '← 返回全部藏品' }).click();
+  assert.equal(await bag.locator('.bag-asset-card').count(), 60, 'poll must preserve 60 loaded assets');
+  await bag.getByRole('button', { name: '生成任务', exact: true }).click();
+  await bag.getByRole('button', { name: '加载更多任务' }).click();
+  await page.waitForFunction(() => document.querySelectorAll('.bag-task').length === 60);
+  const detailCount = counts.get('/assets/asset-65') || 0;
+  await bag.locator('.bag-task').nth(30).getByRole('button', { name: '查看藏品 →' }).click();
+  await page.waitForFunction(() => document.querySelector('input[name=name]')?.value === '藏品65');
+  assert.ok((counts.get('/assets/asset-65') || 0) > detailCount, 'task must fetch asset not loaded in the backpack list');
+  await page.waitForTimeout(5500);
+  assert.equal(await bag.getByLabel('名称', { exact: true }).inputValue(), '藏品65', 'off-page detail must survive polling');
+  await bag.getByRole('button', { name: '← 返回全部藏品' }).click();
+  assert.equal(await bag.locator('.bag-asset-card').count(), 60, 'detail fetch must not corrupt pagination');
+  await bag.getByRole('button', { name: '加载更多藏品' }).click();
+  await page.waitForFunction(() => document.querySelectorAll('.bag-asset-card').length === 65);
+  await bag.locator('.bag-asset-card').nth(60).click();
+  await page.waitForFunction(() => document.querySelector('input[name=name]')?.value === '藏品61');
+  const thirdPoll = counts.get('/assets?cursor=60');
+  await page.waitForTimeout(5500);
+  assert.ok(counts.get('/assets?cursor=60') > thirdPoll, 'poll must retain third page depth');
+  assert.equal(await bag.getByLabel('名称', { exact: true }).inputValue(), '藏品61');
+  await bag.getByRole('button', { name: '← 返回全部藏品' }).click();
+  assert.equal(await bag.locator('.bag-asset-card').count(), 65);
+  assert.equal(await bag.getByRole('button', { name: '加载更多藏品' }).count(), 0, 'tail cursor must remain exhausted');
+  await bag.getByRole('button', { name: '生成任务', exact: true }).click();
+  assert.equal(await bag.locator('.bag-task').count(), 60, 'task pagination must survive repeated polls');
+  await page.goto(base + '/workbench');
+  await page.getByText('生成入口：可用', { exact: false }).waitFor();
+  generationReady = false;
+  await page.getByRole('button', { name: '重新检查' }).click();
+  await page.getByText('生成入口：未启用或暂未就绪', { exact: false }).waitFor();
+  assert.deepEqual(errors, []);
+  console.log(JSON.stringify({ pass: true, scope: 'UI with intercepted APIs; no supplier call', checks: ['loaded 60/65 assets survive polling', '31st/61st selection survives polling', 'task opens off-page asset via GET detail', 'off-page detail survives polling', 'loaded 60 tasks survive polling', 'exhausted cursor stays exhausted', 'generationReady true/false reflected by workbench'], pageErrors: errors }, null, 2));
+} finally { await browser.close(); }

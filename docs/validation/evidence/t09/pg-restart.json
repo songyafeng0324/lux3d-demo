@@ -1,0 +1,8 @@
+{
+  "pass": true,
+  "engine": "PostgreSQL 18.6",
+  "temporaryCluster": true,
+  "socketOnly": true,
+  "previouslyRestoredTask": "4701141",
+  "terminalStatusAndModelHashUnchanged": true
+}

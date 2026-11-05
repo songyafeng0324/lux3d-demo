@@ -2,12 +2,20 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { PavilionEngine, type HudState } from './engine.js';
 import type { ExhibitSlot } from './navigation.js';
 import './game.css';
+import Backpack from './Backpack.js';
+import ModelPreview from './ModelPreview.js';
+import { api, ApiError } from './backpack-api.js';
+import type { ExhibitDetail, GalleryExhibit, GalleryView } from '@aholo/contracts';
 
 type Phase = 'loading' | 'failed' | 'intro' | 'play' | 'paused';
 type Overlay = null | 'menu' | 'bag' | 'detail' | 'help';
 const FLOOR = { ground: '一层 · 中庭', stairs: '楼梯 · 半层', upper: '二层 · 回廊' } as const;
 
-declare global { interface Window { __t10?: { engine: PavilionEngine; ui: () => { phase: Phase; overlay: Overlay; detail: string | null } } } }
+declare global { interface Window { __t10?: { engine: PavilionEngine; ui: () => { phase: Phase; overlay: Overlay; detail: string | null; galleryVersion: number | null; exhibits: number; detailName: string | null } } } }
+type DetailState = { status: 'loading' } | { status: 'failed'; message: string } | { status: 'ready'; data: ExhibitDetail };
+const OWNERSHIP = { museum: '博物馆', personal_collection: '个人收藏' } as const;
+const slotNoOf = (s: ExhibitSlot) => Number(s.id.slice(1));
+const grantHeaders = (g: GalleryView['grant']) => ({ Authorization: 'Bearer ' + g.token, 'X-Snapshot-Grant': g.id });
 
 function slotLabel(s: ExhibitSlot) {
   return `${s.floor === 0 ? '一层' : '二层'}${s.position[0] < 0 ? '西' : '东'}侧 · 展位 ${s.id}`;
@@ -22,8 +30,13 @@ export default function Game() {
   const [error, setError] = useState('');
   const [hud, setHud] = useState<HudState>({ floor: 'ground', target: null, fps: 0, calls: 0 });
   const [detail, setDetail] = useState<ExhibitSlot | null>(null);
-  const state = useRef({ phase, overlay, detail });
-  state.current = { phase, overlay, detail };
+  const [gallery, setGallery] = useState<GalleryView | null>(null);
+  const [galleryNotice, setGalleryNotice] = useState('');
+  const [detailState, setDetailState] = useState<DetailState | null>(null);
+  const grant = useRef<GalleryView['grant'] | null>(null);
+  const state = useRef({ phase, overlay, detail, gallery, detailState });
+  state.current = { phase, overlay, detail, gallery, detailState };
+  const exhibitAt = useCallback((slot: ExhibitSlot | null): GalleryExhibit | null => slot ? state.current.gallery?.slots.find(s => s.slotNo === slotNoOf(slot))?.exhibit ?? null : null, []);
 
   useEffect(() => {
     if (!host.current) return;
@@ -31,7 +44,7 @@ export default function Game() {
     try {
       instance = new PavilionEngine(host.current, {
         progress: setProgress,
-        ready: () => setPhase('intro'),
+        ready: () => { setPhase('intro'); if (new URLSearchParams(location.search).get('backpack') === '1') setOverlay('bag'); void loadGallery(instance); },
         failed: message => { setError(message); setPhase('failed'); },
         hud: setHud,
         // Esc while walking: the browser releases the mouse; we pause until the visitor clicks back in.
@@ -43,8 +56,35 @@ export default function Game() {
       return;
     }
     engine.current = instance;
-    window.__t10 = { engine: instance, ui: () => ({ phase: state.current.phase, overlay: state.current.overlay, detail: state.current.detail?.id ?? null }) };
-    return () => { instance.dispose(); engine.current = null; delete window.__t10; };
+    window.__t10 = { engine: instance, ui: () => ({ phase: state.current.phase, overlay: state.current.overlay, detail: state.current.detail?.id ?? null, galleryVersion: state.current.gallery?.version ?? null, exhibits: instance.exhibitCount(), detailName: state.current.detailState?.status === 'ready' ? state.current.detailState.data.name : null }) };
+    let renewal: ReturnType<typeof setTimeout> | undefined, stopped = false, renewKey: string | null = null;
+    /** Each entry or refresh reads the latest published version; an open page keeps its version (AC42). */
+    async function loadGallery(target: PavilionEngine) {
+      try {
+        const view = await api<GalleryView>('/gallery', { cache: 'no-store', credentials: 'omit' });
+        if (stopped) return;
+        grant.current = view.grant; setGallery(view);
+        const result = await target.setExhibits(view.slots, grantHeaders(view.grant));
+        if (!stopped && result.failed) setGalleryNotice(`${result.failed} 件展品暂时无法载入，刷新后重试。`);
+        scheduleRenew();
+      } catch { if (!stopped) setGalleryNotice('展陈暂时无法读取，展位显示为空；刷新后重试。'); }
+    }
+    function scheduleRenew() {
+      clearTimeout(renewal); const g = grant.current; if (!g || stopped) return;
+      renewal = setTimeout(async () => {
+        const current = grant.current; if (!current || stopped) return;
+        renewKey ??= crypto.randomUUID();
+        try {
+          const result = await api<{ grant: GalleryView['grant'] }>('/snapshots/' + encodeURIComponent(current.id) + '/renew', { method: 'POST', credentials: 'omit', headers: { ...grantHeaders(current), 'Idempotency-Key': renewKey } });
+          renewKey = null; if (!stopped) { grant.current = result.grant; scheduleRenew(); }
+        } catch (e) {
+          // Network loss keeps the same key for a safe retry; a definitive refusal keeps the loaded scene as is.
+          if (e instanceof ApiError && (e.status === 403 || e.status === 404)) { renewKey = null; setGalleryNotice('展陈已更新或参观凭证过期，刷新后可看到最新展陈。'); }
+          else if (!stopped) { renewal = setTimeout(scheduleRenew, 30000); }
+        }
+      }, Math.max(1000, Math.min(60 * 60 * 1000, Date.parse(g.expiresAt) - Date.now() - 5 * 60 * 1000)));
+    }
+    return () => { stopped = true; clearTimeout(renewal); instance.dispose(); engine.current = null; delete window.__t10; };
   }, []);
 
   const play = useCallback(() => {
@@ -59,13 +99,23 @@ export default function Game() {
   /** Any menu, drawer or detail takes input: stop walking and free the mouse. */
   const open = useCallback((next: Exclude<Overlay, null>, slot?: ExhibitSlot) => {
     engine.current?.setEnabled(false);
-    if (slot) setDetail(slot);
+    if (slot) {
+      setDetail(slot);
+      const exhibit = exhibitAt(slot), g = grant.current;
+      if (exhibit && g) {
+        setDetailState({ status: 'loading' });
+        void api<ExhibitDetail>(`/snapshots/${encodeURIComponent(g.id)}/details/${encodeURIComponent(exhibit.candidateId)}`, { credentials: 'omit', cache: 'no-store', headers: { Authorization: 'Bearer ' + g.token } })
+          .then(data => { if (state.current.detail === slot) setDetailState({ status: 'ready', data }); })
+          .catch(e => { if (state.current.detail === slot) setDetailState({ status: 'failed', message: e instanceof ApiError && e.status === 404 ? '这件藏品已不再公开展示，刷新后可看到最新展陈。' : '详情暂时无法读取，请稍后重试。' }); });
+      } else setDetailState(null);
+    }
     setOverlay(next);
-  }, []);
+  }, [exhibitAt]);
   /** Closing returns to a paused state; the visitor clicks to re-lock, so nobody walks by accident. */
   const close = useCallback(() => {
     setOverlay(null);
     setDetail(null);
+    setDetailState(null);
     setPhase(p => (p === 'play' || p === 'paused' ? 'paused' : p));
   }, []);
 
@@ -88,6 +138,9 @@ export default function Game() {
   }, [open, close]);
 
   const walking = phase === 'play' && !overlay;
+  const targetExhibit = exhibitAt(hud.target);
+  const shown = gallery?.slots.filter(s => s.exhibit).length ?? 0;
+  const detailExhibit = exhibitAt(detail);
   return (
     <div className="t10-game" data-phase={phase} data-overlay={overlay ?? ''}>
       <div className="t10-canvas" ref={host} onClick={() => { if (phase === 'paused' && !overlay) play(); }} />
@@ -104,10 +157,11 @@ export default function Game() {
           </nav>
         </header>
         {walking && <span className="t10-crosshair" aria-hidden="true" />}
-        {walking && hud.target && <div className="t10-prompt" role="status"><kbd>E</kbd>查看 {slotLabel(hud.target)}</div>}
+        {walking && hud.target && <div className="t10-prompt" role="status"><kbd>E</kbd>{targetExhibit ? <>查看 <b>{targetExhibit.name}</b><small>{slotLabel(hud.target)}</small></> : <>查看 {slotLabel(hud.target)}</>}</div>}
+        {galleryNotice && !overlay && <div className="t10-notice" role="status">{galleryNotice}</div>}
         <footer className="t10-hud-bottom">
           <span>WASD 行走 · Shift 快走 · 鼠标环顾 · Esc 释放鼠标</span>
-          <span className="t10-meta">建筑框架 · 展位暂空 · {hud.fps} FPS</span>
+          <span className="t10-meta">{gallery ? `展出 ${shown} / 30` : '展陈读取中'} · {hud.fps} FPS</span>
         </footer>
       </>}
 
@@ -131,6 +185,7 @@ export default function Game() {
         <p className="t10-sub">二层古阁 · 三十展位</p>
         <button type="button" className="t10-primary" onClick={play} autoFocus>进入藏宝阁</button>
         <p className="t10-hint">点击后锁定鼠标环顾 · WASD 行走 · 北侧楼梯可上二层</p>
+        <p className="desktop-input-hint">请使用配有键盘和鼠标的电脑操作 3D 场景。</p>
       </div>}
 
       {phase === 'paused' && !overlay && <div className="t10-paused">
@@ -143,7 +198,7 @@ export default function Game() {
           <button type="button" autoFocus onClick={play}>继续参观</button>
           <button type="button" onClick={() => { engine.current?.resetToEntry(); play(); }}>回到入口</button>
           <button type="button" onClick={() => setOverlay('help')}>操作说明</button>
-          <a href="/lab/t04">个人小屋（试验版）</a>
+          <a href="/room">个人小屋</a>
           <a href="/workbench">本地工作台</a>
           <small>Esc 关闭</small>
         </section>
@@ -166,25 +221,42 @@ export default function Game() {
         </section>
       </div>}
 
-      {overlay === 'bag' && <aside className="t10-drawer" role="dialog" aria-modal="true" aria-label="背包">
-        <div className="t10-drawer-head"><h2>背包</h2><button type="button" aria-label="关闭背包" autoFocus onClick={close}>×</button></div>
-        <div className="t10-empty">
-          <span className="t10-seal">囊</span>
-          <p>背包还空着</p>
-          <small>登录、上传图片生成藏品与个人背包即将开放。这里不展示模拟数据。</small>
-        </div>
-        <a className="t10-drawer-link" href="/lab/t04">前往个人小屋（试验版）→</a>
-        <small className="t10-drawer-foot">B / Esc 关闭</small>
-      </aside>}
+      <Backpack open={overlay === 'bag'} close={close} />
 
       {overlay === 'detail' && detail && <div className="t10-modal-backdrop" onClick={close}>
-        <section className="t10-detail" role="dialog" aria-modal="true" aria-label={`展位 ${detail.id}`} onClick={e => e.stopPropagation()}>
+        <section className={`t10-detail${detailExhibit ? ' t10-exhibit' : ''}`} role="dialog" aria-modal="true" aria-label={detailExhibit ? `${detailExhibit.name}详情` : `展位 ${detail.id}`} onClick={e => e.stopPropagation()}>
           <div className="t10-drawer-head"><p>{slotLabel(detail)}</p><button type="button" aria-label="关闭详情" autoFocus onClick={close}>×</button></div>
-          <h2>虚位以待</h2>
-          <p>此展位尚未陈列藏品。用户投稿经审核与策展后，会在这里公开展出。</p>
-          <small>投稿与展陈即将开放 · Esc 关闭后点击画面继续</small>
+          {!detailExhibit ? <>
+            <h2>虚位以待</h2>
+            <p>此展位尚未陈列藏品。用户投稿经审核、管理员安排展位后，会在这里公开展出。</p>
+            <small>Esc 关闭后点击画面继续</small>
+          </> : detailState?.status === 'ready' ? <ExhibitInfo data={detailState.data} headers={grant.current ? grantHeaders(grant.current) : undefined} />
+            : detailState?.status === 'failed' ? <><h2>{detailExhibit.name}</h2><p role="alert">{detailState.message}</p></>
+            : <><h2>{detailExhibit.name}</h2><p role="status">正在读取藏品资料…</p></>}
         </section>
       </div>}
     </div>
   );
+}
+
+/** Public exhibit detail: PRD 7.5 fields, source attribution apart from the holder, independent rotate/zoom preview. */
+function ExhibitInfo({ data, headers }: { data: ExhibitDetail; headers?: Record<string, string> }) {
+  const url = /^https?:\/\//i.test(data.officialUrl) ? data.officialUrl : '';
+  return <div className="t10-exhibit-body">
+    <ModelPreview fileId={data.model.modelFileId} name={data.name} headers={headers} />
+    <div className="t10-exhibit-text">
+      <h2>{data.name}</h2>
+      <p className="t10-exhibit-source">{data.sourceNickname === '官方馆藏' ? '官方馆藏' : `投稿 · ${data.sourceNickname}`}</p>
+      <p className="t10-exhibit-desc">{data.description}</p>
+      <dl className="t10-exhibit-facts">
+        <div><dt>年代</dt><dd>{data.era}</dd></div>
+        <div><dt>材质</dt><dd>{data.material}</dd></div>
+        <div><dt>归属</dt><dd>{OWNERSHIP[data.ownershipType]}</dd></div>
+        <div><dt>收藏方</dt><dd>{data.holderName}</dd></div>
+        <div><dt>所在地</dt><dd>{data.location}</dd></div>
+        {url && <div><dt>官网</dt><dd><a href={url} target="_blank" rel="noopener noreferrer nofollow">{url}</a></dd></div>}
+      </dl>
+      <small>拖动旋转 · 滚轮缩放 · Esc 关闭后点击画面继续</small>
+    </div>
+  </div>;
 }

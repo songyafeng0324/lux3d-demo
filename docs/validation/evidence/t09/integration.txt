@@ -1,0 +1,48 @@
+
+> aholo-lux3d@0.1.0 test:integration
+> node --test tests/*.integration.mjs
+
+Applied 001_initial.sql
+Applied 002_seed_gallery.sql
+Applied 003_generation_delivery.sql
+Applied 004_curation.sql
+✔ real PostgreSQL migrations, constraints, rollback, private-file backup and isolated restore (1721.456541ms)
+Applied 001_initial.sql
+Applied 002_seed_gallery.sql
+Applied 003_generation_delivery.sql
+Applied 004_curation.sql
+✔ official furniture uses real rendered GLB imports, is idempotent and creates no usable system login (2026.158ms)
+Applied 001_initial.sql
+Applied 002_seed_gallery.sql
+Applied 003_generation_delivery.sql
+Applied 004_curation.sql
+(node:5505) [FSTDEP023] FastifyDeprecation: disableRequestLogging option is deprecated. Use the logController option with disableRequestLogging or isLogDisabled override instead. The disableRequestLogging top-level option will be removed in `fastify@6`.
+(Use `node --trace-warnings ...` to show where the warning was created)
+✔ T06 real API: account, cookie/CSRF, idempotency, quota, authorization and import acceptance (3293.231166ms)
+Applied 001_initial.sql
+Applied 002_seed_gallery.sql
+Applied 003_generation_delivery.sql
+Applied 004_curation.sql
+✔ T06 worker: durable delivery, quota/refund, unknown dispatch, nonce evidence, fenced recovery and imports (1065.763583ms)
+Applied 001_initial.sql
+Applied 002_seed_gallery.sql
+Applied 003_generation_delivery.sql
+Applied 004_curation.sql
+(node:5507) [FSTDEP023] FastifyDeprecation: disableRequestLogging option is deprecated. Use the logController option with disableRequestLogging or isLogDisabled override instead. The disableRequestLogging top-level option will be removed in `fastify@6`.
+(Use `node --trace-warnings ...` to show where the warning was created)
+✔ T07 real PostgreSQL/API: CAS layouts, arbitrary counts, stable encrypted sharing and scoped snapshot files (1989.523167ms)
+Applied 001_initial.sql
+Applied 002_seed_gallery.sql
+Applied 003_generation_delivery.sql
+Applied 004_curation.sql
+(node:5508) [FSTDEP023] FastifyDeprecation: disableRequestLogging option is deprecated. Use the logController option with disableRequestLogging or isLogDisabled override instead. The disableRequestLogging top-level option will be removed in `fastify@6`.
+(Use `node --trace-warnings ...` to show where the warning was created)
+✔ T08 real PostgreSQL/API: submissions, review races, 30-slot publishing, gallery grants, quota and risk deletion (4230.696958ms)
+ℹ tests 6
+ℹ suites 0
+ℹ pass 6
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 4521.940875

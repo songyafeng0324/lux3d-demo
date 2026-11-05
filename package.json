@@ -13,7 +13,7 @@
   "scripts": {
     "build:core": "npm run build -w @aholo/contracts && npm run build -w @aholo/domain",
     "build": "npm run build:core && npm run build -w @aholo/api && npm run build -w @aholo/worker && npm run build -w @aholo/web",
-    "local:setup": "npm run build:core && node scripts/local-db.mjs setup && npm run db:migrate",
+    "local:setup": "npm run build:core && node scripts/local-db.mjs setup && npm run db:migrate && npm run seed:furniture",
     "db:start": "node scripts/local-db.mjs start",
     "db:stop": "node scripts/local-db.mjs stop",
     "db:migrate": "node scripts/migrate.mjs",
@@ -30,14 +30,19 @@
     "probe:upload:block": "node scripts/lux3d-block-probe.mjs",
     "test:t04": "node scripts/t04-browser.mjs",
     "test:t04:input": "node scripts/t04-browser.mjs --input-only",
-    "test:t10": "node scripts/t10-game-browser.mjs"
+    "test:t10": "node scripts/t10-game-browser.mjs",
+    "test:t08": "node scripts/t08-browser.mjs",
+    "demo:t08": "node scripts/t08-main-demo.mjs",
+    "seed:furniture": "node scripts/seed-furniture.mjs",
+    "build:furniture": "node scripts/build-furniture.mjs"
   },
   "devDependencies": {
-    "typescript": "7.0.2",
-    "tsx": "4.23.15",
+    "@playwright/test": "1.64.1",
     "@types/node": "26.6.6",
     "@types/pg": "8.23.1",
-    "@playwright/test": "1.64.1"
+    "esbuild": "0.28.2",
+    "tsx": "4.23.15",
+    "typescript": "7.0.2"
   },
   "overrides": {
     "glob": "14.0.3",

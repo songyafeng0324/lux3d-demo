@@ -1,0 +1,18 @@
+
+> aholo-lux3d@0.1.0 test:t08
+> node scripts/t08-browser.mjs
+
+Applied 001_initial.sql
+Applied 002_seed_gallery.sql
+Applied 003_generation_delivery.sql
+Applied 004_curation.sql
+(node:4966) [FSTDEP023] FastifyDeprecation: disableRequestLogging option is deprecated. Use the logController option with disableRequestLogging or isLogDisabled override instead. The disableRequestLogging top-level option will be removed in `fastify@6`.
+(Use `node --trace-warnings ...` to show where the warning was created)
+{"level":30,"time":1793906866549,"pid":4966,"hostname":"yafengdeMacBook-Pro.local","msg":"Server listening at http://127.0.0.1:13008"}
+PASS user submits a backpack model with full public data, withdraws and resubmits
+PASS admin reviews earliest pending with rotatable model and original, approves into candidates
+PASS admin arranges slots 1/2/19 from more candidates and publishes one gallery version
+PASS visitor sees real exhibits fitted on plinths in the full-viewport pavilion and opens E detail
+PASS admin adjusts only today's quota for the collector
+PASS risk delete clears room placement, candidate and slot; open page keeps loaded scene, refresh shows the result
+{"pass":true,"chrome":"157.0.8103.38","os":"Darwin 25.6.0 arm64","viewport":[1440,900],"isolatedDatabase":true,"checks":[{"name":"user submits a backpack model with full public data, withdraws and resubmits","ms":1022},{"name":"admin reviews earliest pending with rotatable model and original, approves into candidates","ms":1323},{"name":"admin arranges slots 1/2/19 from more candidates and publishes one gallery version","ms":368},{"name":"visitor sees real exhibits fitted on plinths in the full-viewport pavilion and opens E detail","ms":1359},{"name":"admin adjusts only today's quota for the collector","ms":184},{"name":"risk delete clears room placement, candidate and slot; open page keeps loaded scene, refresh shows the result","ms":676}],"ms":8382}

@@ -1,0 +1,37 @@
+{
+ "pass": true,
+ "chrome": "157.0.8103.38",
+ "os": "Darwin 25.6.0 arm64",
+ "viewport": [
+  1440,
+  900
+ ],
+ "isolatedDatabase": true,
+ "checks": [
+  {
+   "name": "user submits a backpack model with full public data, withdraws and resubmits",
+   "ms": 1022
+  },
+  {
+   "name": "admin reviews earliest pending with rotatable model and original, approves into candidates",
+   "ms": 1323
+  },
+  {
+   "name": "admin arranges slots 1/2/19 from more candidates and publishes one gallery version",
+   "ms": 368
+  },
+  {
+   "name": "visitor sees real exhibits fitted on plinths in the full-viewport pavilion and opens E detail",
+   "ms": 1359
+  },
+  {
+   "name": "admin adjusts only today's quota for the collector",
+   "ms": 184
+  },
+  {
+   "name": "risk delete clears room placement, candidate and slot; open page keeps loaded scene, refresh shows the result",
+   "ms": 676
+  }
+ ],
+ "ms": 8382
+}

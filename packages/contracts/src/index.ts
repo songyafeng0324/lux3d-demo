@@ -3,7 +3,7 @@ export * from './scene.js';
 
 export interface ReadinessData {
   ready: boolean;
-  generationReady: false;
+  generationReady: boolean;
   checkedAt: string;
   checks: {
     database: CheckStatus;
@@ -12,7 +12,7 @@ export interface ReadinessData {
   };
   generation: {
     configured: boolean;
-    stage: 'pending_integration';
+    stage: 'integrated' | 'disabled';
   };
 }
 
@@ -25,3 +25,6 @@ export interface ApiErrorEnvelope {
   error: { code: string; message: string };
   requestId: string;
 }
+
+export * from './room.js';
+export * from './gallery.js';

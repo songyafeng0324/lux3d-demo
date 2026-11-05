@@ -3,9 +3,10 @@ import fastifyStatic from '@fastify/static';
 import { existsSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { extname } from 'node:path';
-import { loadConfig, createPool, LocalFileStore } from '@aholo/domain';
+import { loadConfig, createPool, LocalFileStore, BusinessError } from '@aholo/domain';
 import type { ApiEnvelope, ApiErrorEnvelope, ReadinessData } from '@aholo/contracts';
 import { registerT04Lab } from './t04.js';
+import { registerBusinessRoutes } from './business.js';
 
 export async function buildApp(config = loadConfig()) {
   const pool = createPool(config.databaseUrl);
@@ -15,11 +16,29 @@ export async function buildApp(config = loadConfig()) {
     disableRequestLogging: true,
   });
 
+  app.setErrorHandler((error, request, reply) => {
+    if (error instanceof BusinessError) {
+      const {currentVersion,fields}=error as BusinessError & {currentVersion?:number;fields?:string[]};
+      return reply.code(error.status).send({error:{code:error.code,message:error.message,...(Number.isSafeInteger(currentVersion)?{currentVersion}: {}),...(Array.isArray(fields)?{fields}:{})},requestId:request.id});
+    }
+    const clientStatus = (error as {statusCode?:number}).statusCode;
+    if (clientStatus && [400,413,415,422].includes(clientStatus)) {
+      return reply.code(clientStatus).send({error:{code:clientStatus===413?'FILE_TOO_LARGE':'INVALID_INPUT',message:clientStatus===413?'文件过大':'请求内容不正确'},requestId:request.id});
+    }
+    // Unexpected failures are logged server-side with the requestId (never returned to the client).
+    request.log.error({ err: error, requestId: request.id, route: request.routeOptions?.url }, 'unhandled request error');
+    const body: ApiErrorEnvelope = {
+      error: { code: 'INTERNAL_ERROR', message: '服务暂时不可用，请稍后重试' },
+      requestId: request.id,
+    };
+    reply.code(500).send(body);
+  });
+
   // Failures remain visible through readiness; liveness is available for diagnosis.
   await store.initialize().catch(() => undefined);
   app.addHook('onClose', async () => { await pool.end(); });
   app.addHook('onSend', async (_request, reply) => {
-    reply.header('Cache-Control', 'no-store');
+    if (!reply.hasHeader('Cache-Control')) reply.header('Cache-Control', 'no-store');
     reply.header('X-Content-Type-Options', 'nosniff');
   });
 
@@ -32,8 +51,8 @@ export async function buildApp(config = loadConfig()) {
     const [database, storage, worker] = await Promise.allSettled([
       pool.query('SELECT 1'),
       store.probe(),
-      pool.query<{ alive: boolean }>(
-        "SELECT EXISTS (SELECT 1 FROM worker_heartbeats WHERE last_seen > now() - interval '10 seconds') AS alive",
+      pool.query<{ alive: boolean; generation: boolean }>(
+        "SELECT EXISTS (SELECT 1 FROM worker_heartbeats WHERE last_seen > now() - interval '10 seconds') AS alive, EXISTS (SELECT 1 FROM worker_heartbeats WHERE generation_enabled AND last_seen > now() - interval '10 seconds') AS generation",
       ),
     ]);
     const checks = {
@@ -46,14 +65,16 @@ export async function buildApp(config = loadConfig()) {
     return {
       data: {
         ready,
-        generationReady: false,
+        generationReady: ready && config.generationEnabled && config.lux3dConfigured && worker.status === 'fulfilled' && worker.value.rows[0]?.generation === true,
         checkedAt: new Date().toISOString(),
         checks,
-        generation: { configured: config.lux3dConfigured, stage: 'pending_integration' },
+        generation: { configured: config.lux3dConfigured, stage: config.generationEnabled ? 'integrated' : 'disabled' },
       },
       requestId: request.id,
     };
   });
+
+  await registerBusinessRoutes(app, { pool, store, config });
 
   if (process.env.AHOLO_T04_LAB === '1' && config.apiHost === '127.0.0.1') {
     await registerT04Lab(app, { stateDir: process.env.T04_LAB_STATE_DIR || undefined });
@@ -79,12 +100,6 @@ export async function buildApp(config = loadConfig()) {
     };
     return reply.code(404).send(body);
   });
-  app.setErrorHandler((_error, request, reply) => {
-    const body: ApiErrorEnvelope = {
-      error: { code: 'INTERNAL_ERROR', message: '服务暂时不可用，请稍后重试' },
-      requestId: request.id,
-    };
-    reply.code(500).send(body);
-  });
+
   return app;
 }

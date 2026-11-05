@@ -24,6 +24,7 @@
 - 用户当前明确指令优先于 Skill、历史记忆和默认偏好；已授权的初始化及必要文档维护直接执行，不重复确认。
 - 只有真正独立、能节省时间或提升质量的工作流才委派；共享状态和连续决策由主 Agent 处理。
 - 网页控制台无 CLI/API 时使用已登录 Chrome；飞书优先 `lark-cli`。
+- 2026-11-05 用户明令：构建、测试、数据库与浏览器验证只在用户 Mac 本机执行，禁止在云端容器跑；需要执行命令时在 Mac 终端运行。
 
 ## 开工前必读
 1. `flow/charter.md` — 目标 / 范围 / 约束 / 成功标准
@@ -78,12 +79,33 @@
 - 文档导航及需求流转见 `docs/README.md`；设计方向见 `DESIGN.md`；具体功能规则回查 PRD。
 - 本地PG为独立55432实例；数据和本机凭证在用户Application Support目录，项目.env被忽略。维护原有数据，不因测试覆盖原库。E2E检查worker缺失，运行前停止开发worker；测试只用独立临时库写fixture。
 - T03 中国区技术接入基线见 `docs/contracts/Lux3D接入契约.md`，真实验证见 `docs/validation/Lux3D接入验证.md`。供方ID无损字符串，create不自动重发；陌生错误保留unknown，不能按相近历史记录自动认领任务。
-- 中国区凭证可由服务端读取私有Lux3D配置，不把key/签名URL放前端或Git。T03的真实资产只在独立验证库，主应用generationReady保持false直到T06正式链路完成。
+- 中国区凭证可由服务端读取私有Lux3D配置，不把key/签名URL放前端或Git。T03资产保持独立验证库；T06正式链路已验收，主应用generationReady由真实配置、存储/数据库及启用生成的worker心跳决定。
 - T04场景基线见 `docs/design/场景与交互方案.md`、`docs/validation/场景交互验证.md`；几何真相源为 `packages/contracts/src/scene.ts`。`/api/lab/t04`只用于独立本机文件实验，不能替代T07/T08正式账号、PG事务及token合同。
 - 保存状态回调不能重置正在拖动的变换；网络丢响应保留原key/body，确定拒绝清旧请求并继续新草稿。具体回归见T04浏览器脚本。
 
 ## 沉浸式体验与建模方向
 - 最新产品增量见 `docs/product/2026-11-04-沉浸场景与建模确认.md`，总体执行依据见 `docs/architecture/沉浸式MVP实施计划.md`：前台全视口游戏式3D、Agent用Blender MCP制作可上下楼二层古阁；先框架/完整功能，细节后补。
-- 2026-11-05用户已明确启动T10；T10（A设计、B建筑框架、C全视口前台）已全部完成并经Mac真机验证；下一步T06。Blender/MCP实际状态和只读探针见环境记录，不把连接检查当成模型交付。
+- 2026-11-05用户已明确启动T10；T10（A设计、B建筑框架、C全视口前台）已全部完成并经Mac真机验证；T06/T07/T08正式业务也已完成，T09 已完成 Mac 本地功能验收与独立复核。Blender/MCP实际状态和只读探针见环境记录，不把连接检查当成模型交付。
 - 首页`/`为全屏藏宝阁，工作台在`/workbench`。行走碰撞以`apps/web/src/game/navigation.ts`为合同（按build_t10.py几何抄录），改建筑几何必须同步此文件并跑`npm test`与`npm run test:t10`（含GLB射线对照）；不要改用渲染网格做碰撞。
 - 云端容器只有软件WebGL（约1帧/秒），性能与实走结论以用户M5/Chrome为准。
+
+## T09 本地验收
+- AC01～AC51 的逐项证据见 `docs/validation/MVP验收结果.md`。主链路复用真实任务，恢复副本用于测试写入、并发和高DPR布置。真实十人试用与物理休眠中的在途恢复单独记录。
+
+## T06 正式账号与生成
+- T06实际证据见 `docs/validation/账号资产生成验证.md`；首页B背包接正式session/额度/任务/资产与预览，T07个人小屋保存/分享已接入，投稿策展后台留T08。
+- worker真实create前必须持久dispatch_started与报价承诺；未知提交不重发，精确nonce证据恢复，失租/终态不可发布；失败原日唯一refund。运维只查原任务的工具为 `scripts/generation-diagnose.mjs`。
+- 模型ready前必须真Chrome渲染及同SHA落存，工程资源预算见数据契约第8节；不能以GLB头或供方成功代替。私有APP_DATA_KEY生成一次跨进程复用，备份须保存实际配置key。
+
+## T07 正式小屋与分享
+- 正式入口`/room`和`/shared/:token`，几何/DTO在contracts的scene.ts与room.ts；新布局用真实资产UUID和各自bounds，禁止套用T04固定AssetId字典。验证见 `docs/validation/小屋分享验证.md`。
+- 全视口3D与墨底金线HUD不变，物品库/列表是按需覆盖抽屉，不能用旧T04常驻侧栏挤压画布。
+- 布局保存必须CAS/immutable版本/同键回执原子提交，锁序user→排序旧新assets→room。丢响应保留原key/body，旧ACK不得回弹当前拖动或误认后续草稿已保存。
+- 分享稳定token加密、grant256bit摘要/原版/epoch隔离，文件有grant头就不能回退cookie扩大权限；关闭/重开不复活旧grant。源删除后的完整布局/展陈清理由T08负责。
+- 基础家具源与manifest在assets/furniture，构建/幂等导入用scripts/build-furniture.mjs和seed-furniture.mjs；系统来源记录不能登录，不替代正常管理员种子。
+
+## T08 投稿、后台与展陈
+- 实现入口 `apps/api/src/curation.ts`、`apps/web/src/admin/`、首页 `game/Game.tsx`/`engine.ts`；合同第10节，验证见 `docs/validation/后台展陈验证.md`。
+- 会话复核用户行锁为FOR NO KEY UPDATE，同一行一个事务只UPDATE一次，避免外键KEY SHARE引发死锁；意外错误按requestId写服务端日志。
+- 加引用（保存房间、审核、发布展位）必须先锁asset；风险删除锁asset→房间→gallery并推进版本。过期草稿含已删模型返回409，展陈grant详情/文件只看该展品是否ready。
+- 展陈槽n=布局标记T0n，展品用 `exhibitFit` 自动居中落台；不加手动高度/旋转/缩放。浏览器回归 `npm run test:t08` 只用临时库。

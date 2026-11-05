@@ -1,0 +1,23 @@
+{
+  "pass": true,
+  "scope": "intercepted APIs; no supplier calls",
+  "checks": [
+    "owner/visitor full viewport and overlay drawer",
+    "all catalog pages",
+    "initial load never PUT",
+    "response-loss same-key retry followed by new draft",
+    "real mouse gizmo drag does not orbit or snap on ACK",
+    "413/422 clear rejected request",
+    "409 retains draft until explicit reload",
+    "dynamic UUID placement",
+    "same-source clone and removal share resources",
+    "server normalization matches geometry",
+    "real pointer-lock visit walk and return",
+    "stable share link reopen",
+    "visitor has no editor/backpack/details",
+    "visitor files carry grant scope",
+    "renewal retries same key and keeps snapshot",
+    "load failure never PUT"
+  ],
+  "pageErrors": []
+}

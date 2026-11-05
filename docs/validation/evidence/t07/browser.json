@@ -1,0 +1,100 @@
+{
+  "pass": true,
+  "browser": "157.0.8103.38",
+  "checks": [
+    "formal room loads with real personal model and three official furniture",
+    "real mouse XYZ translate/rotate and positive uniform scale",
+    "server-confirmed full transforms restore exactly and bounds reject corners",
+    "actual committed response loss retries original key/body before saving later draft",
+    "list targets and removes one copy while preserving original asset and other copy",
+    "anonymous share shows only placed models and cannot read original/private inventory",
+    "ordinary save preserves open snapshot; renewal keeps the original version",
+    "close blocks new entry/resources; reopen keeps stable URL and never revives old grant",
+    "first-person input walks and resets to entry; no page errors"
+  ],
+  "pageErrors": [],
+  "roomId": "1fb44b34-cc8c-4c59-8490-af4a3a4329d9",
+  "version": 52,
+  "placements": [
+    {
+      "id": "8d309181-1dd5-4582-bb3d-e505a3c035f4",
+      "scale": 2,
+      "assetId": "fd2e8fdc-b668-4492-a899-beb2bcabce25",
+      "position": [
+        0,
+        0,
+        0
+      ],
+      "rotation": [
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "id": "fb6e027f-388f-4d12-8255-61f1231ee9e5",
+      "scale": 1.5,
+      "assetId": "fd2e8fdc-b668-4492-a899-beb2bcabce25",
+      "position": [
+        -3,
+        0,
+        -2
+      ],
+      "rotation": [
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "id": "50c91940-44e5-48d1-8b07-808549dafac4",
+      "scale": 1,
+      "assetId": "f49b3bb1-61d5-4024-a148-927f9b699bb9",
+      "position": [
+        -1.6,
+        0,
+        0.9
+      ],
+      "rotation": [
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "id": "27dbc044-a879-4494-96d3-5ff66a1b60fa",
+      "scale": 1.8,
+      "assetId": "9f6852c1-3bcc-4ba6-bd9a-89bb8152f9aa",
+      "position": [
+        3,
+        0,
+        -2
+      ],
+      "rotation": [
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "id": "755d0dbe-06bd-4a9a-9b0a-a09d9e745b35",
+      "scale": 0.55,
+      "assetId": "f4c2533c-2fa8-49b3-8a6f-6a98b7860ab5",
+      "position": [
+        0,
+        1.05,
+        0
+      ],
+      "rotation": [
+        0,
+        0.3,
+        0
+      ]
+    }
+  ],
+  "modelCount": 4,
+  "shareUrlHash": "d637ea959e0aacd194fa1e0229ee90fc34917a35045ce53076d52db683c1ba9e",
+  "shareEnabled": true,
+  "generationTaskIdsUnchanged": true,
+  "checkedAt": "2026-11-05T13:39:31.980Z"
+}

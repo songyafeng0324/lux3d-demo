@@ -4,6 +4,8 @@ import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import pavilionUrl from '../../../../assets/t10/pavilion-v1.glb?url';
 import layout from '../../../../assets/t10/pavilion-layout.json';
 import { buildNavWorld, step, targetSlot, floorOf, BODY, type ExhibitSlot, type Player, type NavWorld } from './navigation.js';
+import { exhibitFit, slotMarker, EXHIBIT_FIT, type GallerySlot, type RoomModel } from '@aholo/contracts';
+import { disposeResources } from '../scene/assets.js';
 
 export interface HudState { floor: ReturnType<typeof floorOf>; target: ExhibitSlot | null; fps: number; calls: number }
 export interface EngineHooks {
@@ -29,6 +31,8 @@ export class PavilionEngine {
   private scene = new T.Scene();
   private camera = new T.PerspectiveCamera(68, 1, 0.05, 220);
   private building = new T.Group();
+  private exhibits = new T.Group();
+  private exhibitToken = 0;
   private player: Player = { ...this.world.entry };
   private yaw = ENTRY_YAW;
   private pitch = 0.05;
@@ -59,7 +63,7 @@ export class PavilionEngine {
     host.append(canvas);
     this.scene.background = new T.Color('#5d6f7b');
     this.scene.fog = new T.Fog('#5d6f7b', 40, 120);
-    this.scene.add(this.building);
+    this.scene.add(this.building, this.exhibits);
     this.lights();
     this.observer = new ResizeObserver(() => this.fit());
     this.observer.observe(host);
@@ -250,12 +254,57 @@ export class PavilionEngine {
     };
   }
 
+  /**
+   * Places the published gallery version on its plinths: every model is centred on the plinth axis,
+   * rests on the plinth top and is uniformly fitted (PRD 7.7, no manual height/rotation/scale).
+   * Files are read with the snapshot grant only, never with the visitor's login cookie.
+   */
+  async setExhibits(slots: GallerySlot[], headers: Record<string, string>): Promise<{ loaded: number; failed: number }> {
+    const token = ++this.exhibitToken;
+    const old = [...this.exhibits.children];
+    this.exhibits.clear();
+    disposeResources(old);
+    const byMarker = new Map(this.world.slots.map(s => [s.id, s]));
+    const queue = slots.filter(s => s.exhibit && byMarker.has(slotMarker(s.slotNo)));
+    let loaded = 0, failed = 0;
+    const loadOne = async (slot: GallerySlot) => {
+      const model = slot.exhibit!.model, marker = byMarker.get(slotMarker(slot.slotNo))!;
+      try {
+        const source = await this.loadModel(model, headers);
+        if (this.closed || token !== this.exhibitToken) { disposeResources([source]); return; }
+        const fit = exhibitFit(model.bounds);
+        const holder = new T.Group();
+        holder.name = `exhibit-${slot.slotNo}`;
+        holder.userData = { slotNo: slot.slotNo, candidateId: slot.exhibit!.candidateId };
+        holder.position.set(marker.position[0] + fit.offset[0], marker.position[1] + EXHIBIT_FIT.plinthTop + fit.offset[1], marker.position[2] + fit.offset[2]);
+        holder.scale.setScalar(fit.scale);
+        holder.add(source);
+        source.traverse(o => { const m = o as T.Mesh; if (m.isMesh) { m.castShadow = true; m.receiveShadow = true; } });
+        this.exhibits.add(holder);
+        loaded++;
+      } catch { if (token === this.exhibitToken) failed++; }
+    };
+    await Promise.all(Array.from({ length: Math.min(3, queue.length) }, async () => { for (let s; (s = queue.shift());) await loadOne(s); }));
+    return { loaded, failed };
+  }
+  private async loadModel(model: RoomModel, headers: Record<string, string>) {
+    const response = await fetch('/api/v1/files/' + encodeURIComponent(model.modelFileId) + '/content', { headers, credentials: 'omit', cache: 'no-store', signal: this.abort.signal });
+    if (!response.ok) throw new Error('展品读取失败');
+    const manager = new T.LoadingManager();
+    manager.setURLModifier(url => { if (url.startsWith('blob:') || url.startsWith('data:')) return url; throw new Error('模型包含外部资源。'); });
+    const scene = (await new GLTFLoader(manager).parseAsync(await response.arrayBuffer(), '')).scene;
+    const translated = new T.Group(); translated.position.fromArray(model.normalization.translation); translated.add(scene);
+    const normalized = new T.Group(); normalized.scale.setScalar(model.normalization.scale); normalized.add(translated);
+    return normalized;
+  }
+  exhibitCount() { return this.exhibits.children.length; }
+
   /** Read-only state for local checks (scripts/t10-game-browser.mjs). */
   debugState() {
     return {
       player: { ...this.player }, yaw: this.yaw, pitch: this.pitch, enabled: this.enabled, keys: [...this.keys],
       locked: document.pointerLockElement === this.renderer.domElement, ...this.hud(),
-      meshes: this.building.children.length,
+      meshes: this.building.children.length, exhibits: this.exhibits.children.map(o => ({ ...o.userData, position: o.position.toArray(), scale: o.scale.x, bounds: (b => [b.min.toArray(), b.max.toArray()])(new T.Box3().setFromObject(o)) })),
       triangles: this.renderer.info.render.triangles,
       viewport: [this.host.clientWidth, this.host.clientHeight], pixelRatio: this.renderer.getPixelRatio(),
     };
@@ -287,6 +336,9 @@ export class PavilionEngine {
     window.removeEventListener('pointerup', this.pointerUp);
     window.removeEventListener('pointermove', this.pointerMove);
     document.removeEventListener('pointerlockchange', this.lockChange);
+    this.exhibitToken++;
+    disposeResources([...this.exhibits.children]);
+    this.exhibits.clear();
     this.scene.traverse(o => {
       const mesh = o as T.Mesh;
       if (mesh.isMesh) { mesh.geometry.dispose(); (mesh.material as T.Material).dispose(); }

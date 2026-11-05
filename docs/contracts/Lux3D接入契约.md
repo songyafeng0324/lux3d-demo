@@ -56,3 +56,11 @@ create每次调用仅发一次。HTTP401及已核实的参数拒绝c=-1/并发�
 本轮真实PNG输入及自包含GLB通过；模型约8.9MB、48,964三角面，只有一个样本，不能把这些值写成网站允许上限。JPEG/WebP及损坏图片、体积/纹理资源策略由T06校验并补测试；古建/边界/性能由T04验证。源模型没有外部纹理依赖，离线预览已实测旋转缩放。
 
 工具命令见 `docs/本地运行.md`。probe CLI提供status/upload/query/download/ingest，没有create命令；新生成继续按实际方案/报价及已有授权执行。
+
+## T06 正式链路增量（2026-11-05）
+
+正式worker复用上述中国区适配器，系统统一极速版、50000目标面、GLB、PBR开启、尺寸预测关闭。create前GET account/balance必须带source=1，再对精确参数POST pricing/openapi-quotes；quote_id/committed_credits在dispatch_started同事务持久化，未知提交不清费用承诺。报价采用账户权益前口径，不宣称逐任务实际结算。
+
+恢复入口 `scripts/generation-diagnose.mjs list/evidence/reconcile` 只查询原任务与记录明确证据；证据文件须来自原create响应或供方确认并携带原attemptId/dispatchNonce，不按时间或列表唯一性自动匹配。即使本站已失败，明确原ID的终态可释放供方占用，但不复活任务或资产。
+
+工程资源上限与正式渲染判据见数据契约第8节；实际生成与用户批次授权证据见 `../validation/账号资产生成验证.md`。本次用户额外明确批准1个瓷瓶测试，最多1积分；这不授权Agent追加付费候选。

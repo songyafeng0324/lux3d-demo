@@ -20,7 +20,7 @@ export async function backup(config=loadConfig()){
  for(const f of files){const input=await store.openRead(f.object_key);const out=await fs.open(path.join(dir,'objects',f.object_key),'wx',0o600);try{for await(const b of input)await out.writeFile(b);await out.sync();}finally{await out.close();input.destroy();}
    if(await digest(path.join(dir,'objects',f.object_key))!==f.sha256)throw new Error('Committed object checksum mismatch');}
  const counts={};for(const t of ['users','assets','files','exhibit_slots','schema_migrations'])counts[t]=(await c.query(`SELECT count(*)::int AS n FROM ${t}`)).rows[0].n;
- const key=process.env.APP_DATA_KEY;if(key)await fs.writeFile(path.join(dir,'app-data-key'),key,{mode:0o600});
+ const key=config.appDataKey;if(key)await fs.writeFile(path.join(dir,'app-data-key'),key,{mode:0o600});
  const manifest={version:1,createdAt:new Date().toISOString(),generationEnabled:false,files,counts,dumpSha256:await digest(path.join(dir,'database.dump')),keySha256:key?createHash('sha256').update(key).digest('hex'):null};
  await fs.writeFile(path.join(dir,'manifest.json'),JSON.stringify(manifest,null,2),{mode:0o600,flag:'wx'});return dir;
  }catch(e){await fs.rm(dir,{recursive:true,force:true});throw e;}

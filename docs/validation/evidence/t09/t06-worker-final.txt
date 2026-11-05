@@ -1,0 +1,13 @@
+Applied 001_initial.sql
+Applied 002_seed_gallery.sql
+Applied 003_generation_delivery.sql
+Applied 004_curation.sql
+✔ T06 worker: durable delivery, quota/refund, unknown dispatch, nonce evidence, fenced recovery and imports (411.173792ms)
+ℹ tests 1
+ℹ suites 0
+ℹ pass 1
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 617.03375

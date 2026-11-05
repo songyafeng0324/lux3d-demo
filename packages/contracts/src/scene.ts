@@ -16,7 +16,10 @@ export const assetBounds = ASSET_BOUNDS;
 
 /** Euler XYZ, matching Three.js Euler('XYZ'): no geometry library on the server. */
 export function transformedCorners(p: Placement): Vec3[] {
-  const bounds = ASSET_BOUNDS[p.assetId];
+  return transformedBoundsCorners(p,ASSET_BOUNDS[p.assetId]);
+}
+
+export function transformedBoundsCorners(p:Pick<Placement,'position'|'rotation'|'scale'>,bounds:Bounds):Vec3[] {
   const [a, b, c] = p.rotation;
   const sx = Math.sin(a), cx = Math.cos(a), sy = Math.sin(b), cy = Math.cos(b), sz = Math.sin(c), cz = Math.cos(c);
   const result: Vec3[] = [];

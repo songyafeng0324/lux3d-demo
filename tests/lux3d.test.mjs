@@ -60,3 +60,10 @@ test('recovery is bounded, never creates again, and does not resurrect a termina
  assert.equal(recoveryDecision({...base,localStatus:'failed',providerTaskId:'1',providerStatus:3,deliveryVerified:true}).action,'preserve_terminal');
  assert.equal(recoveryDecision({...base,providerTaskId:'1',providerStatus:1}).action,'query_original');
 });
+
+test('formal quote preserves source/account context and binds one exact create body before dispatch',async()=>{
+ const now=Date.now(),seen=[];
+ const client=new Lux3dCnClient({apiKey:'fixture-key',fetchImpl:async(url,init)=>{seen.push([new URL(url),init]);const data=seen.length===1?{uniqueId:'ctx_fixture',uniqueIdExpiresAt:new Date(now+60000).toISOString()}:{source:1,uniqueId:'ctx_fixture',pricingScope:'BEFORE_ACCOUNT_BENEFITS',quoteId:'quote_fixture',expiresAt:new Date(now+60000).toISOString(),estimatedCreditsTotal:1,details:{'1':1}};return new Response(JSON.stringify({c:'0',d:data}),{status:200});}});
+ const params={img:'https://holo-cos.aholo3d.cn/input.png',version:'G1-Turbo',faceCount:50000,outputFormat:['glb'],enablePbr:true,aiPredictSize:false};
+ assert.equal((await client.quoteImageTask(params)).credits,1);assert.equal(seen.length,2);assert.equal(seen[0][0].searchParams.get('source'),'1');const body=JSON.parse(seen[1][1].body);assert.equal(body.source,1);assert.equal(body.uniqueId,'ctx_fixture');assert.deepEqual(JSON.parse(body.items['1'].parameters.body),params);assert.ok(!seen.some(([u])=>u.pathname.endsWith('/create')));
+});

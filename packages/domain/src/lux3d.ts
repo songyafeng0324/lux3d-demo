@@ -147,6 +147,17 @@ export class Lux3dCnClient {
     }
   }
 
+  async quoteImageTask(params: ImageTaskParams): Promise<{quoteId:string;credits:number;expiresAt:string}> {
+    validateProfile(params);
+    const account=object(this.#envelope(await this.#request(new URL('/lux3d/v1/account/balance?source=1',CN_ORIGIN),{headers:this.#authorization()},'account'),'account'));
+    if(typeof account.uniqueId!=='string'||typeof account.uniqueIdExpiresAt!=='string'||Date.parse(account.uniqueIdExpiresAt)<=Date.now())throw new Lux3dTransportError('query_error','quote');
+    const body={source:1,uniqueId:account.uniqueId,items:{'1':{endpoint:{method:'POST',path:'/lux3d/v1/generate/img-to-3d/task/create'},parameters:{pathParameters:'{}',queryParameters:'{}',body:JSON.stringify(params)}}}};
+    const q=object(this.#envelope(await this.#request(new URL('/lux3d/v1/pricing/openapi-quotes',CN_ORIGIN),{method:'POST',headers:{...this.#authorization(),'Content-Type':'application/json'},body:JSON.stringify(body)},'quote'),'quote'));
+    const credits=integer(q.estimatedCreditsTotal,0),details=object(q.details);
+    if(q.source!==1||q.uniqueId!==account.uniqueId||q.pricingScope!=='BEFORE_ACCOUNT_BENEFITS'||typeof q.quoteId!=='string'||!/^quote_[a-zA-Z0-9_-]+$/.test(q.quoteId)||typeof q.expiresAt!=='string'||!Number.isFinite(Date.parse(q.expiresAt))||Date.parse(q.expiresAt)<=Date.now()||Object.keys(details).length!==1||details['1']!==credits)throw new Lux3dTransportError('query_error','quote');
+    return {quoteId:q.quoteId,credits,expiresAt:q.expiresAt};
+  }
+
   async createImageTask(params: ImageTaskParams): Promise<string> {
     let body: string;
     try {

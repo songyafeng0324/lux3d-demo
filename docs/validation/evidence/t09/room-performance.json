@@ -1,0 +1,48 @@
+{
+  "chrome": "157.0.8103.38",
+  "viewport": [
+    1500,
+    1000
+  ],
+  "cases": [
+    {
+      "placements": 30,
+      "firstLoadMs": 492.61,
+      "reentryMs": [
+        454.13,
+        453.31,
+        439.66,
+        438.56,
+        439.22
+      ],
+      "heapBefore": 6131120,
+      "heapAfter": 5915056,
+      "frameMedianMs": 16.699999999999818,
+      "frameP95Ms": 16.700000000000273,
+      "drawCalls": 63,
+      "triangles": 728594,
+      "pixelRatio": 1.5,
+      "gpu": "ANGLE (Apple, ANGLE Metal Renderer: Apple M5, Unspecified Version)"
+    },
+    {
+      "placements": 100,
+      "firstLoadMs": 455.72,
+      "reentryMs": [
+        452.13,
+        451.91,
+        429.58,
+        432.95,
+        436.96
+      ],
+      "heapBefore": 6847600,
+      "heapAfter": 6704556,
+      "frameMedianMs": 16.69999999999999,
+      "frameP95Ms": 16.700000000000273,
+      "drawCalls": 192,
+      "triangles": 2419550,
+      "pixelRatio": 1.5,
+      "gpu": "ANGLE (Apple, ANGLE Metal Renderer: Apple M5, Unspecified Version)"
+    }
+  ],
+  "errors": []
+}

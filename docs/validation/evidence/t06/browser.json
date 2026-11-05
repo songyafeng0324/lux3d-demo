@@ -1,0 +1,19 @@
+{
+  "pass": true,
+  "realAPI": true,
+  "realGeneratedModel": true,
+  "username": "t06_demo_20261105",
+  "taskId": "671b3671-173a-458b-b6f8-e657b935388c",
+  "browser": "157.0.8103.38",
+  "quota": {
+    "day": "2026-11-05",
+    "total": 3,
+    "used": 1,
+    "available": 2
+  },
+  "sessionSurvivesReload": true,
+  "rotationChangesPixels": true,
+  "zoomChangesPixels": true,
+  "pageErrors": [],
+  "checkedAt": "2026-11-05T08:49:26.463Z"
+}

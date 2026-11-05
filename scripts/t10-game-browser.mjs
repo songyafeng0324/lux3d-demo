@@ -5,9 +5,13 @@
 import { chromium } from 'playwright';
 import fs from 'node:fs/promises';
 import assert from 'node:assert/strict';
+import { resolve, sep } from 'node:path';
+import { pathToFileURL } from 'node:url';
 
 const BASE = process.env.T10_BASE || 'http://localhost:5173';
-const OUT = new URL('../docs/validation/evidence/t10-c/', import.meta.url);
+const OUT = process.env.T10_EVIDENCE_DIR
+  ? pathToFileURL(resolve(process.env.T10_EVIDENCE_DIR) + sep)
+  : new URL('../docs/validation/evidence/t10-c/', import.meta.url);
 await fs.mkdir(OUT, { recursive: true });
 const channel = process.env.CHROME_CHANNEL ?? 'chrome';
 const browser = await chromium.launch({ headless: true, ...(channel ? { channel } : {}), args: ['--disable-background-timer-throttling', '--disable-renderer-backgrounding', '--enable-unsafe-swiftshader'] });

@@ -1,0 +1,48 @@
+/* Back office: the same 墨底金线 tokens as the game HUD, as a scrollable management page. */
+.adm{overflow:auto;user-select:text;background:radial-gradient(ellipse at 20% -10%,rgba(214,176,104,.10),transparent 55%),#0f0c0a}
+.adm button,.adm .adm-links a{color:var(--paper);border:1px solid var(--line);border-radius:5px;background:rgba(214,176,104,.06);font:inherit;font-size:13px;padding:8px 13px;cursor:pointer;line-height:1.4;text-decoration:none}
+.adm button:hover{background:rgba(214,176,104,.14);border-color:var(--gold)}.adm button:disabled{cursor:default;opacity:.45}
+.adm button[aria-pressed=true],.adm button[aria-checked=true]{color:var(--gold);border-color:var(--gold);background:rgba(214,176,104,.12)}
+.adm select,.adm-filter input{box-sizing:border-box;border:1px solid var(--line);border-radius:5px;padding:8px 10px;font:inherit;font-size:13px;color:var(--paper);background:rgba(0,0,0,.3)}
+.adm select option{background:#1b1612}
+.adm h2,.adm h3{font-family:"Songti SC","Noto Serif SC","STSong",serif;font-weight:600;margin:0;color:var(--paper)}.adm h2{font-size:20px}.adm h3{font-size:15px;margin:18px 0 8px}
+.adm h2 small{font-family:ui-sans-serif,-apple-system,"PingFang SC",sans-serif;font-size:12px;font-weight:400;color:var(--muted);margin-left:8px}
+.adm-top{position:sticky;top:0;z-index:2;display:flex;justify-content:space-between;align-items:center;gap:16px;padding:14px 24px;border-bottom:1px solid var(--line);background:rgba(15,12,10,.92);backdrop-filter:blur(6px)}
+.adm-top .t10-place small{display:block;color:var(--muted);font-size:12px;margin-top:3px}.adm-top .t10-place strong{font-size:16px;letter-spacing:.12em}
+.adm-links{display:flex;gap:8px;flex-wrap:wrap}
+.adm-main{max-width:1280px;margin:0 auto;padding:20px 24px 60px}
+.adm-tabs{display:flex;gap:8px;margin-bottom:18px;flex-wrap:wrap}.adm-tabs button{padding:9px 18px;letter-spacing:.08em}
+.adm-muted{color:var(--muted);font-size:12px;line-height:1.7;margin:6px 0}.adm-error{color:#f0c3a4;font-size:12px}
+.adm-login{max-width:380px;margin:40px auto;padding:28px;border:1px solid var(--line);border-radius:8px;background:var(--ink)}
+.adm-empty{max-width:480px;margin:60px auto;text-align:center}.adm-empty a{color:var(--gold)}
+.adm-split{display:grid;grid-template-columns:minmax(280px,380px) minmax(0,1fr);gap:20px;align-items:start}
+.adm-list,.adm-detail,.adm-picker{border:1px solid var(--line);border-radius:8px;background:var(--ink);padding:16px;display:flex;flex-direction:column;gap:8px;min-width:0}
+.adm-detail{position:sticky;top:78px;max-height:calc(100dvh - 100px);overflow:auto;gap:12px}
+.adm-list-head{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:4px}
+.adm-row{display:grid!important;grid-template-columns:1fr auto;gap:2px 10px;text-align:left;padding:10px 12px!important}
+.adm-row strong{font-weight:500;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.adm-row span{color:var(--muted);font-size:12px;text-align:right}.adm-row small{grid-column:1/-1;color:var(--muted);font-size:11px}
+.adm-detail-head{display:flex;justify-content:space-between;gap:12px;align-items:flex-start}
+.adm-pill{border:1px solid var(--gold);color:var(--gold);border-radius:999px;padding:3px 10px;font-size:12px;white-space:nowrap}
+.adm-media{display:grid;grid-template-columns:minmax(0,1.4fr) minmax(0,1fr);gap:12px;align-items:start}.adm-media .bag-preview-wrap{margin:0}
+.adm-media figure{margin:0;border:1px solid var(--line);border-radius:6px;overflow:hidden;background:#191512}.adm-media img{display:block;width:100%;max-height:290px;object-fit:contain}.adm-media figcaption{font-size:11px;color:var(--muted);padding:6px 8px}
+.adm-desc{margin:0;font-size:13px;line-height:1.75;white-space:pre-wrap;overflow-wrap:anywhere}
+.adm-actions{display:grid;gap:10px;margin-top:6px}.adm-actions-inline{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.adm-reason{display:flex;flex-direction:column;gap:6px;color:var(--muted);font-size:12px}.adm-reason textarea{box-sizing:border-box;width:100%;border:1px solid var(--line);border-radius:5px;padding:9px;font:inherit;font-size:13px;color:var(--paper);background:rgba(0,0,0,.25)}
+.adm .adm-danger{border-color:#a46a49;color:#f0c3a4;background:rgba(142,44,34,.25)}.adm .adm-danger:hover{background:rgba(142,44,34,.55);border-color:#e08b6b}
+.adm-confirm{border:1px solid #a46a49;border-radius:6px;padding:14px;background:rgba(142,44,34,.12)}.adm-confirm h3{margin-top:0}.adm-confirm p{font-size:13px;line-height:1.7;margin:0 0 10px}
+.adm-gallery{display:flex;flex-direction:column;gap:12px}
+.adm-slots{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:8px}
+.adm-slot{display:flex!important;flex-direction:column;align-items:flex-start;gap:4px;text-align:left;min-height:82px}
+.adm-slot small{color:var(--muted);font-size:11px}.adm-slot strong{font-weight:500;font-size:13px}.adm-slot span{color:var(--gold);font-size:11px}
+.adm-slot[data-changed=true]{border-style:dashed;border-color:var(--gold)}
+.adm-cands{display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:8px;max-height:360px;overflow:auto}
+.adm-cand{display:flex!important;flex-direction:column;align-items:flex-start;gap:3px;text-align:left}.adm-cand span{color:var(--gold);font-size:11px}.adm-cand small{color:var(--muted);font-size:11px}
+.adm-upload{border-bottom:1px solid var(--line);padding-bottom:16px;margin-bottom:6px}
+.adm-seg{display:flex;gap:6px}
+.adm-filter{display:flex;gap:6px}.adm-filter input{flex:1;min-width:0}
+.adm-quota{display:grid;gap:10px;padding:14px;border:1px solid var(--line);border-radius:6px}
+.adm-quota>div{display:flex;flex-direction:column}.adm-quota>div span{font-size:12px;color:var(--muted)}.adm-quota>div strong{font-size:30px;color:var(--gold);font-family:"Songti SC",serif}.adm-quota>div small{color:var(--muted);font-size:12px}
+.adm-quota form{display:flex;align-items:flex-end;gap:8px}.adm-quota label{display:flex;flex-direction:column;gap:6px;color:var(--muted);font-size:12px}
+.adm-quota input{width:120px;border:1px solid var(--line);border-radius:5px;padding:8px 10px;font:inherit;color:var(--paper);background:rgba(0,0,0,.3)}
+.adm-table{display:grid;gap:4px}.adm-table div{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px;padding:6px 8px;border-bottom:1px solid rgba(214,176,104,.12);font-size:12px}
+@media (max-width:900px){.adm-split{grid-template-columns:1fr}.adm-detail{position:static;max-height:none}.adm-media{grid-template-columns:1fr}.adm-main{padding:16px}.adm-top{padding:12px 16px}}

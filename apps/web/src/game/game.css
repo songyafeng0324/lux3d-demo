@@ -42,3 +42,17 @@ kbd{display:inline-grid;place-items:center;min-width:20px;height:20px;padding:0 
 .t10-drawer-link{display:block;padding:12px 14px;border:1px solid var(--line);border-radius:6px;font-size:13px;color:var(--gold)}
 .t10-drawer-foot{margin-top:12px;font-size:12px;color:var(--muted);text-align:center}
 @media (max-width:640px){.t10-hud-top{padding:14px 16px}.t10-hud-bottom{padding:12px 16px;flex-direction:column;gap:4px}.t10-actions button{height:34px;padding:0 10px;font-size:12px}.t10-actions kbd{display:none}.t10-screen h1{font-size:30px}}
+/* T08 public exhibits */
+.t10-prompt b{font-weight:600;color:var(--gold);margin:0 6px}.t10-prompt small{color:var(--muted);font-size:11px;margin-left:4px}
+.t10-notice{position:absolute;top:76px;left:50%;transform:translateX(-50%);max-width:min(560px,calc(100% - 32px));padding:8px 14px;border:1px solid var(--line);border-radius:6px;background:var(--ink);color:var(--paper);font-size:12px;text-align:center;pointer-events:none}
+.t10-detail.t10-exhibit{width:min(860px,100%);max-height:calc(100dvh - 32px);overflow:auto}
+.t10-exhibit-body{display:grid;grid-template-columns:minmax(0,1.1fr) minmax(0,1fr);gap:22px;align-items:start}
+.t10-exhibit-body .bag-preview-wrap{margin:0;position:relative;min-height:340px;height:100%;border:1px solid var(--line);border-radius:8px;background:radial-gradient(ellipse at 50% 40%,rgba(214,176,104,.12),rgba(0,0,0,.25));overflow:hidden}
+.t10-exhibit-body .bag-preview{position:absolute;inset:0;height:auto}.t10-exhibit-body .bag-preview canvas{display:block;width:100%;height:100%}
+.t10-exhibit-text{display:flex;flex-direction:column;gap:10px;min-width:0}.t10-exhibit-text h2{margin:0;font-size:24px}
+.t10-exhibit-source{color:var(--gold)!important;font-size:12px!important;letter-spacing:.12em}
+.t10-exhibit-desc{white-space:pre-wrap;overflow-wrap:anywhere}
+.t10-exhibit-facts{margin:4px 0 0;display:grid;gap:0;border-top:1px solid var(--line)}
+.t10-exhibit-facts div{display:grid;grid-template-columns:64px 1fr;gap:10px;padding:8px 0;border-bottom:1px solid rgba(214,176,104,.14);font-size:13px}
+.t10-exhibit-facts dt{color:var(--muted)}.t10-exhibit-facts dd{margin:0;color:var(--paper);overflow-wrap:anywhere}.t10-exhibit-facts a{color:var(--gold)}
+@media (max-width:720px){.t10-exhibit-body{grid-template-columns:1fr}.t10-exhibit-body .bag-preview-wrap{min-height:260px}}

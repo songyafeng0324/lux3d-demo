@@ -1,0 +1,417 @@
+{
+  "scope": "T10-C game front: walking/collision/HUD on the T10-B frame; no business features",
+  "base": "http://localhost:5173",
+  "browser": "157.0.8103.38",
+  "viewport": {
+    "width": 1440,
+    "height": 900
+  },
+  "dpr": 1,
+  "started": "2026-11-05T08:48:57.094Z",
+  "layout": {
+    "canvas": [
+      0,
+      0,
+      1440,
+      900
+    ],
+    "viewport": [
+      1440,
+      900
+    ],
+    "scroll": [
+      1440,
+      900
+    ]
+  },
+  "measuredFrameMs": 17,
+  "pointerLockAfterEnter": true,
+  "meshesAfterMerge": 9,
+  "surfaceProbe": {
+    "checked": 2774,
+    "mismatches": []
+  },
+  "inputExclusion": "bag, paused, menu and focused input all blocked movement",
+  "walk": {
+    "seconds": 55,
+    "samples": 2144,
+    "maxY": 4.8,
+    "legs": [
+      {
+        "to": [
+          0,
+          0,
+          9
+        ],
+        "at": [
+          0,
+          0,
+          9.25
+        ],
+        "floor": "ground"
+      },
+      {
+        "to": [
+          8,
+          0,
+          9
+        ],
+        "at": [
+          7.75,
+          0,
+          9.01
+        ],
+        "floor": "ground"
+      },
+      {
+        "to": [
+          8,
+          0,
+          -5.9
+        ],
+        "at": [
+          8,
+          0,
+          -5.64
+        ],
+        "floor": "ground"
+      },
+      {
+        "to": [
+          1.5,
+          0,
+          -5.9
+        ],
+        "at": [
+          1.75,
+          0,
+          -5.89
+        ],
+        "floor": "ground"
+      },
+      {
+        "to": [
+          1.5,
+          0,
+          -6.7
+        ],
+        "at": [
+          1.59,
+          0,
+          -6.42
+        ],
+        "floor": "ground"
+      },
+      {
+        "to": [
+          1.5,
+          2.4,
+          -11.5
+        ],
+        "at": [
+          1.5,
+          2.26,
+          -11.22
+        ],
+        "floor": "stairs"
+      },
+      {
+        "to": [
+          1.5,
+          2.4,
+          -12.25
+        ],
+        "at": [
+          1.5,
+          2.4,
+          -11.97
+        ],
+        "floor": "stairs"
+      },
+      {
+        "to": [
+          -1.5,
+          2.4,
+          -12.25
+        ],
+        "at": [
+          -1.24,
+          2.4,
+          -12.23
+        ],
+        "floor": "stairs"
+      },
+      {
+        "to": [
+          -1.5,
+          2.4,
+          -11.5
+        ],
+        "at": [
+          -1.41,
+          2.4,
+          -11.76
+        ],
+        "floor": "stairs"
+      },
+      {
+        "to": [
+          -1.5,
+          4.8,
+          -6.7
+        ],
+        "at": [
+          -1.5,
+          4.67,
+          -6.96
+        ],
+        "floor": "upper"
+      },
+      {
+        "to": [
+          -1.5,
+          4.8,
+          -5.9
+        ],
+        "at": [
+          -1.5,
+          4.8,
+          -6.16
+        ],
+        "floor": "upper"
+      },
+      {
+        "to": [
+          -8,
+          4.8,
+          -5.9
+        ],
+        "at": [
+          -7.75,
+          4.8,
+          -5.91
+        ],
+        "floor": "upper"
+      },
+      {
+        "to": [
+          -8,
+          4.8,
+          10
+        ],
+        "at": [
+          -8,
+          4.8,
+          9.74
+        ],
+        "floor": "upper"
+      },
+      {
+        "to": [
+          8,
+          4.8,
+          10
+        ],
+        "at": [
+          7.75,
+          4.8,
+          10
+        ],
+        "floor": "upper"
+      },
+      {
+        "to": [
+          8,
+          4.8,
+          -5.9
+        ],
+        "at": [
+          8,
+          4.8,
+          -5.6
+        ],
+        "floor": "upper"
+      },
+      {
+        "to": [
+          -1.5,
+          4.8,
+          -5.9
+        ],
+        "at": [
+          -1.2,
+          4.8,
+          -5.89
+        ],
+        "floor": "upper"
+      },
+      {
+        "to": [
+          -1.5,
+          4.8,
+          -6.7
+        ],
+        "at": [
+          -1.41,
+          4.8,
+          -6.45
+        ],
+        "floor": "upper"
+      },
+      {
+        "to": [
+          -1.5,
+          2.4,
+          -11.5
+        ],
+        "at": [
+          -1.5,
+          2.53,
+          -11.25
+        ],
+        "floor": "stairs"
+      },
+      {
+        "to": [
+          -1.5,
+          2.4,
+          -12.25
+        ],
+        "at": [
+          -1.5,
+          2.4,
+          -12
+        ],
+        "floor": "stairs"
+      },
+      {
+        "to": [
+          1.5,
+          2.4,
+          -12.25
+        ],
+        "at": [
+          1.24,
+          2.4,
+          -12.23
+        ],
+        "floor": "stairs"
+      },
+      {
+        "to": [
+          1.5,
+          2.4,
+          -11.5
+        ],
+        "at": [
+          1.41,
+          2.4,
+          -11.76
+        ],
+        "floor": "stairs"
+      },
+      {
+        "to": [
+          1.5,
+          0,
+          -6.7
+        ],
+        "at": [
+          1.5,
+          0.13,
+          -6.96
+        ],
+        "floor": "ground"
+      },
+      {
+        "to": [
+          1.5,
+          0,
+          -5.9
+        ],
+        "at": [
+          1.5,
+          0,
+          -6.16
+        ],
+        "floor": "ground"
+      },
+      {
+        "to": [
+          8,
+          0,
+          -5.9
+        ],
+        "at": [
+          7.74,
+          0,
+          -5.91
+        ],
+        "floor": "ground"
+      },
+      {
+        "to": [
+          8,
+          0,
+          9
+        ],
+        "at": [
+          8,
+          0,
+          8.74
+        ],
+        "floor": "ground"
+      },
+      {
+        "to": [
+          0,
+          0,
+          9
+        ],
+        "at": [
+          0.3,
+          0,
+          8.99
+        ],
+        "floor": "ground"
+      },
+      {
+        "to": [
+          0,
+          0,
+          12.2
+        ],
+        "at": [
+          0.03,
+          0,
+          11.93
+        ],
+        "floor": "ground"
+      }
+    ]
+  },
+  "lockLossPauses": true,
+  "performance": {
+    "entry": {
+      "medianMs": 16.7,
+      "p95Ms": 16.8,
+      "calls": 18,
+      "triangles": 42020,
+      "pixelRatio": 1
+    },
+    "upper": {
+      "medianMs": 16.7,
+      "p95Ms": 16.7,
+      "calls": 18
+    }
+  },
+  "errors": [],
+  "narrow": {
+    "overflow": false,
+    "canvas": 390
+  },
+  "failedAssetShowsError": true,
+  "workbenchRoute": true,
+  "pass": true,
+  "finished": "2026-11-05T08:50:09.106Z"
+}

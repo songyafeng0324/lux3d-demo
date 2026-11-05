@@ -1,0 +1,5 @@
+
+> aholo-lux3d@0.1.0 test:e2e
+> node scripts/smoke.mjs
+
+{"result":"PASS","browser":"157.0.8103.38","live":true,"workerAbsence503":true,"ready":true,"generationReady":false,"apiFallback":true,"roomLoginGate":true,"invalidShareGate":true,"pageErrors":0}

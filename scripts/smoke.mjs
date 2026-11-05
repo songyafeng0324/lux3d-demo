@@ -6,7 +6,7 @@ import {chromium} from '@playwright/test';
 import {loadConfig,createPool} from '@aholo/domain';
 loadConfig();
 const origin='http://127.0.0.1:13001';
-const env={...process.env,API_HOST:'127.0.0.1',API_PORT:'13001',PUBLIC_ORIGIN:origin};
+const env={...process.env,API_HOST:'127.0.0.1',API_PORT:'13001',PUBLIC_ORIGIN:origin,LUX3D_GENERATION_ENABLED:'0'};
 const api=spawn(process.execPath,['apps/api/dist/index.js'],{env,stdio:'ignore'});
 let worker;let browser;
 async function wait(fn){let last;for(let i=0;i<80;i++){try{return await fn();}catch(e){last=e;await delay(150);}}throw last;}
@@ -16,7 +16,7 @@ try{
  const live=await fetch(origin+'/api/v1/health/live').then(r=>r.json());assert.equal(live.data.status,'ok');
  // No other worker is running during this smoke test: absence must be visible.
  const pool=createPool(loadConfig().databaseUrl);await pool.query('DELETE FROM worker_heartbeats WHERE last_seen < now() - interval \'10 seconds\'');await pool.end();
- const before=await fetch(origin+'/api/v1/health/ready');assert.equal(before.status,503);assert.equal((await before.json()).data.checks.worker,'unavailable');
+ const before=await wait(async()=>{const response=await fetch(origin+'/api/v1/health/ready');assert.equal(response.status,503);return response.json();});assert.equal(before.data.checks.worker,'unavailable');
  worker=spawn(process.execPath,['apps/worker/dist/index.js'],{env,stdio:'ignore'});
  const health=await wait(async()=>{const r=await fetch(origin+'/api/v1/health/ready');const j=await r.json();assert.equal(r.status,200);return j.data;});assert.equal(health.generationReady,false);
  for(const p of ['/api/v1/missing','/api','/api%2Fv1%2Fmissing','/missing.js']){const r=await fetch(origin+p,{headers:{accept:'text/html'}});assert.equal(r.status,404);assert.match(r.headers.get('content-type'),/json/);}
@@ -24,6 +24,8 @@ try{
  const page=await browser.newPage({viewport:{width:1360,height:900}});const errors=[];page.on('pageerror',e=>errors.push(e.message));
  await page.goto(origin+'/workbench');await page.getByText('基础服务可用',{exact:true}).waitFor({timeout:10000});
  await fs.mkdir('docs/validation/evidence',{recursive:true});await page.screenshot({path:'docs/validation/evidence/T05-local-workbench.png',fullPage:true});assert.deepEqual(errors,[]);
- console.log(JSON.stringify({result:'PASS',browser:await browser.version(),live:true,workerAbsence503:true,ready:true,generationReady:false,apiFallback:true,pageErrors:errors.length}));
+ await page.goto(origin+'/room');await page.getByRole('link',{name:'登录后进入自己的小屋 →'}).waitFor();
+ await page.goto(origin+'/shared/invalid-token');await page.getByText('此分享链接不可访问，可能已关闭或不存在。',{exact:true}).waitFor();assert.deepEqual(errors,[]);
+ console.log(JSON.stringify({result:'PASS',browser:await browser.version(),live:true,workerAbsence503:true,ready:true,generationReady:false,apiFallback:true,roomLoginGate:true,invalidShareGate:true,pageErrors:errors.length}));
  await stop(worker);worker=undefined;await wait(async()=>{const r=await fetch(origin+'/api/v1/health/ready');assert.equal(r.status,503);});
 }finally{await browser?.close();await stop(worker);await stop(api);}

@@ -1,0 +1,18 @@
+{
+ "adminSeeded": true,
+ "steps": [
+  "created administrator aholo_admin",
+  "real T06 model 资产01 (f4c2533c-2fa8-49b3-8a6f-6a98b7860ab5)",
+  "submitted with full public data",
+  "approved into candidates",
+  "published gallery version 1 with slot 1",
+  "visitor sees the real model and its E detail in Chrome",
+  "administrator logs into /admin and sees the arrangement"
+ ],
+ "galleryVersion": 1,
+ "slotNo": 1,
+ "exhibits": 1,
+ "pass": true,
+ "chrome": "157.0.8103.38",
+ "at": "2026-11-05T14:58:12.718Z"
+}

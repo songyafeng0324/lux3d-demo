@@ -1,0 +1,21 @@
+{
+  "pass": true,
+  "scope": "UI with intercepted API; no supplier call",
+  "checks": [
+    "register/login",
+    "quota",
+    "image upload",
+    "same-key replay after response loss",
+    "drawer close and reload retain request",
+    "task refresh",
+    "actual GLB render",
+    "asset editing",
+    "nickname editing",
+    "input exclusion",
+    "password change signs out"
+  ],
+  "browser": "157.0.8103.38",
+  "pageErrors": [],
+  "generationRequests": 2,
+  "sameKey": true
+}

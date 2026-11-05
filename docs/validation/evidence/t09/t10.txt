@@ -1,0 +1,26 @@
+
+> aholo-lux3d@0.1.0 test:t10
+> node scripts/t10-game-browser.mjs
+
+{
+  "pass": true,
+  "walk": {
+    "seconds": 55,
+    "maxY": 4.8
+  },
+  "probe": 2774,
+  "performance": {
+    "entry": {
+      "medianMs": 16.7,
+      "p95Ms": 16.8,
+      "calls": 22,
+      "triangles": 230240,
+      "pixelRatio": 1
+    },
+    "upper": {
+      "medianMs": 16.7,
+      "p95Ms": 16.7,
+      "calls": 20
+    }
+  }
+}
