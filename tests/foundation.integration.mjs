@@ -1,0 +1,35 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import fs from 'node:fs/promises';
+import os from 'node:os';
+import path from 'node:path';
+import {randomUUID} from 'node:crypto';
+import pg from 'pg';
+import {loadConfig,createPool,LocalFileStore,transaction,seedAdmin} from '@aholo/domain';
+import {migrate} from '../scripts/migrate.mjs';
+import {backup} from '../scripts/backup.mjs';
+import {restoreCheck} from '../scripts/restore-check.mjs';
+test('real PostgreSQL migrations, constraints, rollback, private-file backup and isolated restore',async()=>{
+ const config=loadConfig();const creds=JSON.parse(await fs.readFile(path.join(os.homedir(),'Library/Application Support/aholo-lux3d/local-db.json'),'utf8'));
+ const admin=new pg.Client({host:'127.0.0.1',port:creds.port,user:'aholo_bootstrap',password:creds.adminPassword,database:'postgres'});await admin.connect();
+ const db='aholo_test_'+randomUUID().replaceAll('-','');await admin.query(`CREATE DATABASE ${db} OWNER aholo_app`);
+ const root=await fs.mkdtemp(path.join(os.tmpdir(),'aholo-foundation-'));const u=new URL(config.databaseUrl);u.pathname='/'+db;const pool=createPool(u.href);
+ try{await migrate(pool);await migrate(pool);assert.equal((await pool.query('SELECT count(*)::int n FROM schema_migrations')).rows[0].n,2);assert.equal((await pool.query('SELECT count(*)::int n FROM exhibit_slots')).rows[0].n,30);
+ const bad=path.join(root,'migrations');await fs.mkdir(bad);await fs.writeFile(path.join(bad,'003_bad.sql'),'CREATE TABLE must_rollback(id integer); SELECT invalid_column;');await assert.rejects(()=>migrate(pool,bad));assert.equal((await pool.query("SELECT to_regclass('must_rollback') AS t")).rows[0].t,null);
+ const uid=randomUUID();await pool.query("INSERT INTO users(id,username_key,username_display,nickname,password_hash) VALUES($1,'fixture_user','fixture_user','Fixture','not-a-login-fixture')",[uid]);
+ const store=new LocalFileStore(root);await store.initialize();const content=Buffer.from('durable binary fixture');const staged=await store.putStaged(content);const object=await store.commit(staged);const file=randomUUID();
+ await pool.query("INSERT INTO files(id,owner_id,purpose,object_key,sha256,byte_size,mime,state) VALUES($1,$2,'input_image',$3,$4,$5,'image/png','committed')",[file,uid,object.objectKey,object.sha256,object.byteSize]);
+ const task=randomUUID();await pool.query("INSERT INTO generation_tasks(id,user_id,input_file_id,submitted_day,policy_version) VALUES($1,$2,$3,'2026-11-04','test')",[task,uid,file]);
+ await assert.rejects(()=>pool.query("INSERT INTO generation_tasks(user_id,input_file_id,submitted_day,policy_version) VALUES($1,$2,'2026-11-05','test')",[uid,file]),e=>e.code==='23505');
+ await assert.rejects(()=>transaction(pool,async c=>{await c.query("UPDATE users SET nickname='RolledBack' WHERE id=$1",[uid]);throw new Error('controlled failure');}));assert.equal((await pool.query('SELECT nickname FROM users WHERE id=$1',[uid])).rows[0].nickname,'Fixture');
+ await pool.query("INSERT INTO quota_days(user_id,quota_day,used_net) VALUES($1,'2026-11-04',1)",[uid]);await pool.query("INSERT INTO quota_events(task_id,user_id,kind,quota_day,delta) VALUES($1,$2,'reserve','2026-11-04',1)",[task,uid]);
+ await assert.rejects(()=>pool.query("INSERT INTO quota_events(task_id,user_id,kind,quota_day,delta) VALUES($1,$2,'reserve','2026-11-04',1)",[task,uid]),e=>e.code==='23505');
+ assert.equal((await seedAdmin(pool,{username:'seed_admin',nickname:'Admin',password:'fixture-password-123'})).created,true);
+ const adminBefore=(await pool.query("SELECT password_hash FROM users WHERE username_key='seed_admin'")).rows[0].password_hash;assert.match(adminBefore,/^scrypt\$131072\$/);
+ assert.equal((await seedAdmin(pool,{username:'seed_admin',nickname:'Changed',password:'different-password-123'})).created,false);
+ assert.equal((await pool.query("SELECT password_hash FROM users WHERE username_key='seed_admin'")).rows[0].password_hash,adminBefore);
+ assert.equal((await seedAdmin(pool,{username:'fixture_user',nickname:'NoPromote',password:'different-password-123'})).created,false);assert.equal((await pool.query('SELECT role FROM users WHERE id=$1',[uid])).rows[0].role,'user');
+ const local={...config,databaseUrl:u.href,dataDir:root};const b=await backup(local);const result=await restoreCheck(b,local);assert.equal(result.filesVerified,1);assert.equal(result.generationEnabled,false);
+ await fs.writeFile(path.join(b,'objects',object.objectKey),'corrupt');await assert.rejects(()=>restoreCheck(b,local));
+ }finally{await pool.end();await admin.query(`DROP DATABASE ${db} WITH (FORCE)`);await admin.end();await fs.rm(root,{recursive:true,force:true});}
+});

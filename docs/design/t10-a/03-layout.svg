@@ -1,0 +1,214 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1680" height="1320" viewBox="0 0 1680 1320">
+<defs><marker id="arrow" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto"><path d="M0,0 L6,3 L0,6" fill="none" stroke="#44a99c" stroke-width="1.3"/></marker><pattern id="hatch" width="8" height="8" patternUnits="userSpaceOnUse"><path d="M0 8L8 0" stroke="#d7d1c4" stroke-width="1"/></pattern></defs>
+<rect width="1680" height="1320" fill="#f4f0e6"/>
+<text x="60" y="58" font-family="PingFang SC, sans-serif" font-size="36" fill="#233335" text-anchor="start">藏宝阁 / 空间设计草案</text>
+<text x="60" y="95" font-family="PingFang SC, sans-serif" font-size="18" fill="#64716e" text-anchor="start">T10-A · 先确定能走通的空间，再制作建筑 · 2026.11.05</text>
+<text x="1600" y="55" font-family="PingFang SC, sans-serif" font-size="18" fill="#233335" text-anchor="end">01 / 结构依据</text>
+<text x="1600" y="85" font-family="PingFang SC, sans-serif" font-size="16" fill="#817567" text-anchor="end">尺寸暂定 · 非施工图 · 非运行验证</text>
+<text x="100" y="145" font-family="PingFang SC, sans-serif" font-size="25" fill="#233335" text-anchor="start">一层 / 18 个展位</text>
+<rect x="100" y="180" width="432" height="504" fill="#e7dcc7" stroke="#514f43" stroke-width="3"/>
+<rect x="208" y="351.0" width="216" height="216.0" fill="#f7f5ee" stroke="#b4a389" stroke-width="2"/>
+<text x="316" y="450" font-family="PingFang SC, sans-serif" font-size="17" fill="#233335" text-anchor="middle">通高中庭</text>
+<text x="316" y="476" font-family="PingFang SC, sans-serif" font-size="16" fill="#6e776e" text-anchor="middle">12 × 12 m</text>
+<rect x="267.4" y="198" width="97.2" height="113.39999999999999" fill="#b8c9bc" stroke="#455f54" stroke-width="2"/>
+<rect x="267.4" y="198" width="97.2" height="27.0" fill="#9db7a7" stroke="#a7997f" stroke-width="1"/>
+<path d="M267.4,225.0 L310.6,225.0" fill="none" stroke="#788978" stroke-width="1" />
+<path d="M321.4,225.0 L364.59999999999997,225.0" fill="none" stroke="#788978" stroke-width="1" />
+<path d="M267.4,230.76 L310.6,230.76" fill="none" stroke="#788978" stroke-width="1" />
+<path d="M321.4,230.76 L364.59999999999997,230.76" fill="none" stroke="#788978" stroke-width="1" />
+<path d="M267.4,236.52 L310.6,236.52" fill="none" stroke="#788978" stroke-width="1" />
+<path d="M321.4,236.52 L364.59999999999997,236.52" fill="none" stroke="#788978" stroke-width="1" />
+<path d="M267.4,242.28000000000003 L310.6,242.28000000000003" fill="none" stroke="#788978" stroke-width="1" />
+<path d="M321.4,242.28000000000003 L364.59999999999997,242.28000000000003" fill="none" stroke="#788978" stroke-width="1" />
+<path d="M267.4,248.04 L310.6,248.04" fill="none" stroke="#788978" stroke-width="1" />
+<path d="M321.4,248.04 L364.59999999999997,248.04" fill="none" stroke="#788978" stroke-width="1" />
+<path d="M267.4,253.8 L310.6,253.8" fill="none" stroke="#788978" stroke-width="1" />
+<path d="M321.4,253.8 L364.59999999999997,253.8" fill="none" stroke="#788978" stroke-width="1" />
+<path d="M267.4,259.56 L310.6,259.56" fill="none" stroke="#788978" stroke-width="1" />
+<path d="M321.4,259.56 L364.59999999999997,259.56" fill="none" stroke="#788978" stroke-width="1" />
+<path d="M267.4,265.32 L310.6,265.32" fill="none" stroke="#788978" stroke-width="1" />
+<path d="M321.4,265.32 L364.59999999999997,265.32" fill="none" stroke="#788978" stroke-width="1" />
+<path d="M267.4,271.08000000000004 L310.6,271.08000000000004" fill="none" stroke="#788978" stroke-width="1" />
+<path d="M321.4,271.08000000000004 L364.59999999999997,271.08000000000004" fill="none" stroke="#788978" stroke-width="1" />
+<path d="M267.4,276.84 L310.6,276.84" fill="none" stroke="#788978" stroke-width="1" />
+<path d="M321.4,276.84 L364.59999999999997,276.84" fill="none" stroke="#788978" stroke-width="1" />
+<path d="M267.4,282.6 L310.6,282.6" fill="none" stroke="#788978" stroke-width="1" />
+<path d="M321.4,282.6 L364.59999999999997,282.6" fill="none" stroke="#788978" stroke-width="1" />
+<path d="M267.4,288.36 L310.6,288.36" fill="none" stroke="#788978" stroke-width="1" />
+<path d="M321.4,288.36 L364.59999999999997,288.36" fill="none" stroke="#788978" stroke-width="1" />
+<path d="M267.4,294.12 L310.6,294.12" fill="none" stroke="#788978" stroke-width="1" />
+<path d="M321.4,294.12 L364.59999999999997,294.12" fill="none" stroke="#788978" stroke-width="1" />
+<path d="M267.4,299.88 L310.6,299.88" fill="none" stroke="#788978" stroke-width="1" />
+<path d="M321.4,299.88 L364.59999999999997,299.88" fill="none" stroke="#788978" stroke-width="1" />
+<path d="M267.4,305.64 L310.6,305.64" fill="none" stroke="#788978" stroke-width="1" />
+<path d="M321.4,305.64 L364.59999999999997,305.64" fill="none" stroke="#788978" stroke-width="1" />
+<path d="M267.4,311.4 L310.6,311.4" fill="none" stroke="#788978" stroke-width="1" />
+<path d="M321.4,311.4 L364.59999999999997,311.4" fill="none" stroke="#788978" stroke-width="1" />
+<path d="M343.0,306 L343.0,230.4" fill="none" stroke="#236a5e" stroke-width="2" marker-end="url(#arrow)" />
+<path d="M289.0,230.4 L289.0,306" fill="none" stroke="#236a5e" stroke-width="2" marker-end="url(#arrow)" />
+<text x="373.59999999999997" y="252" font-family="PingFang SC, sans-serif" font-size="14" fill="#233335" text-anchor="start">折返梯</text>
+<text x="373.59999999999997" y="273" font-family="PingFang SC, sans-serif" font-size="12" fill="#233335" text-anchor="start">0 → 2.4 → 4.8 m</text>
+<text x="316" y="347.4" font-family="PingFang SC, sans-serif" font-size="11" fill="#233335" text-anchor="middle">横向净通道 2.2 m</text>
+<path d="M316,666 L316,594 L460,594 L460,325.79999999999995 L343.0,325.79999999999995 L343.0,311.4" fill="none" stroke="#44a99c" stroke-width="3" marker-end="url(#arrow)" stroke-dasharray="7 5" />
+<circle cx="200.8" cy="343.79999999999995" r="7.2" fill="#5a4736"/>
+<circle cx="200.8" cy="459.0" r="7.2" fill="#5a4736"/>
+<circle cx="200.8" cy="574.2" r="7.2" fill="#5a4736"/>
+<circle cx="431.2" cy="343.79999999999995" r="7.2" fill="#5a4736"/>
+<circle cx="431.2" cy="459.0" r="7.2" fill="#5a4736"/>
+<circle cx="431.2" cy="574.2" r="7.2" fill="#5a4736"/>
+<rect x="132.39999999999998" y="241.2" width="21.6" height="21.6" fill="#a98041" stroke="#72562d" stroke-width="1"/>
+<text x="143.2" y="256" font-family="PingFang SC, sans-serif" font-size="10" fill="#fff" text-anchor="middle">T01</text>
+<rect x="132.39999999999998" y="286.2" width="21.6" height="21.6" fill="#a98041" stroke="#72562d" stroke-width="1"/>
+<text x="143.2" y="301.0" font-family="PingFang SC, sans-serif" font-size="10" fill="#fff" text-anchor="middle">T02</text>
+<rect x="132.39999999999998" y="331.2" width="21.6" height="21.6" fill="#a98041" stroke="#72562d" stroke-width="1"/>
+<text x="143.2" y="346" font-family="PingFang SC, sans-serif" font-size="10" fill="#fff" text-anchor="middle">T03</text>
+<rect x="132.39999999999998" y="376.2" width="21.6" height="21.6" fill="#a98041" stroke="#72562d" stroke-width="1"/>
+<text x="143.2" y="391.0" font-family="PingFang SC, sans-serif" font-size="10" fill="#fff" text-anchor="middle">T04</text>
+<rect x="132.39999999999998" y="421.2" width="21.6" height="21.6" fill="#a98041" stroke="#72562d" stroke-width="1"/>
+<text x="143.2" y="436" font-family="PingFang SC, sans-serif" font-size="10" fill="#fff" text-anchor="middle">T05</text>
+<rect x="132.39999999999998" y="466.2" width="21.6" height="21.6" fill="#a98041" stroke="#72562d" stroke-width="1"/>
+<text x="143.2" y="481.0" font-family="PingFang SC, sans-serif" font-size="10" fill="#fff" text-anchor="middle">T06</text>
+<rect x="132.39999999999998" y="511.2" width="21.6" height="21.6" fill="#a98041" stroke="#72562d" stroke-width="1"/>
+<text x="143.2" y="526" font-family="PingFang SC, sans-serif" font-size="10" fill="#fff" text-anchor="middle">T07</text>
+<rect x="132.39999999999998" y="556.2" width="21.6" height="21.6" fill="#a98041" stroke="#72562d" stroke-width="1"/>
+<text x="143.2" y="571.0" font-family="PingFang SC, sans-serif" font-size="10" fill="#fff" text-anchor="middle">T08</text>
+<rect x="132.39999999999998" y="601.2" width="21.6" height="21.6" fill="#a98041" stroke="#72562d" stroke-width="1"/>
+<text x="143.2" y="616" font-family="PingFang SC, sans-serif" font-size="10" fill="#fff" text-anchor="middle">T09</text>
+<rect x="478.0" y="241.2" width="21.6" height="21.6" fill="#a98041" stroke="#72562d" stroke-width="1"/>
+<text x="488.8" y="256" font-family="PingFang SC, sans-serif" font-size="10" fill="#fff" text-anchor="middle">T10</text>
+<rect x="478.0" y="286.2" width="21.6" height="21.6" fill="#a98041" stroke="#72562d" stroke-width="1"/>
+<text x="488.8" y="301.0" font-family="PingFang SC, sans-serif" font-size="10" fill="#fff" text-anchor="middle">T11</text>
+<rect x="478.0" y="331.2" width="21.6" height="21.6" fill="#a98041" stroke="#72562d" stroke-width="1"/>
+<text x="488.8" y="346" font-family="PingFang SC, sans-serif" font-size="10" fill="#fff" text-anchor="middle">T12</text>
+<rect x="478.0" y="376.2" width="21.6" height="21.6" fill="#a98041" stroke="#72562d" stroke-width="1"/>
+<text x="488.8" y="391.0" font-family="PingFang SC, sans-serif" font-size="10" fill="#fff" text-anchor="middle">T13</text>
+<rect x="478.0" y="421.2" width="21.6" height="21.6" fill="#a98041" stroke="#72562d" stroke-width="1"/>
+<text x="488.8" y="436" font-family="PingFang SC, sans-serif" font-size="10" fill="#fff" text-anchor="middle">T14</text>
+<rect x="478.0" y="466.2" width="21.6" height="21.6" fill="#a98041" stroke="#72562d" stroke-width="1"/>
+<text x="488.8" y="481.0" font-family="PingFang SC, sans-serif" font-size="10" fill="#fff" text-anchor="middle">T15</text>
+<rect x="478.0" y="511.2" width="21.6" height="21.6" fill="#a98041" stroke="#72562d" stroke-width="1"/>
+<text x="488.8" y="526" font-family="PingFang SC, sans-serif" font-size="10" fill="#fff" text-anchor="middle">T16</text>
+<rect x="478.0" y="556.2" width="21.6" height="21.6" fill="#a98041" stroke="#72562d" stroke-width="1"/>
+<text x="488.8" y="571.0" font-family="PingFang SC, sans-serif" font-size="10" fill="#fff" text-anchor="middle">T17</text>
+<rect x="478.0" y="601.2" width="21.6" height="21.6" fill="#a98041" stroke="#72562d" stroke-width="1"/>
+<text x="488.8" y="616" font-family="PingFang SC, sans-serif" font-size="10" fill="#fff" text-anchor="middle">T18</text>
+<path d="M280,684h72" fill="none" stroke="#f4f0e6" stroke-width="6" />
+<text x="316" y="716" font-family="PingFang SC, sans-serif" font-size="17" fill="#233335" text-anchor="middle">南侧入口 / 净宽 4 m</text>
+<text x="316" y="168" font-family="PingFang SC, sans-serif" font-size="15" fill="#6e776e" text-anchor="middle">24 m</text>
+<text x="58" y="434" font-family="PingFang SC, sans-serif" font-size="15" fill="#6e776e" text-anchor="start">28 m</text>
+<text x="520" y="162" font-family="PingFang SC, sans-serif" font-size="17" fill="#233335" text-anchor="start">北 ↑</text>
+<text x="720" y="145" font-family="PingFang SC, sans-serif" font-size="25" fill="#233335" text-anchor="start">二层 / 12 个展位</text>
+<rect x="720" y="180" width="432" height="504" fill="#d8c5a4" stroke="#514f43" stroke-width="3"/>
+<rect x="828" y="351.0" width="216" height="216.0" fill="#f7f5ee" stroke="#b4a389" stroke-width="2"/>
+<rect x="828" y="351.0" width="216" height="216.0" fill="url(#hatch)" stroke="#826740" stroke-width="3"/>
+<text x="936" y="450" font-family="PingFang SC, sans-serif" font-size="17" fill="#233335" text-anchor="middle">中庭开口 / 无楼板</text>
+<text x="936" y="476" font-family="PingFang SC, sans-serif" font-size="16" fill="#6e776e" text-anchor="middle">12 × 12 m</text>
+<rect x="887.4" y="198" width="97.2" height="113.39999999999999" fill="#b8c9bc" stroke="#455f54" stroke-width="2"/>
+<rect x="887.4" y="198" width="97.2" height="27.0" fill="#9db7a7" stroke="#a7997f" stroke-width="1"/>
+<path d="M887.4,225.0 L930.6,225.0" fill="none" stroke="#788978" stroke-width="1" />
+<path d="M941.4,225.0 L984.5999999999999,225.0" fill="none" stroke="#788978" stroke-width="1" />
+<path d="M887.4,230.76 L930.6,230.76" fill="none" stroke="#788978" stroke-width="1" />
+<path d="M941.4,230.76 L984.5999999999999,230.76" fill="none" stroke="#788978" stroke-width="1" />
+<path d="M887.4,236.52 L930.6,236.52" fill="none" stroke="#788978" stroke-width="1" />
+<path d="M941.4,236.52 L984.5999999999999,236.52" fill="none" stroke="#788978" stroke-width="1" />
+<path d="M887.4,242.28000000000003 L930.6,242.28000000000003" fill="none" stroke="#788978" stroke-width="1" />
+<path d="M941.4,242.28000000000003 L984.5999999999999,242.28000000000003" fill="none" stroke="#788978" stroke-width="1" />
+<path d="M887.4,248.04 L930.6,248.04" fill="none" stroke="#788978" stroke-width="1" />
+<path d="M941.4,248.04 L984.5999999999999,248.04" fill="none" stroke="#788978" stroke-width="1" />
+<path d="M887.4,253.8 L930.6,253.8" fill="none" stroke="#788978" stroke-width="1" />
+<path d="M941.4,253.8 L984.5999999999999,253.8" fill="none" stroke="#788978" stroke-width="1" />
+<path d="M887.4,259.56 L930.6,259.56" fill="none" stroke="#788978" stroke-width="1" />
+<path d="M941.4,259.56 L984.5999999999999,259.56" fill="none" stroke="#788978" stroke-width="1" />
+<path d="M887.4,265.32 L930.6,265.32" fill="none" stroke="#788978" stroke-width="1" />
+<path d="M941.4,265.32 L984.5999999999999,265.32" fill="none" stroke="#788978" stroke-width="1" />
+<path d="M887.4,271.08000000000004 L930.6,271.08000000000004" fill="none" stroke="#788978" stroke-width="1" />
+<path d="M941.4,271.08000000000004 L984.5999999999999,271.08000000000004" fill="none" stroke="#788978" stroke-width="1" />
+<path d="M887.4,276.84 L930.6,276.84" fill="none" stroke="#788978" stroke-width="1" />
+<path d="M941.4,276.84 L984.5999999999999,276.84" fill="none" stroke="#788978" stroke-width="1" />
+<path d="M887.4,282.6 L930.6,282.6" fill="none" stroke="#788978" stroke-width="1" />
+<path d="M941.4,282.6 L984.5999999999999,282.6" fill="none" stroke="#788978" stroke-width="1" />
+<path d="M887.4,288.36 L930.6,288.36" fill="none" stroke="#788978" stroke-width="1" />
+<path d="M941.4,288.36 L984.5999999999999,288.36" fill="none" stroke="#788978" stroke-width="1" />
+<path d="M887.4,294.12 L930.6,294.12" fill="none" stroke="#788978" stroke-width="1" />
+<path d="M941.4,294.12 L984.5999999999999,294.12" fill="none" stroke="#788978" stroke-width="1" />
+<path d="M887.4,299.88 L930.6,299.88" fill="none" stroke="#788978" stroke-width="1" />
+<path d="M941.4,299.88 L984.5999999999999,299.88" fill="none" stroke="#788978" stroke-width="1" />
+<path d="M887.4,305.64 L930.6,305.64" fill="none" stroke="#788978" stroke-width="1" />
+<path d="M941.4,305.64 L984.5999999999999,305.64" fill="none" stroke="#788978" stroke-width="1" />
+<path d="M887.4,311.4 L930.6,311.4" fill="none" stroke="#788978" stroke-width="1" />
+<path d="M941.4,311.4 L984.5999999999999,311.4" fill="none" stroke="#788978" stroke-width="1" />
+<path d="M963.0,306 L963.0,230.4" fill="none" stroke="#236a5e" stroke-width="2" marker-end="url(#arrow)" />
+<path d="M909.0,230.4 L909.0,306" fill="none" stroke="#236a5e" stroke-width="2" marker-end="url(#arrow)" />
+<text x="993.5999999999999" y="252" font-family="PingFang SC, sans-serif" font-size="14" fill="#233335" text-anchor="start">折返梯</text>
+<text x="993.5999999999999" y="273" font-family="PingFang SC, sans-serif" font-size="12" fill="#233335" text-anchor="start">0 → 2.4 → 4.8 m</text>
+<text x="936" y="347.4" font-family="PingFang SC, sans-serif" font-size="11" fill="#233335" text-anchor="middle">横向净通道 2.2 m</text>
+<path d="M909.0,311.4 L909.0,325.79999999999995 L792,325.79999999999995 L792,612 L1080,612 L1080,325.79999999999995 L999.0,325.79999999999995" fill="none" stroke="#44a99c" stroke-width="3" marker-end="url(#arrow)" stroke-dasharray="7 5" />
+<circle cx="820.8" cy="343.79999999999995" r="7.2" fill="#5a4736"/>
+<circle cx="820.8" cy="459.0" r="7.2" fill="#5a4736"/>
+<circle cx="820.8" cy="574.2" r="7.2" fill="#5a4736"/>
+<circle cx="1051.2" cy="343.79999999999995" r="7.2" fill="#5a4736"/>
+<circle cx="1051.2" cy="459.0" r="7.2" fill="#5a4736"/>
+<circle cx="1051.2" cy="574.2" r="7.2" fill="#5a4736"/>
+<rect x="752.4000000000001" y="241.2" width="21.6" height="21.6" fill="#a98041" stroke="#72562d" stroke-width="1"/>
+<text x="763.2" y="256" font-family="PingFang SC, sans-serif" font-size="10" fill="#fff" text-anchor="middle">T19</text>
+<rect x="752.4000000000001" y="313.2" width="21.6" height="21.6" fill="#a98041" stroke="#72562d" stroke-width="1"/>
+<text x="763.2" y="328" font-family="PingFang SC, sans-serif" font-size="10" fill="#fff" text-anchor="middle">T20</text>
+<rect x="752.4000000000001" y="385.2" width="21.6" height="21.6" fill="#a98041" stroke="#72562d" stroke-width="1"/>
+<text x="763.2" y="400" font-family="PingFang SC, sans-serif" font-size="10" fill="#fff" text-anchor="middle">T21</text>
+<rect x="752.4000000000001" y="457.2" width="21.6" height="21.6" fill="#a98041" stroke="#72562d" stroke-width="1"/>
+<text x="763.2" y="472" font-family="PingFang SC, sans-serif" font-size="10" fill="#fff" text-anchor="middle">T22</text>
+<rect x="752.4000000000001" y="529.2" width="21.6" height="21.6" fill="#a98041" stroke="#72562d" stroke-width="1"/>
+<text x="763.2" y="544" font-family="PingFang SC, sans-serif" font-size="10" fill="#fff" text-anchor="middle">T23</text>
+<rect x="752.4000000000001" y="601.2" width="21.6" height="21.6" fill="#a98041" stroke="#72562d" stroke-width="1"/>
+<text x="763.2" y="616" font-family="PingFang SC, sans-serif" font-size="10" fill="#fff" text-anchor="middle">T24</text>
+<rect x="1098.0" y="241.2" width="21.6" height="21.6" fill="#a98041" stroke="#72562d" stroke-width="1"/>
+<text x="1108.8" y="256" font-family="PingFang SC, sans-serif" font-size="10" fill="#fff" text-anchor="middle">T25</text>
+<rect x="1098.0" y="313.2" width="21.6" height="21.6" fill="#a98041" stroke="#72562d" stroke-width="1"/>
+<text x="1108.8" y="328" font-family="PingFang SC, sans-serif" font-size="10" fill="#fff" text-anchor="middle">T26</text>
+<rect x="1098.0" y="385.2" width="21.6" height="21.6" fill="#a98041" stroke="#72562d" stroke-width="1"/>
+<text x="1108.8" y="400" font-family="PingFang SC, sans-serif" font-size="10" fill="#fff" text-anchor="middle">T27</text>
+<rect x="1098.0" y="457.2" width="21.6" height="21.6" fill="#a98041" stroke="#72562d" stroke-width="1"/>
+<text x="1108.8" y="472" font-family="PingFang SC, sans-serif" font-size="10" fill="#fff" text-anchor="middle">T28</text>
+<rect x="1098.0" y="529.2" width="21.6" height="21.6" fill="#a98041" stroke="#72562d" stroke-width="1"/>
+<text x="1108.8" y="544" font-family="PingFang SC, sans-serif" font-size="10" fill="#fff" text-anchor="middle">T29</text>
+<rect x="1098.0" y="601.2" width="21.6" height="21.6" fill="#a98041" stroke="#72562d" stroke-width="1"/>
+<text x="1108.8" y="616" font-family="PingFang SC, sans-serif" font-size="10" fill="#fff" text-anchor="middle">T30</text>
+<text x="936" y="716" font-family="PingFang SC, sans-serif" font-size="17" fill="#233335" text-anchor="middle">二层标高 +4.8 m / 环绕参观</text>
+<text x="936" y="168" font-family="PingFang SC, sans-serif" font-size="15" fill="#6e776e" text-anchor="middle">24 m</text>
+<text x="678" y="434" font-family="PingFang SC, sans-serif" font-size="15" fill="#6e776e" text-anchor="start">28 m</text>
+<text x="1140" y="162" font-family="PingFang SC, sans-serif" font-size="17" fill="#233335" text-anchor="start">北 ↑</text>
+<text x="1240" y="164" font-family="PingFang SC, sans-serif" font-size="24" fill="#233335" text-anchor="start">布局要点</text>
+<text x="1240" y="208" font-family="PingFang SC, sans-serif" font-size="18" fill="#233335" text-anchor="start">南侧进入，北侧上楼</text>
+<text x="1240" y="245" font-family="PingFang SC, sans-serif" font-size="18" fill="#233335" text-anchor="start">右梯上行 → 平台折返</text>
+<text x="1240" y="282" font-family="PingFang SC, sans-serif" font-size="18" fill="#233335" text-anchor="start">左梯抵达二层北廊</text>
+<text x="1240" y="319" font-family="PingFang SC, sans-serif" font-size="18" fill="#233335" text-anchor="start">中庭与梯井均需护栏</text>
+<text x="1240" y="356" font-family="PingFang SC, sans-serif" font-size="18" fill="#233335" text-anchor="start">展位沿外侧，内侧留通道</text>
+<text x="1240" y="393" font-family="PingFang SC, sans-serif" font-size="18" fill="#233335" text-anchor="start">总计 30 位，编号 T01—T30</text>
+<text x="1240" y="430" font-family="PingFang SC, sans-serif" font-size="18" fill="#233335" text-anchor="start">两层展位均为概念锚点</text>
+<text x="1240" y="467" font-family="PingFang SC, sans-serif" font-size="18" fill="#233335" text-anchor="start">个人小屋仍保持一间</text>
+<rect x="1240" y="540" width="22" height="15" fill="#a98041" stroke="none" stroke-width="1"/>
+<text x="1274" y="554" font-family="PingFang SC, sans-serif" font-size="16" fill="#233335" text-anchor="start">展位 / 1.2 × 1.2 m</text>
+<path d="M1240 585h24" fill="none" stroke="#44a99c" stroke-width="3" marker-end="url(#arrow)" />
+<text x="1274" y="591" font-family="PingFang SC, sans-serif" font-size="16" fill="#233335" text-anchor="start">建议参观路线</text>
+<rect x="1240" y="613" width="22" height="15" fill="url(#hatch)" stroke="#826740" stroke-width="1"/>
+<text x="1274" y="628" font-family="PingFang SC, sans-serif" font-size="16" fill="#233335" text-anchor="start">楼板开口 / 不可行走</text>
+<path d="M60 780H1620" fill="none" stroke="#d2c8b5" stroke-width="1" />
+<text x="60" y="830" font-family="PingFang SC, sans-serif" font-size="26" fill="#233335" text-anchor="start">楼梯展开剖面 / 两段平行梯展开表示，不是第三层</text>
+<path d="M70,1145H130" fill="none" stroke="#4e5247" stroke-width="3" />
+<path d="M100.00,1145.00 L100.00,1136.36 L117.28,1136.36 L117.28,1127.72 L134.56,1127.72 L134.56,1119.08 L151.84,1119.08 L151.84,1110.44 L169.12,1110.44 L169.12,1101.80 L186.40,1101.80 L186.40,1093.16 L203.68,1093.16 L203.68,1084.52 L220.96,1084.52 L220.96,1075.88 L238.24,1075.88 L238.24,1067.24 L255.52,1067.24 L255.52,1058.60 L272.80,1058.60 L272.80,1049.96 L290.08,1049.96 L290.08,1041.32 L307.36,1041.32 L307.36,1032.68 L324.64,1032.68 L324.64,1024.04 L341.92,1024.04 L341.92,1015.40 L359.20,1015.40 L440.20,1015.40 L440.20,1006.76 L457.48,1006.76 L457.48,998.12 L474.76,998.12 L474.76,989.48 L492.04,989.48 L492.04,980.84 L509.32,980.84 L509.32,972.20 L526.60,972.20 L526.60,963.56 L543.88,963.56 L543.88,954.92 L561.16,954.92 L561.16,946.28 L578.44,946.28 L578.44,937.64 L595.72,937.64 L595.72,929.00 L613.00,929.00 L613.00,920.36 L630.28,920.36 L630.28,911.72 L647.56,911.72 L647.56,903.08 L664.84,903.08 L664.84,894.44 L682.12,894.44 L682.12,885.80 L699.40,885.80" fill="none" stroke="#6c5a3f" stroke-width="3" />
+<path d="M699.3999999999995,885.7999999999988h90" fill="none" stroke="#6c5a3f" stroke-width="4" />
+<text x="90" y="1170" font-family="PingFang SC, sans-serif" font-size="17" fill="#233335" text-anchor="start">一层 ±0.00</text>
+<text x="365" y="1045" font-family="PingFang SC, sans-serif" font-size="17" fill="#233335" text-anchor="start">折返平台 +2.40</text>
+<text x="730" y="930" font-family="PingFang SC, sans-serif" font-size="17" fill="#233335" text-anchor="start">二层 +4.80</text>
+<text x="160" y="1135" font-family="PingFang SC, sans-serif" font-size="16" fill="#233335" text-anchor="start">第一段：15 × 0.16 m</text>
+<text x="545" y="1025" font-family="PingFang SC, sans-serif" font-size="16" fill="#233335" text-anchor="start">第二段：15 × 0.16 m</text>
+<text x="1060" y="877" font-family="PingFang SC, sans-serif" font-size="23" fill="#233335" text-anchor="start">楼梯草案参数</text>
+<text x="1060" y="916" font-family="PingFang SC, sans-serif" font-size="17" fill="#233335" text-anchor="start">梯带宽 2.4 m；平台深 1.5 m</text>
+<text x="1060" y="949" font-family="PingFang SC, sans-serif" font-size="17" fill="#233335" text-anchor="start">单段水平投影约 4.8 m</text>
+<text x="1060" y="982" font-family="PingFang SC, sans-serif" font-size="17" fill="#233335" text-anchor="start">梯井预留 5.4 × 6.3 m</text>
+<text x="1060" y="1015" font-family="PingFang SC, sans-serif" font-size="17" fill="#233335" text-anchor="start">栏杆高 1.15 m；楼板厚约 0.3 m</text>
+<text x="1060" y="1048" font-family="PingFang SC, sans-serif" font-size="17" fill="#233335" text-anchor="start">护栏扣减后净宽、净高、碰撞待粗模验证</text>
+<text x="60" y="1200" font-family="PingFang SC, sans-serif" font-size="18" fill="#233335" text-anchor="start">结构优先级：layout-draft.json → 本图 → 视角概念图。透视图不用于测量或确认梯段拓扑。</text>
+<text x="60" y="1240" font-family="PingFang SC, sans-serif" font-size="17" fill="#68746e" text-anchor="start">概念图中的采光顶、楼梯形状与展品数量允许偏差；建模以尺寸草案校验，最终以浏览器实走结果收敛。</text>
+<text x="60" y="1283" font-family="PingFang SC, sans-serif" font-size="15" fill="#8b7e6a" text-anchor="start">AHOLO / LUX3D                                           SPACE STUDY 01                                       18 + 12 = 30</text>
+</svg>

@@ -1,0 +1,11 @@
+{
+  "source": "https://download.blender.org/release/Blender4.5/blender-4.5.9-macos-arm64.dmg",
+  "checksumSource": "https://download.blender.org/release/Blender4.5/blender-4.5.9.sha256",
+  "sha256": "e3a3d7aac381fb4e4d05197f99cd8899484d7e8bc4497c134066e6733f372238",
+  "officialChecksumMatched": true,
+  "blenderVersion": "4.5.9 LTS",
+  "installPath": "/Users/yafeng/Applications/Blender.app",
+  "mcpPackage": "mcp-for-blender==2.2.7",
+  "scope": "environment preparation only",
+  "projectMcpRecognized": true
+}

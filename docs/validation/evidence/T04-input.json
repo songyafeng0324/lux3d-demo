@@ -1,0 +1,34 @@
+{
+  "result": "PASS",
+  "checkedAt": "2026-11-04T12:39:48.015Z",
+  "browser": "157.0.8103.38",
+  "headless": true,
+  "viewport": {
+    "width": 1440,
+    "height": 1000
+  },
+  "productionBusinessImplemented": false,
+  "steps": [
+    {
+      "name": "30 slot centering/fit evidence",
+      "count": 30,
+      "longestModelEdge": 1.15,
+      "deckWidth": 1.2,
+      "deckHeight": 1.04
+    },
+    {
+      "name": "actual pointer lock and mouse look release on Escape and mode switches",
+      "result": "PASS"
+    },
+    {
+      "name": "name autosaves; failed local draft can still close active stable sharing",
+      "result": "PASS"
+    },
+    {
+      "name": "risk deletion retains loaded view but removes active references and denies new model reads",
+      "result": "PASS"
+    }
+  ],
+  "performance": [],
+  "pageErrors": []
+}

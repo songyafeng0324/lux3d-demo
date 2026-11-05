@@ -1,0 +1,45 @@
+{
+  "title": "藏宝阁 · T10-A 设计图册",
+  "images": [
+    {
+      "src": "01-entry-concept.png",
+      "width": 1672,
+      "height": 941
+    },
+    {
+      "src": "02-upper-concept.png",
+      "width": 1672,
+      "height": 941
+    },
+    {
+      "src": "03-layout.png",
+      "width": 1680,
+      "height": 1320
+    },
+    {
+      "src": "04-hud-concept.png",
+      "width": 1672,
+      "height": 941
+    }
+  ],
+  "overflow": false,
+  "links": [
+    "#entry",
+    "#upper",
+    "#layout",
+    "#hud",
+    "../T10-A空间与体验设计.md",
+    "01-entry-concept.png",
+    "02-upper-concept.png",
+    "03-layout.svg",
+    "layout-draft.json",
+    "03-layout.svg",
+    "04-hud-concept.png"
+  ],
+  "mobileOverflow": false,
+  "exhibitCount": {
+    "ground": 18,
+    "upper": 12
+  },
+  "scope": "Design gallery and draft-data checks only; no application or navigation validation."
+}

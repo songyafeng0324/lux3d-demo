@@ -1,0 +1,8 @@
+[mcp_servers.blender]
+command = "/Users/yafeng/Library/Application Support/aholo-lux3d/blender-mcp/.venv/bin/mcp-for-blender"
+args = ["--host", "127.0.0.1", "--port", "9876"]
+startup_timeout_sec = 30
+tool_timeout_sec = 120
+
+[mcp_servers.blender.env]
+BLENDER_MCP_DISABLE_TELEMETRY = "1"

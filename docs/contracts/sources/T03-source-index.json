@@ -1,0 +1,39 @@
+[
+  {
+    "name": "asset-cn",
+    "url": "https://labs.aholo3d.cn/api-docs/specifications/services/asset/openapi.json",
+    "observedOn": "2026-11-04",
+    "sha256": "63a53c7370d858cde7d24194c783382d965c19b3c705179d8aa61ab2bfbd7eb8",
+    "infoVersion": "1.0",
+    "paths": [
+      "/asset/v1/token",
+      "/ous/api/v2/single/upload",
+      "/ous/api/v2/block/upload/init",
+      "/ous/api/v2/block/upload/part",
+      "/ous/api/v2/upload/status"
+    ],
+    "securityScheme": "Authorization raw API key"
+  },
+  {
+    "name": "lux3d-cn",
+    "url": "https://labs.aholo3d.cn/api-docs/specifications/services/lux3d/openapi.json",
+    "observedOn": "2026-11-04",
+    "sha256": "e5ec86d623e02cc6cddf161743af1100ce1a9c4e2ac26e33cba59d1ecd2e9293",
+    "infoVersion": "2.0",
+    "paths": [
+      "/lux3d/v1/generate/multimodal-to-image/task/create",
+      "/lux3d/v1/generate/image-to-four-view/task/create",
+      "/lux3d/v1/generate/img-to-3d/task/create",
+      "/lux3d/v1/generate/text-to-3d/task/create",
+      "/lux3d/v1/generate/material-transfer/task/create",
+      "/lux3d/v1/part-split/task/create",
+      "/lux3d/v1/multi-format-export/task/create",
+      "/lux3d/v1/articulation-animation/task/create",
+      "/lux3d/v1/animations/rig/task/create",
+      "/lux3d/v1/animations/retarget/task/create",
+      "/lux3d/v1/generate/task/get",
+      "/lux3d/v1/generate/task/list"
+    ],
+    "securityScheme": "Authorization raw API key"
+  }
+]

@@ -1,0 +1,59 @@
+{
+  "scope": "T10-B static GLB preview, not game navigation",
+  "browser": "157.0.8103.38",
+  "viewport": {
+    "width": 1440,
+    "height": 900
+  },
+  "dpr": 1,
+  "state": {
+    "ready": true,
+    "error": null,
+    "view": "overview",
+    "roofHidden": false,
+    "stats": {
+      "meshCount": 191,
+      "triangles": 21010,
+      "slotCount": 30,
+      "bounds": {
+        "min": [
+          -13.300000190734863,
+          -0.3199999928474426,
+          -15.09000015258789
+        ],
+        "max": [
+          13.300000190734863,
+          11.574999809265137,
+          15.09000015258789
+        ],
+        "size": [
+          26.600000381469727,
+          11.89499980211258,
+          30.18000030517578
+        ]
+      },
+      "floorChecks": {
+        "atrium": {
+          "y": 0,
+          "name": "GroundBase_Stone"
+        },
+        "landing": {
+          "y": 2.4000000953674316,
+          "name": "HalfLanding_Cedar"
+        },
+        "upper": {
+          "y": 4.800000190734863,
+          "name": "UpperSlab_1_Cedar"
+        }
+      }
+    },
+    "frameTimeMs": 16.66611111111111,
+    "renderCalls": 382
+  },
+  "errors": [],
+  "smallViewport": {
+    "overflow": false,
+    "canvasWidth": 390
+  },
+  "failedAssetShowsError": true
+}

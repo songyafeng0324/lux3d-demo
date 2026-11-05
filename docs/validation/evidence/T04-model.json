@@ -1,0 +1,19 @@
+{
+  "originalSha256": "15f22bbe7cf83f06b2cdf55e97ab0b87aeff947ddba0b13ea1372d2b253bd639",
+  "bytes": 8935140,
+  "triangles": 48964,
+  "images": [
+    {
+      "mimeType": "image/png",
+      "width": 2048,
+      "height": 2048,
+      "bytes": 6106792
+    },
+    {
+      "mimeType": "image/png",
+      "width": 2048,
+      "height": 2048,
+      "bytes": 1098364
+    }
+  ]
+}

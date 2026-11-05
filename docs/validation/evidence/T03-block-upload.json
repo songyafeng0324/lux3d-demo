@@ -1,0 +1,11 @@
+{
+  "status": "passed",
+  "format": "png",
+  "bytes": 5242897,
+  "blockSize": 5242880,
+  "blockInitRequests": 1,
+  "blockPartRequests": 2,
+  "uploadedAboveThreshold": true,
+  "urlHost": "holo-cos.aholo3d.cn",
+  "checkedAt": "2026-11-04T07:42:55.059Z"
+}

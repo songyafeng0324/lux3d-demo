@@ -1,0 +1,37 @@
+{
+  "scope": "Actual Blender MCP render and static route audit; not runtime navigation",
+  "tool": "mcp__blender__execute_blender_code",
+  "user_prompt": "继续做",
+  "calls": [
+    {
+      "script": "scripts/blender/render_t10.py",
+      "response": {
+        "content": [
+          {
+            "type": "text",
+            "text": "Code executed successfully: Rendered T10_Entry /Users/yafeng/Documents/ChatGPT/hackathon/aholo-lux3d/docs/validation/evidence/t10-b/blender-entry.png\nRendered T10_Upper /Users/yafeng/Documents/ChatGPT/hackathon/aholo-lux3d/docs/validation/evidence/t10-b/blender-upper.png\nInfo: Saved as \"pavilion-v1.blend\"\nActual two-view evidence rendered; saved editable blend with entry camera.\n"
+          }
+        ],
+        "structuredContent": {
+          "result": "Code executed successfully: Rendered T10_Entry /Users/yafeng/Documents/ChatGPT/hackathon/aholo-lux3d/docs/validation/evidence/t10-b/blender-entry.png\nRendered T10_Upper /Users/yafeng/Documents/ChatGPT/hackathon/aholo-lux3d/docs/validation/evidence/t10-b/blender-upper.png\nInfo: Saved as \"pavilion-v1.blend\"\nActual two-view evidence rendered; saved editable blend with entry camera.\n"
+        },
+        "isError": false
+      }
+    },
+    {
+      "script": "scripts/blender/audit_t10_route.py",
+      "response": {
+        "content": [
+          {
+            "type": "text",
+            "text": "Code executed successfully: {\"scope\": \"Static sampled rays only; no continuous motion, WASD, frame-rate or anti-fall verification\", \"sampleSpacingMax\": 0.16, \"bodyRadiusProbe\": 0.28, \"headroomRequirement\": 1.8, \"samples\": 1025, \"issues\": [], \"maxAdjacentGroundHeightChange\": 0.17200005054473877, \"minOverheadHitWithin2_2m\": null, \"pass\": true}\n"
+          }
+        ],
+        "structuredContent": {
+          "result": "Code executed successfully: {\"scope\": \"Static sampled rays only; no continuous motion, WASD, frame-rate or anti-fall verification\", \"sampleSpacingMax\": 0.16, \"bodyRadiusProbe\": 0.28, \"headroomRequirement\": 1.8, \"samples\": 1025, \"issues\": [], \"maxAdjacentGroundHeightChange\": 0.17200005054473877, \"minOverheadHitWithin2_2m\": null, \"pass\": true}\n"
+        },
+        "isError": false
+      }
+    }
+  ]
+}

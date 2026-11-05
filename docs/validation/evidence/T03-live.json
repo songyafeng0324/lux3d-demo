@@ -1,0 +1,30 @@
+{
+  "status": "verified_in_isolated_probe",
+  "providerTaskId": "4639946",
+  "assetId": "9c0baa84-d7a3-40e6-8e71-ab76ccb8ed64",
+  "database": "aholo_lux3d_t03_validation",
+  "replayed": true,
+  "quotedCredits": 1,
+  "committedCredits": 1,
+  "recordedAttemptCount": 1,
+  "geometry": {
+    "sha256": "15f22bbe7cf83f06b2cdf55e97ab0b87aeff947ddba0b13ea1372d2b253bd639",
+    "byteSize": 8935140,
+    "meshes": 1,
+    "materials": 1,
+    "triangles": 48964,
+    "min": [
+      -0.49761295318603516,
+      -0.3822234272956848,
+      -0.4935883581638336
+    ],
+    "max": [
+      0.49728715419769287,
+      0.37822267413139343,
+      0.49282723665237427
+    ]
+  },
+  "rendered": true,
+  "mainApplicationBackpackImplemented": false,
+  "checkedAt": "2026-11-04T07:41:32.084Z"
+}

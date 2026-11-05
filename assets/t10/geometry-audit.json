@@ -1,0 +1,230 @@
+{
+  "scene": "T10_Pavilion_v1",
+  "objects": 207,
+  "meshObjects": 191,
+  "triangles": 21010,
+  "exportBytes": 1215344,
+  "glbMagic": "glTF",
+  "gltfMeshCount": 191,
+  "gltfMaterials": 9,
+  "groundSlotIds": [
+    "T01",
+    "T02",
+    "T03",
+    "T04",
+    "T05",
+    "T06",
+    "T07",
+    "T08",
+    "T09",
+    "T10",
+    "T11",
+    "T12",
+    "T13",
+    "T14",
+    "T15",
+    "T16",
+    "T17",
+    "T18"
+  ],
+  "upperSlotIds": [
+    "T19",
+    "T20",
+    "T21",
+    "T22",
+    "T23",
+    "T24",
+    "T25",
+    "T26",
+    "T27",
+    "T28",
+    "T29",
+    "T30"
+  ],
+  "raycasts": {
+    "atriumBelowUpper": {
+      "hit": true,
+      "y": 0.0,
+      "object": "GroundBase_Stone"
+    },
+    "upperNorthBridge": {
+      "hit": true,
+      "y": 4.8,
+      "object": "UpperSlab_6_Cedar"
+    },
+    "landingBelowUpper": {
+      "hit": true,
+      "y": 2.4,
+      "object": "HalfLanding_Cedar"
+    },
+    "upperSideWalk": {
+      "hit": true,
+      "y": 4.8,
+      "object": "UpperSlab_1_Cedar"
+    },
+    "upperSouthWalk": {
+      "hit": true,
+      "y": 4.8,
+      "object": "UpperSlab_2_Cedar"
+    },
+    "eastTreads": [
+      {
+        "hit": true,
+        "y": 0.16,
+        "object": "EastFlight_Treads_Cedar"
+      },
+      {
+        "hit": true,
+        "y": 0.32,
+        "object": "EastFlight_Treads_Cedar"
+      },
+      {
+        "hit": true,
+        "y": 0.48,
+        "object": "EastFlight_Treads_Cedar"
+      },
+      {
+        "hit": true,
+        "y": 0.64,
+        "object": "EastFlight_Treads_Cedar"
+      },
+      {
+        "hit": true,
+        "y": 0.8,
+        "object": "EastFlight_Treads_Cedar"
+      },
+      {
+        "hit": true,
+        "y": 0.96,
+        "object": "EastFlight_Treads_Cedar"
+      },
+      {
+        "hit": true,
+        "y": 1.12,
+        "object": "EastFlight_Treads_Cedar"
+      },
+      {
+        "hit": true,
+        "y": 1.28,
+        "object": "EastFlight_Treads_Cedar"
+      },
+      {
+        "hit": true,
+        "y": 1.44,
+        "object": "EastFlight_Treads_Cedar"
+      },
+      {
+        "hit": true,
+        "y": 1.6,
+        "object": "EastFlight_Treads_Cedar"
+      },
+      {
+        "hit": true,
+        "y": 1.76,
+        "object": "EastFlight_Treads_Cedar"
+      },
+      {
+        "hit": true,
+        "y": 1.92,
+        "object": "EastFlight_Treads_Cedar"
+      },
+      {
+        "hit": true,
+        "y": 2.08,
+        "object": "EastFlight_Treads_Cedar"
+      },
+      {
+        "hit": true,
+        "y": 2.24,
+        "object": "EastFlight_Treads_Cedar"
+      },
+      {
+        "hit": true,
+        "y": 2.4,
+        "object": "EastFlight_Treads_Cedar"
+      }
+    ],
+    "westTreads": [
+      {
+        "hit": true,
+        "y": 2.56,
+        "object": "WestFlight_Treads_Cedar"
+      },
+      {
+        "hit": true,
+        "y": 2.72,
+        "object": "WestFlight_Treads_Cedar"
+      },
+      {
+        "hit": true,
+        "y": 2.88,
+        "object": "WestFlight_Treads_Cedar"
+      },
+      {
+        "hit": true,
+        "y": 3.04,
+        "object": "WestFlight_Treads_Cedar"
+      },
+      {
+        "hit": true,
+        "y": 3.2,
+        "object": "WestFlight_Treads_Cedar"
+      },
+      {
+        "hit": true,
+        "y": 3.36,
+        "object": "WestFlight_Treads_Cedar"
+      },
+      {
+        "hit": true,
+        "y": 3.52,
+        "object": "WestFlight_Treads_Cedar"
+      },
+      {
+        "hit": true,
+        "y": 3.68,
+        "object": "WestFlight_Treads_Cedar"
+      },
+      {
+        "hit": true,
+        "y": 3.84,
+        "object": "WestFlight_Treads_Cedar"
+      },
+      {
+        "hit": true,
+        "y": 4.0,
+        "object": "WestFlight_Treads_Cedar"
+      },
+      {
+        "hit": true,
+        "y": 4.16,
+        "object": "WestFlight_Treads_Cedar"
+      },
+      {
+        "hit": true,
+        "y": 4.32,
+        "object": "WestFlight_Treads_Cedar"
+      },
+      {
+        "hit": true,
+        "y": 4.48,
+        "object": "WestFlight_Treads_Cedar"
+      },
+      {
+        "hit": true,
+        "y": 4.64,
+        "object": "WestFlight_Treads_Cedar"
+      },
+      {
+        "hit": true,
+        "y": 4.8,
+        "object": "WestFlight_Treads_Cedar"
+      }
+    ]
+  },
+  "sourceSHA256": {
+    "build_t10.py": "6e9a231ad801b252974ac4434a78a5b41ca0d9c1d7f17953e630d4eb90d903ac",
+    "finalize_t10.py": "d6ff3d86cb214d390657725a86623e78522d93c2c37c8f5e47befe3cc2ff007b"
+  },
+  "scope": "Static asset geometry audit, not navigation collision or game implementation"
+}

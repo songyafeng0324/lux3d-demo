@@ -1,0 +1,594 @@
+{
+  "result": "PASS",
+  "checkedAt": "2026-11-04T12:35:40.997Z",
+  "browser": "157.0.8103.38",
+  "headless": true,
+  "viewport": {
+    "width": 1440,
+    "height": 1000
+  },
+  "productionBusinessImplemented": false,
+  "steps": [
+    {
+      "name": "real model and authored furniture geometry agree with shared bounds",
+      "result": "PASS"
+    },
+    {
+      "name": "UI adds independent copies, list selects/focuses occluded placements",
+      "result": "PASS"
+    },
+    {
+      "name": "mouse XYZ translation, rotation and uniform scale preserve camera isolation",
+      "result": "PASS"
+    },
+    {
+      "name": "arbitrary rotation/scale bounds agree and confirmed layout reloads exactly",
+      "result": "PASS"
+    },
+    {
+      "name": "lost save response retries same key/body; newer edits are not acknowledged early",
+      "result": "PASS"
+    },
+    {
+      "name": "later edits wait for in-flight ack and old ack never marks newer edits saved",
+      "result": "PASS"
+    },
+    {
+      "name": "deterministic rejection releases invalid pending payload after correction",
+      "result": "PASS"
+    },
+    {
+      "name": "in-flight 422 followed by a newer draft saves latest payload without stale replay",
+      "result": "PASS"
+    },
+    {
+      "name": "expired editor capability renews once and replays the original save request",
+      "result": "PASS"
+    },
+    {
+      "name": "save acknowledgement during a paused real gizmo drag does not roll back the transform",
+      "result": "PASS"
+    },
+    {
+      "name": "first read failure retries GET without default empty PUT",
+      "result": "PASS"
+    },
+    {
+      "name": "two tabs conflict and explicit confirmed reload preserves remote changes",
+      "result": "PASS"
+    },
+    {
+      "name": "stable sharing refreshes confirmed version; old view stays loaded and revocation denies new reads",
+      "result": "PASS"
+    },
+    {
+      "name": "gallery has 30 fitted real assets; E detail pauses walking, Escape closes and entry resets",
+      "result": "PASS"
+    },
+    {
+      "name": "finite resource lifecycle evidence",
+      "mainMemoryBefore": {
+        "geometries": 72,
+        "textures": 4
+      },
+      "mainMemoryAfter": {
+        "geometries": 72,
+        "textures": 4
+      },
+      "previewCycles": 12,
+      "sceneRemounts": 3,
+      "lifecycle": {
+        "sceneCreated": 4,
+        "sceneDisposed": 3,
+        "sceneContextsLost": 3,
+        "previewCreated": 13,
+        "previewDisposed": 13,
+        "previewContextsLost": 13
+      },
+      "heapBefore": {
+        "Documents": 1,
+        "Nodes": 125,
+        "JSHeapUsedSize": 8216080
+      },
+      "heapAfter": {
+        "Documents": 1,
+        "Nodes": 184,
+        "JSHeapUsedSize": 8823192
+      }
+    },
+    {
+      "name": "preview and real scene teardown release contexts with finite heap/counter evidence",
+      "result": "PASS"
+    },
+    {
+      "name": "uncapped room instances performance samples and lossless saves",
+      "result": "PASS"
+    },
+    {
+      "name": "ten browser contexts edit distinct rooms concurrently without lost instances",
+      "result": "PASS"
+    }
+  ],
+  "performance": [
+    {
+      "scenario": "room",
+      "instances": 1,
+      "frames": 180,
+      "medianMs": 16.699999999999818,
+      "p95Ms": 16.799999999999272,
+      "averageFps": 60.00200006666888,
+      "info": {
+        "memory": {
+          "geometries": 17,
+          "textures": 4
+        },
+        "render": {
+          "frame": 305,
+          "calls": 9,
+          "triangles": 52878,
+          "points": 0,
+          "lines": 0
+        },
+        "programs": 2
+      },
+      "pixelRatio": 1,
+      "width": 1114,
+      "height": 774,
+      "camera": [
+        13,
+        13,
+        17.000000000000004
+      ],
+      "renderer": "WebKit WebGL",
+      "gpu": "ANGLE (Apple, ANGLE Metal Renderer: Apple M5, Unspecified Version)"
+    },
+    {
+      "scenario": "room",
+      "instances": 30,
+      "frames": 180,
+      "medianMs": 16.69999999999891,
+      "p95Ms": 16.700000000000728,
+      "averageFps": 60.00400026668446,
+      "info": {
+        "memory": {
+          "geometries": 17,
+          "textures": 4
+        },
+        "render": {
+          "frame": 542,
+          "calls": 38,
+          "triangles": 1472834,
+          "points": 0,
+          "lines": 0
+        },
+        "programs": 2
+      },
+      "pixelRatio": 1,
+      "width": 1114,
+      "height": 774,
+      "camera": [
+        13,
+        13,
+        17.000000000000004
+      ],
+      "renderer": "WebKit WebGL",
+      "gpu": "ANGLE (Apple, ANGLE Metal Renderer: Apple M5, Unspecified Version)"
+    },
+    {
+      "scenario": "room",
+      "instances": 100,
+      "frames": 180,
+      "medianMs": 16.69999999999891,
+      "p95Ms": 16.799999999999272,
+      "averageFps": 59.99999999999999,
+      "info": {
+        "memory": {
+          "geometries": 17,
+          "textures": 4
+        },
+        "render": {
+          "frame": 780,
+          "calls": 108,
+          "triangles": 4900314,
+          "points": 0,
+          "lines": 0
+        },
+        "programs": 2
+      },
+      "pixelRatio": 1,
+      "width": 1114,
+      "height": 774,
+      "camera": [
+        13,
+        13,
+        17.000000000000004
+      ],
+      "renderer": "WebKit WebGL",
+      "gpu": "ANGLE (Apple, ANGLE Metal Renderer: Apple M5, Unspecified Version)"
+    },
+    {
+      "scenario": "room",
+      "instances": 300,
+      "frames": 180,
+      "medianMs": 16.700000000000728,
+      "p95Ms": 16.799999999999272,
+      "averageFps": 60.00200006666893,
+      "info": {
+        "memory": {
+          "geometries": 17,
+          "textures": 4
+        },
+        "render": {
+          "frame": 1020,
+          "calls": 308,
+          "triangles": 14693114,
+          "points": 0,
+          "lines": 0
+        },
+        "programs": 2
+      },
+      "pixelRatio": 1,
+      "width": 1114,
+      "height": 774,
+      "camera": [
+        13,
+        13,
+        17.000000000000004
+      ],
+      "renderer": "WebKit WebGL",
+      "gpu": "ANGLE (Apple, ANGLE Metal Renderer: Apple M5, Unspecified Version)"
+    },
+    {
+      "scenario": "gallery",
+      "instances": 30,
+      "frames": 180,
+      "medianMs": 16.69999999999709,
+      "p95Ms": 16.799999999999272,
+      "averageFps": 60.00200006666886,
+      "info": {
+        "memory": {
+          "geometries": 72,
+          "textures": 4
+        },
+        "render": {
+          "frame": 1202,
+          "calls": 80,
+          "triangles": 1185278,
+          "points": 0,
+          "lines": 0
+        },
+        "programs": 2
+      },
+      "pixelRatio": 1,
+      "width": 1382,
+      "height": 774,
+      "camera": [
+        0,
+        1.65,
+        12.5
+      ],
+      "renderer": "WebKit WebGL",
+      "gpu": "ANGLE (Apple, ANGLE Metal Renderer: Apple M5, Unspecified Version)"
+    },
+    {
+      "scenario": "ten-concurrent-contexts",
+      "clients": 10,
+      "instancesPerClient": 30,
+      "saveLatencyMs": [
+        535,
+        536,
+        561,
+        583,
+        556,
+        615,
+        602,
+        592,
+        614,
+        636
+      ],
+      "samples": [
+        {
+          "frames": 180,
+          "medianMs": 16.699999999999818,
+          "p95Ms": 16.700000000000273,
+          "averageFps": 60.00200006666894,
+          "info": {
+            "memory": {
+              "geometries": 9,
+              "textures": 4
+            },
+            "render": {
+              "frame": 277,
+              "calls": 38,
+              "triangles": 1472834,
+              "points": 0,
+              "lines": 0
+            },
+            "programs": 2
+          },
+          "pixelRatio": 1,
+          "width": 1114,
+          "height": 774,
+          "camera": [
+            13,
+            13,
+            17.000000000000004
+          ],
+          "renderer": "WebKit WebGL",
+          "gpu": "ANGLE (Apple, ANGLE Metal Renderer: Apple M5, Unspecified Version)"
+        },
+        {
+          "frames": 180,
+          "medianMs": 16.699999999999818,
+          "p95Ms": 16.700000000000273,
+          "averageFps": 60.00000000000006,
+          "info": {
+            "memory": {
+              "geometries": 9,
+              "textures": 4
+            },
+            "render": {
+              "frame": 275,
+              "calls": 38,
+              "triangles": 1472834,
+              "points": 0,
+              "lines": 0
+            },
+            "programs": 2
+          },
+          "pixelRatio": 1,
+          "width": 1114,
+          "height": 774,
+          "camera": [
+            13,
+            13,
+            17.000000000000004
+          ],
+          "renderer": "WebKit WebGL",
+          "gpu": "ANGLE (Apple, ANGLE Metal Renderer: Apple M5, Unspecified Version)"
+        },
+        {
+          "frames": 180,
+          "medianMs": 16.699999999999818,
+          "p95Ms": 16.700000000000728,
+          "averageFps": 60.00400026668452,
+          "info": {
+            "memory": {
+              "geometries": 9,
+              "textures": 4
+            },
+            "render": {
+              "frame": 270,
+              "calls": 38,
+              "triangles": 1472834,
+              "points": 0,
+              "lines": 0
+            },
+            "programs": 2
+          },
+          "pixelRatio": 1,
+          "width": 1114,
+          "height": 774,
+          "camera": [
+            13,
+            13,
+            17.000000000000004
+          ],
+          "renderer": "WebKit WebGL",
+          "gpu": "ANGLE (Apple, ANGLE Metal Renderer: Apple M5, Unspecified Version)"
+        },
+        {
+          "frames": 180,
+          "medianMs": 16.699999999999818,
+          "p95Ms": 16.800000000000182,
+          "averageFps": 60.00200006666893,
+          "info": {
+            "memory": {
+              "geometries": 9,
+              "textures": 4
+            },
+            "render": {
+              "frame": 270,
+              "calls": 38,
+              "triangles": 1472834,
+              "points": 0,
+              "lines": 0
+            },
+            "programs": 2
+          },
+          "pixelRatio": 1,
+          "width": 1114,
+          "height": 774,
+          "camera": [
+            13,
+            13,
+            17.000000000000004
+          ],
+          "renderer": "WebKit WebGL",
+          "gpu": "ANGLE (Apple, ANGLE Metal Renderer: Apple M5, Unspecified Version)"
+        },
+        {
+          "frames": 181,
+          "medianMs": 16.699999999999818,
+          "p95Ms": 16.700000000000273,
+          "averageFps": 60.001325996154655,
+          "info": {
+            "memory": {
+              "geometries": 9,
+              "textures": 4
+            },
+            "render": {
+              "frame": 268,
+              "calls": 38,
+              "triangles": 1472834,
+              "points": 0,
+              "lines": 0
+            },
+            "programs": 2
+          },
+          "pixelRatio": 1,
+          "width": 1114,
+          "height": 774,
+          "camera": [
+            13,
+            13,
+            17.000000000000004
+          ],
+          "renderer": "WebKit WebGL",
+          "gpu": "ANGLE (Apple, ANGLE Metal Renderer: Apple M5, Unspecified Version)"
+        },
+        {
+          "frames": 180,
+          "medianMs": 16.699999999999818,
+          "p95Ms": 16.799999999999727,
+          "averageFps": 60.002000066668955,
+          "info": {
+            "memory": {
+              "geometries": 9,
+              "textures": 4
+            },
+            "render": {
+              "frame": 266,
+              "calls": 38,
+              "triangles": 1472834,
+              "points": 0,
+              "lines": 0
+            },
+            "programs": 2
+          },
+          "pixelRatio": 1,
+          "width": 1114,
+          "height": 774,
+          "camera": [
+            13,
+            13,
+            17.000000000000004
+          ],
+          "renderer": "WebKit WebGL",
+          "gpu": "ANGLE (Apple, ANGLE Metal Renderer: Apple M5, Unspecified Version)"
+        },
+        {
+          "frames": 180,
+          "medianMs": 16.699999999999818,
+          "p95Ms": 16.700000000000273,
+          "averageFps": 60.002000066668955,
+          "info": {
+            "memory": {
+              "geometries": 9,
+              "textures": 4
+            },
+            "render": {
+              "frame": 264,
+              "calls": 38,
+              "triangles": 1472834,
+              "points": 0,
+              "lines": 0
+            },
+            "programs": 2
+          },
+          "pixelRatio": 1,
+          "width": 1114,
+          "height": 774,
+          "camera": [
+            13,
+            13,
+            17.000000000000004
+          ],
+          "renderer": "WebKit WebGL",
+          "gpu": "ANGLE (Apple, ANGLE Metal Renderer: Apple M5, Unspecified Version)"
+        },
+        {
+          "frames": 180,
+          "medianMs": 16.699999999999818,
+          "p95Ms": 16.700000000000728,
+          "averageFps": 60.00400026668449,
+          "info": {
+            "memory": {
+              "geometries": 9,
+              "textures": 4
+            },
+            "render": {
+              "frame": 263,
+              "calls": 38,
+              "triangles": 1472834,
+              "points": 0,
+              "lines": 0
+            },
+            "programs": 2
+          },
+          "pixelRatio": 1,
+          "width": 1114,
+          "height": 774,
+          "camera": [
+            13,
+            13,
+            17.000000000000004
+          ],
+          "renderer": "WebKit WebGL",
+          "gpu": "ANGLE (Apple, ANGLE Metal Renderer: Apple M5, Unspecified Version)"
+        },
+        {
+          "frames": 180,
+          "medianMs": 16.699999999999818,
+          "p95Ms": 16.700000000000728,
+          "averageFps": 60.00200006666894,
+          "info": {
+            "memory": {
+              "geometries": 9,
+              "textures": 4
+            },
+            "render": {
+              "frame": 263,
+              "calls": 38,
+              "triangles": 1472834,
+              "points": 0,
+              "lines": 0
+            },
+            "programs": 2
+          },
+          "pixelRatio": 1,
+          "width": 1114,
+          "height": 774,
+          "camera": [
+            13,
+            13,
+            17.000000000000004
+          ],
+          "renderer": "WebKit WebGL",
+          "gpu": "ANGLE (Apple, ANGLE Metal Renderer: Apple M5, Unspecified Version)"
+        },
+        {
+          "frames": 180,
+          "medianMs": 16.699999999999818,
+          "p95Ms": 16.700000000000728,
+          "averageFps": 60.00400026668452,
+          "info": {
+            "memory": {
+              "geometries": 9,
+              "textures": 4
+            },
+            "render": {
+              "frame": 261,
+              "calls": 38,
+              "triangles": 1472834,
+              "points": 0,
+              "lines": 0
+            },
+            "programs": 2
+          },
+          "pixelRatio": 1,
+          "width": 1114,
+          "height": 774,
+          "camera": [
+            13,
+            13,
+            17.000000000000004
+          ],
+          "renderer": "WebKit WebGL",
+          "gpu": "ANGLE (Apple, ANGLE Metal Renderer: Apple M5, Unspecified Version)"
+        }
+      ]
+    }
+  ],
+  "pageErrors": []
+}

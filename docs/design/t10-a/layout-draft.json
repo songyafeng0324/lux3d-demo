@@ -1,0 +1,547 @@
+{
+  "version": "treasure-pavilion-t10-a-draft-v1",
+  "status": "design-only-not-runtime",
+  "units": "metres",
+  "axes": "Web Y up; north = -Z; east = +X",
+  "footprint": {
+    "x": [
+      -12,
+      12
+    ],
+    "z": [
+      -14,
+      14
+    ]
+  },
+  "upperFloorY": 4.8,
+  "upperSlabThickness": 0.3,
+  "atriumOpening": {
+    "x": [
+      -6,
+      6
+    ],
+    "z": [
+      -4.5,
+      7.5
+    ]
+  },
+  "entrance": {
+    "x": [
+      -2,
+      2
+    ],
+    "z": 14
+  },
+  "cameraEntry": {
+    "position": [
+      0,
+      1.65,
+      12.2
+    ],
+    "target": [
+      0,
+      3,
+      -9
+    ]
+  },
+  "stair": {
+    "footprint": {
+      "x": [
+        -2.7,
+        2.7
+      ],
+      "z": [
+        -13,
+        -6.7
+      ]
+    },
+    "flightBandWidth": 2.4,
+    "finishedClearWidth": null,
+    "centralGap": 0.6,
+    "rise": 4.8,
+    "risersPerFlight": 15,
+    "riserHeight": 0.16,
+    "conceptualRunPerFlight": 4.8,
+    "landing": {
+      "x": [
+        -2.7,
+        2.7
+      ],
+      "z": [
+        -13,
+        -11.5
+      ],
+      "y": 2.4
+    },
+    "ascendingPath": [
+      [
+        1.5,
+        0,
+        -6.7
+      ],
+      [
+        1.5,
+        2.4,
+        -11.5
+      ],
+      [
+        1.5,
+        2.4,
+        -12.25
+      ],
+      [
+        -1.5,
+        2.4,
+        -12.25
+      ],
+      [
+        -1.5,
+        2.4,
+        -11.5
+      ],
+      [
+        -1.5,
+        4.8,
+        -6.7
+      ]
+    ],
+    "upperOpening": {
+      "x": [
+        -2.7,
+        2.7
+      ],
+      "z": [
+        -13,
+        -6.7
+      ]
+    },
+    "note": "Flight width is conceptual band width, not finished clear width. Path is schematic, not collision-validated. Two parallel opposing flights. Reserve footprint on both floors; no access below. Upper exit only at west flight south end; guard every other hole edge."
+  },
+  "guardrailHeight": 1.15,
+  "northCrossAisleDepth": 2.2,
+  "columnRadius": 0.4,
+  "columns": [
+    [
+      -6.4,
+      -4.9
+    ],
+    [
+      -6.4,
+      1.5
+    ],
+    [
+      -6.4,
+      7.9
+    ],
+    [
+      6.4,
+      -4.9
+    ],
+    [
+      6.4,
+      1.5
+    ],
+    [
+      6.4,
+      7.9
+    ]
+  ],
+  "minNominalSideClearWidth": 2.2,
+  "exhibitSlots": [
+    {
+      "id": "T01",
+      "floor": 0,
+      "position": [
+        -9.6,
+        0.0,
+        -10
+      ],
+      "footprint": [
+        1.2,
+        1.2
+      ]
+    },
+    {
+      "id": "T02",
+      "floor": 0,
+      "position": [
+        -9.6,
+        0.0,
+        -7.5
+      ],
+      "footprint": [
+        1.2,
+        1.2
+      ]
+    },
+    {
+      "id": "T03",
+      "floor": 0,
+      "position": [
+        -9.6,
+        0.0,
+        -5
+      ],
+      "footprint": [
+        1.2,
+        1.2
+      ]
+    },
+    {
+      "id": "T04",
+      "floor": 0,
+      "position": [
+        -9.6,
+        0.0,
+        -2.5
+      ],
+      "footprint": [
+        1.2,
+        1.2
+      ]
+    },
+    {
+      "id": "T05",
+      "floor": 0,
+      "position": [
+        -9.6,
+        0.0,
+        0
+      ],
+      "footprint": [
+        1.2,
+        1.2
+      ]
+    },
+    {
+      "id": "T06",
+      "floor": 0,
+      "position": [
+        -9.6,
+        0.0,
+        2.5
+      ],
+      "footprint": [
+        1.2,
+        1.2
+      ]
+    },
+    {
+      "id": "T07",
+      "floor": 0,
+      "position": [
+        -9.6,
+        0.0,
+        5
+      ],
+      "footprint": [
+        1.2,
+        1.2
+      ]
+    },
+    {
+      "id": "T08",
+      "floor": 0,
+      "position": [
+        -9.6,
+        0.0,
+        7.5
+      ],
+      "footprint": [
+        1.2,
+        1.2
+      ]
+    },
+    {
+      "id": "T09",
+      "floor": 0,
+      "position": [
+        -9.6,
+        0.0,
+        10
+      ],
+      "footprint": [
+        1.2,
+        1.2
+      ]
+    },
+    {
+      "id": "T10",
+      "floor": 0,
+      "position": [
+        9.6,
+        0.0,
+        -10
+      ],
+      "footprint": [
+        1.2,
+        1.2
+      ]
+    },
+    {
+      "id": "T11",
+      "floor": 0,
+      "position": [
+        9.6,
+        0.0,
+        -7.5
+      ],
+      "footprint": [
+        1.2,
+        1.2
+      ]
+    },
+    {
+      "id": "T12",
+      "floor": 0,
+      "position": [
+        9.6,
+        0.0,
+        -5
+      ],
+      "footprint": [
+        1.2,
+        1.2
+      ]
+    },
+    {
+      "id": "T13",
+      "floor": 0,
+      "position": [
+        9.6,
+        0.0,
+        -2.5
+      ],
+      "footprint": [
+        1.2,
+        1.2
+      ]
+    },
+    {
+      "id": "T14",
+      "floor": 0,
+      "position": [
+        9.6,
+        0.0,
+        0
+      ],
+      "footprint": [
+        1.2,
+        1.2
+      ]
+    },
+    {
+      "id": "T15",
+      "floor": 0,
+      "position": [
+        9.6,
+        0.0,
+        2.5
+      ],
+      "footprint": [
+        1.2,
+        1.2
+      ]
+    },
+    {
+      "id": "T16",
+      "floor": 0,
+      "position": [
+        9.6,
+        0.0,
+        5
+      ],
+      "footprint": [
+        1.2,
+        1.2
+      ]
+    },
+    {
+      "id": "T17",
+      "floor": 0,
+      "position": [
+        9.6,
+        0.0,
+        7.5
+      ],
+      "footprint": [
+        1.2,
+        1.2
+      ]
+    },
+    {
+      "id": "T18",
+      "floor": 0,
+      "position": [
+        9.6,
+        0.0,
+        10
+      ],
+      "footprint": [
+        1.2,
+        1.2
+      ]
+    },
+    {
+      "id": "T19",
+      "floor": 1,
+      "position": [
+        -9.6,
+        4.8,
+        -10
+      ],
+      "footprint": [
+        1.2,
+        1.2
+      ]
+    },
+    {
+      "id": "T20",
+      "floor": 1,
+      "position": [
+        -9.6,
+        4.8,
+        -6
+      ],
+      "footprint": [
+        1.2,
+        1.2
+      ]
+    },
+    {
+      "id": "T21",
+      "floor": 1,
+      "position": [
+        -9.6,
+        4.8,
+        -2
+      ],
+      "footprint": [
+        1.2,
+        1.2
+      ]
+    },
+    {
+      "id": "T22",
+      "floor": 1,
+      "position": [
+        -9.6,
+        4.8,
+        2
+      ],
+      "footprint": [
+        1.2,
+        1.2
+      ]
+    },
+    {
+      "id": "T23",
+      "floor": 1,
+      "position": [
+        -9.6,
+        4.8,
+        6
+      ],
+      "footprint": [
+        1.2,
+        1.2
+      ]
+    },
+    {
+      "id": "T24",
+      "floor": 1,
+      "position": [
+        -9.6,
+        4.8,
+        10
+      ],
+      "footprint": [
+        1.2,
+        1.2
+      ]
+    },
+    {
+      "id": "T25",
+      "floor": 1,
+      "position": [
+        9.6,
+        4.8,
+        -10
+      ],
+      "footprint": [
+        1.2,
+        1.2
+      ]
+    },
+    {
+      "id": "T26",
+      "floor": 1,
+      "position": [
+        9.6,
+        4.8,
+        -6
+      ],
+      "footprint": [
+        1.2,
+        1.2
+      ]
+    },
+    {
+      "id": "T27",
+      "floor": 1,
+      "position": [
+        9.6,
+        4.8,
+        -2
+      ],
+      "footprint": [
+        1.2,
+        1.2
+      ]
+    },
+    {
+      "id": "T28",
+      "floor": 1,
+      "position": [
+        9.6,
+        4.8,
+        2
+      ],
+      "footprint": [
+        1.2,
+        1.2
+      ]
+    },
+    {
+      "id": "T29",
+      "floor": 1,
+      "position": [
+        9.6,
+        4.8,
+        6
+      ],
+      "footprint": [
+        1.2,
+        1.2
+      ]
+    },
+    {
+      "id": "T30",
+      "floor": 1,
+      "position": [
+        9.6,
+        4.8,
+        10
+      ],
+      "footprint": [
+        1.2,
+        1.2
+      ]
+    }
+  ],
+  "exclusions": [
+    "Do not migrate courtyard-v1",
+    "Do not add private-room floors",
+    "No real published exhibits in these drawings"
+  ]
+}
