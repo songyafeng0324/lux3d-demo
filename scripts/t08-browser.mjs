@@ -150,6 +150,8 @@ try{
   await vp.keyboard.press('Escape');await vp.waitForFunction(()=>window.__t10.ui().overlay===null);
   await vp.keyboard.press('KeyB');
   const bag=vp.getByRole('dialog',{name:'背包',exact:true});
+  await bag.getByRole('button',{name:'我收藏的',exact:true}).click();
+  await vp.waitForFunction(()=>document.querySelector('.bag-asset-card .asset-thumbnail img')?.naturalWidth===192);
   await bag.getByRole('button',{name:'生成任务',exact:true}).click();
   await bag.getByText('图片最好不要有背景，将背景处理为白色效果更好。',{exact:true}).waitFor();
   await vp.keyboard.press('Escape');await bag.waitFor({state:'hidden'});
@@ -165,6 +167,7 @@ try{
    await collectorRoom.goto(base+'/room?backpack=1');
    const bag=collectorRoom.getByRole('dialog',{name:'背包',exact:true});
    await bag.getByRole('button',{name:'我收藏的',exact:true}).click();
+   await collectorRoom.waitForFunction(()=>document.querySelector('.bag-asset-card .asset-thumbnail img')?.naturalWidth===192);
    await bag.getByRole('button',{name:'预览模型：紫檀靠背椅',exact:true}).click();
    const preview=bag.getByRole('region',{name:'藏品预览'});
    await preview.getByRole('heading',{name:'紫檀靠背椅（藏友小周）'}).waitFor();

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState, type FormEvent } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent } from 'react';
 import { DEFAULT_DAILY_QUOTA, type CollectedAsset, type CollectionRemoval } from '@aholo/contracts';
 import ModelPreview from './ModelPreview.js';
 import AssetThumbnail, { type ThumbnailCache } from './AssetThumbnail.js';
@@ -51,7 +51,7 @@ interface DrawerProps {
   onCollectionRemoved?: (item: CollectedAsset, result: CollectionRemoval) => void;
 }
 
-export default function Backpack({ open, close, kind = 'backpack', onAccountChange, beforeSessionEnd, beforeLogin, thumbnailCache, onCollectionRemoved }: DrawerProps) {
+export default function Backpack({ open, close, kind = 'backpack', onAccountChange, beforeSessionEnd, beforeLogin, thumbnailCache: sharedThumbnailCache, onCollectionRemoved }: DrawerProps) {
   const account = kind === 'account';
   const title = account ? '账号设置' : '背包';
   const closeLabel = '关闭' + title;
@@ -64,6 +64,7 @@ export default function Backpack({ open, close, kind = 'backpack', onAccountChan
   const previewPanel = useRef<HTMLElement>(null);
   const submissionSelect = useRef<HTMLSelectElement>(null);
   const [me, setMe] = useState<Me | null>(null);
+  const thumbnailCache = useMemo<ThumbnailCache>(() => sharedThumbnailCache ?? new Map(), [sharedThumbnailCache, me?.user.id]);
   const meRef = useRef(me); meRef.current = me;
   const [loading, setLoading] = useState(true);
   const [tab, setTab] = useState<Tab>('assets');
@@ -403,7 +404,7 @@ export default function Backpack({ open, close, kind = 'backpack', onAccountChan
       listRevision.current.collections++;
       setCollections(items => items.filter(row => row.collectionId !== item.collectionId));
       setSelectedCollection(id => id === item.collectionId ? null : id);
-      thumbnailCache?.delete(item.modelFileId);
+      thumbnailCache.delete(item.modelFileId);
       collectionRemoved.current?.(item, result);
       setMessage('已取消收藏。');
     }, 'DELETE');
