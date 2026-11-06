@@ -5,7 +5,7 @@ import { disposeResources } from '../scene/assets.js';
 import { configurePreview, framePreview, previewScene, readPreviewModel } from './model-preview-scene.js';
 
 /** `headers` carries a snapshot grant for public exhibits; without it the visitor's own login is used. */
-export default function ModelPreview({ fileId, name, headers }: { fileId: string; name: string; headers?: Record<string, string> }) {
+export default function ModelPreview({ fileId, name, headers, showHint = true }: { fileId: string; name: string; headers?: Record<string, string>; showHint?: boolean }) {
   const headerKey = JSON.stringify(headers ?? null);
   const host = useRef<HTMLDivElement>(null);
   const [status, setStatus] = useState('正在载入模型…');
@@ -78,6 +78,6 @@ export default function ModelPreview({ fileId, name, headers }: { fileId: string
   return <div className="bag-preview-wrap">
     <div className="bag-preview" ref={host} />
     {status && <p className="bag-preview-status" role={failed ? 'alert' : 'status'}>{status}</p>}
-    {!status && <small className="bag-preview-hint">拖动旋转 · 滚轮缩放</small>}
+    {!status && showHint && <small className="bag-preview-hint">拖动旋转 · 滚轮缩放</small>}
   </div>;
 }

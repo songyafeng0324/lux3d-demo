@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { validateRoomLayout, type Bounds, type PersonalRoom, type RoomModel, type RoomPlacement, type SharedRoom } from '@aholo/contracts';
-import { api, ApiError, type Asset, type Me, type Page } from '../game/backpack-api.js';
+import { validateRoomLayout, type CollectedAsset, type CollectionRemoval, type PersonalRoom, type RoomModel, type RoomPlacement, type SharedRoom } from '@aholo/contracts';
+import { api, ApiError, type Me, type Page } from '../game/backpack-api.js';
 import Backpack from '../game/Backpack.js';
 import AssetThumbnail, { type ThumbnailCache } from '../game/AssetThumbnail.js';
 import '../game/game.css';
@@ -8,7 +8,9 @@ import { RoomEngine, type RoomMode, type RoomTool } from './engine.js';
 import { PersonalRoomSave, type RoomSaveState } from './save.js';
 import '../scene/scene.css';
 import './room.css';
-interface CatalogAsset extends Asset { sourceType?: string; normalization: RoomModel['normalization']; bounds: Bounds }
+const catalogGroups = { personal: '我生成的', collected: '我收藏的', furniture: '官方家具' } as const;
+type CatalogGroup = keyof typeof catalogGroups;
+interface CatalogAsset extends RoomModel { name: string; originalImageId?: string | null; collectionId?: string }
 const labels = { loading: '正在读取布置', loadFailed: '读取失败', saved: '已自动保存', dirty: '有修改待保存', saving: '正在保存…', failed: '保存未确认', rejected: '布置未通过校验', conflict: '房间版本冲突' };
 async function allAssets(path: string): Promise<CatalogAsset[]> {
   const items: CatalogAsset[] = []; let cursor: string | null = null; const seen = new Set<string>();
@@ -27,10 +29,9 @@ export default function Room({ shareToken }: { shareToken?: string }) {
   const [save, setSave] = useState<RoomSaveState>({ status: 'loading', version: 0, sequence: 0, message: '' });
   const [owner, setOwner] = useState<Me | null>(null);
   const thumbnailCache = useMemo<ThumbnailCache>(() => new Map(), [owner?.user.id]);
-  const [catalog, setCatalog] = useState<CatalogAsset[]>([]);
+  const [catalog, setCatalog] = useState<(CatalogAsset & { group: CatalogGroup })[]>([]);
   const catalogById = useMemo(() => new Map(catalog.map(asset => [asset.id, asset])), [catalog]);
   const catalogSequence = useRef(0);
-  const [furniture, setFurniture] = useState<Set<string>>(new Set());
   const [mode, setMode] = useState<RoomMode>(visitor ? 'share' : 'edit');
   const [tool, setTool] = useState<RoomTool>('translate'), [selected, setSelected] = useState<string | null>(null);
   const [tab, setTab] = useState<'catalog' | 'objects'>('catalog');
@@ -44,12 +45,12 @@ export default function Room({ shareToken }: { shareToken?: string }) {
   const [hasSharePending, setHasSharePending] = useState(false), [shareNote, setShareNote] = useState('');
   const refreshCatalog = useCallback(async (instance: RoomEngine) => {
     const sequence = ++catalogSequence.current;
-    const [personal, official] = await Promise.all([allAssets('/assets'), allAssets('/furniture')]);
+    const groups: [CatalogGroup, string][] = [['personal', '/assets'], ['collected', '/collections'], ['furniture', '/furniture']];
+    const lists = await Promise.all(groups.map(async ([group, path]) => (await allAssets(path)).map(asset => ({ ...asset, group }))));
     if (engine.current !== instance || sequence !== catalogSequence.current) return;
-    const rows = [...personal, ...official];
+    const rows = lists.flat();
     instance.setCatalog(rows.map(modelOf));
     setCatalog(rows);
-    setFurniture(new Set(official.map(asset => asset.id)));
   }, []);
 
   function accountChanged(value: Me | null, ended = false) {
@@ -76,7 +77,7 @@ export default function Room({ shareToken }: { shareToken?: string }) {
     profile.current = value;
     setOwner(value);
     catalogSequence.current++;
-    setCatalog([]); setFurniture(new Set());
+    setCatalog([]);
     setRoom(null); current.current = null;
     setDrawerOpen(false); setNotice(''); setShareNote('');
     setLoadingModel(false); setShareBusy(false);
@@ -103,6 +104,13 @@ export default function Room({ shareToken }: { shareToken?: string }) {
     }
     if (overlay === 'menu' || overlay === 'account') menuButton.current?.focus();
   }, [overlay, refreshCatalog]);
+  function collectionRemoved(item: CollectedAsset, result: CollectionRemoval) {
+    const currentCollection = catalogById.get(item.id)?.collectionId;
+    if (currentCollection && currentCollection !== item.collectionId) return;
+    catalogSequence.current++;
+    setCatalog(rows => rows.filter(row => row.collectionId !== item.collectionId));
+    saver.current?.removeCollectedAsset(item.id, result);
+  }
 
   function openCatalog() {
     setDrawerOpen(true);
@@ -119,11 +127,12 @@ export default function Room({ shareToken }: { shareToken?: string }) {
   };
   const add = async (assetId: string) => {
     const instance = engine.current;
-    if (!instance || !profile.current || !saver.current?.canEdit || !current.current || loadingModel) return;
+    if (!instance || !profile.current || !saver.current?.canEdit || !current.current || loadingModel || !catalogById.has(assetId)) return;
+    const sequence = catalogSequence.current;
     setLoadingModel(true);
     try {
       await instance.ensureModel(assetId);
-      if (instance !== engine.current || !profile.current || !current.current) return;
+      if (instance !== engine.current || sequence !== catalogSequence.current || !profile.current || !current.current) return;
       const n = current.current.placements.length;
       const placement: RoomPlacement = { id: crypto.randomUUID(), assetId, position: [((n % 5) - 2) * 1.5, 0, (Math.floor(n / 5) % 3 - 1) * 1.5], rotation: [0, 0, 0], scale: 1 };
       if (validateRoomLayout(current.current.name, [placement], instance.bounds)) placement.position = [0, 0, 0];
@@ -199,7 +208,7 @@ export default function Room({ shareToken }: { shareToken?: string }) {
           if (stopped) return;
           if (error instanceof ApiError && error.status === 401) {
             profile.current = null; setOwner(null); setLoginRequired(true);
-            setCatalog([]); setFurniture(new Set());
+            setCatalog([]);
           }
           setLoadError(error instanceof Error ? error.message : '小屋暂时无法读取。');
         }
@@ -266,10 +275,10 @@ export default function Room({ shareToken }: { shareToken?: string }) {
           <button className={tab === 'objects' ? 'active' : ''} onClick={() => setTab('objects')}>房间物品 <small>{room?.placements.length ?? 0}</small></button>
         </div>
         {tab === 'catalog' ? <div className="room-catalog">
-          <p className="sidebar-note">每次添加均为独立摆放。名称和简介在背包维护。</p>
-          {[false, true].map(official => <section key={String(official)}>
-            <h2 className="group-label">{official ? '官方家具' : '个人背包'}</h2>
-            <div className="room-asset-grid">{catalog.filter(asset => furniture.has(asset.id) === official).map(asset => <button type="button" className="room-asset-card" key={asset.id} disabled={!canEdit} onClick={() => void add(asset.id)}>
+          <p className="sidebar-note">每次添加均为独立摆放。</p>
+          {(Object.keys(catalogGroups) as CatalogGroup[]).map(group => <section key={group}>
+            <h2 className="group-label">{catalogGroups[group]}</h2>
+            <div className="room-asset-grid">{catalog.filter(asset => asset.group === group).map(asset => <button type="button" className="room-asset-card" key={asset.id} disabled={!canEdit} onClick={() => void add(asset.id)}>
               <AssetThumbnail asset={asset} cache={thumbnailCache} />
               <span className="asset-short-name" title={asset.name}>{asset.name}</span>
               <span className="room-asset-add" aria-hidden="true">＋</span>
@@ -320,7 +329,7 @@ export default function Room({ shareToken }: { shareToken?: string }) {
       </div>}
       <Backpack kind="account" open={overlay === 'account'} close={closeOverlay} onAccountChange={accountChanged}
         beforeSessionEnd={allowSessionEnd} beforeLogin={allowLogin} />
-      <Backpack key={owner?.user.id ?? 'guest'} open={overlay === 'backpack'} close={closeOverlay} onAccountChange={accountChanged} beforeLogin={allowLogin} thumbnailCache={thumbnailCache} />
+      <Backpack key={owner?.user.id ?? 'guest'} open={overlay === 'backpack'} close={closeOverlay} onAccountChange={accountChanged} beforeLogin={allowLogin} thumbnailCache={thumbnailCache} onCollectionRemoved={collectionRemoved} />
     </>}
   </div>;
 }

@@ -24,6 +24,7 @@ try{
  async function call(pathname,method,body,headers={}){const h={origin:base,'idempotency-key':randomUUID(),...headers};if(!(body instanceof FormData)&&body!==undefined)h['content-type']='application/json';const r=await fetch(base+'/api/v1'+pathname,{method,headers:h,body:body instanceof FormData?body:body===undefined?undefined:JSON.stringify(body)});const text=await r.text();if(!r.ok)throw new Error(`${method} ${pathname} ${r.status} ${text}`);return {r,data:text?JSON.parse(text).data:null};}
  const login=async username=>{const {r,data}=await call('/auth/login','POST',{username,password:pw});return {cookie:r.headers.get('set-cookie').split(';')[0],'x-csrf-token':data.csrfToken,user:data.user};};
  await call('/auth/register','POST',{username:'t08_collector',nickname:'藏友小周',password:pw,confirmPassword:pw});
+ await call('/auth/register','POST',{username:'t13_visitor',nickname:'收藏访客',password:pw,confirmPassword:pw});
  const admin=await login('t08_admin'),collector=await login('t08_collector');
  // Official public candidates: real GLB upload → real import worker (Chrome render validation) → candidate.
  for(const [file,name,era,material] of [['table.glb','明式长案','明代','黄花梨'],['cabinet.glb','双门陈列柜','清代','紫檀']]){
@@ -61,9 +62,16 @@ try{
   await up.goto(base+'/room?backpack=1');
   const bag=up.getByRole('dialog',{name:'背包'});await bag.getByLabel('用户名').fill('t08_collector');await bag.getByLabel('密码',{exact:true}).fill(pw);await bag.getByRole('button',{name:'登录并打开背包'}).click();
   await up.waitForFunction(() => document.querySelector('.bag-asset-card img')?.naturalWidth > 0);
-  const card=bag.getByRole('button',{name:'资产01',exact:true});
+  const card=bag.locator('.bag-asset-card').filter({hasText:'资产01'});
   assert.equal(await card.locator('.bag-approved').count(),0);
-  await card.click();await bag.getByRole('button',{name:'保存资料'}).waitFor();
+  await card.getByRole('button',{name:'预览模型：资产01',exact:true}).click();
+  const preview=bag.getByRole('region',{name:'藏品预览'});
+  await preview.getByRole('heading',{name:'资产01（藏友小周）'}).waitFor();
+  await card.getByRole('button',{name:'修改名称：资产01',exact:true}).click();
+  await bag.getByRole('textbox',{name:'藏品名称'}).fill('私藏靠背椅');
+  await bag.getByRole('button',{name:'保存名称'}).click();
+  await preview.getByRole('heading',{name:'私藏靠背椅（藏友小周）'}).waitFor();
+  assert.equal(await bag.getByLabel('简介',{exact:true}).count(),0);
   assert.equal(await bag.locator('.bag-submit').count(),0);
   await bag.getByRole('button',{name:'投稿',exact:true}).click();
   await bag.getByLabel('选择要投稿的藏品').selectOption(assetId);
@@ -130,9 +138,57 @@ try{
     return details.top >= preview.bottom && dialog.scrollWidth <= dialog.clientWidth;
   }), true, 'narrow detail stacks the model and text without horizontal overflow');
   await vp.setViewportSize({width:1440,height:900});
+  await dlg.getByRole('button',{name:'添加到我的藏品'}).click();
+  const account=vp.getByRole('dialog',{name:'账号设置',exact:true});
+  await account.getByLabel('用户名',{exact:true}).fill('t13_visitor');
+  await account.getByLabel('密码',{exact:true}).fill(pw);
+  await account.getByRole('button',{name:'登录账号',exact:true}).click();
+  await dlg.getByRole('button',{name:'添加到我的藏品'}).click();
+  await dlg.getByRole('button',{name:'已收藏',exact:true}).waitFor();
   await vp.keyboard.press('Escape');await vp.waitForFunction(()=>window.__t10.ui().overlay===null);
   await vp.locator('.t10-canvas').click();await vp.waitForFunction(()=>window.__t10.ui().phase==='play');await faceSlot(vp,-6.6,-8.6,Math.PI*.5);await vp.evaluate(()=>window.__t10.engine.look(Math.PI*.5,-.12));await vp.waitForTimeout(500);await vp.screenshot({path:path.join(out,'06-visitor-hall.png')});
   oldVisitorExhibits=(await ui(vp)).exhibits;
+ });
+ await step('T13 collection preview, current author, room save, share and uncollect',async()=>{
+  const collectorRoom=await visitorCtx.newPage();
+  const shared=await browser.newPage({viewport:{width:1440,height:900}});
+  collectorRoom.on('pageerror',error=>errors.push('collector room: '+error.message));
+  shared.on('pageerror',error=>errors.push('shared room: '+error.message));
+  try{
+   await collectorRoom.goto(base+'/room?backpack=1');
+   const bag=collectorRoom.getByRole('dialog',{name:'背包',exact:true});
+   await bag.getByRole('button',{name:'我收藏的',exact:true}).click();
+   await bag.getByRole('button',{name:'预览模型：紫檀靠背椅',exact:true}).click();
+   const preview=bag.getByRole('region',{name:'藏品预览'});
+   await preview.getByRole('heading',{name:'紫檀靠背椅（藏友小周）'}).waitFor();
+   await preview.locator('canvas').waitFor();
+   await collectorRoom.waitForFunction(()=>!document.querySelector('.bag-side-preview .bag-preview-status'));
+   assert.equal(await bag.getByRole('button',{name:/修改名称/}).count(),0);
+   assert.equal(await bag.evaluate(dialog=>dialog.querySelector('.bag-side-preview').getBoundingClientRect().right < dialog.querySelector('.bag-drawer').getBoundingClientRect().left),true);
+   await call('/me','PATCH',{nickname:'作者现用昵称'},collector);
+   await preview.getByRole('heading',{name:'紫檀靠背椅（作者现用昵称）'}).waitFor();
+   await collectorRoom.screenshot({path:path.join(out,'t13-collected-preview.png')});
+   await bag.getByRole('button',{name:'关闭背包',exact:true}).click();
+   await collectorRoom.getByRole('button',{name:'打开物品库',exact:true}).click();
+   for(const [index,name] of ['紫檀靠背椅','紫檀靠背椅','验收木椅'].entries()){
+    await collectorRoom.getByRole('button',{name,exact:true}).click();
+    await collectorRoom.waitForFunction(n=>window.__room?.snapshot()?.placements.length===n,index+1);
+   }
+   await collectorRoom.waitForFunction(()=>window.__room?.save?.state.status==='saved');
+   await collectorRoom.getByRole('button',{name:'开启分享',exact:true}).click();
+   const shareLink=collectorRoom.locator('.room-share-panel a');
+   await shareLink.waitFor();
+   await shared.goto(await shareLink.getAttribute('href'));
+   await shared.waitForFunction(()=>window.__room?.snapshot()?.placements.length===3);
+   await collectorRoom.reload();
+   await collectorRoom.waitForFunction(()=>window.__room?.snapshot()?.placements.length===3);
+   await bag.getByRole('button',{name:'我收藏的',exact:true}).click();
+   await bag.getByRole('button',{name:'取消收藏：紫檀靠背椅',exact:true}).click();
+   await bag.getByText('还没有收藏的展品').waitFor();
+   await collectorRoom.waitForFunction(()=>window.__room?.snapshot()?.placements.length===1&&window.__room?.engine.debug().instances===1);
+   await shared.reload();
+   await shared.waitForFunction(()=>window.__room?.snapshot()?.placements.length===1);
+  }finally{await shared.close();await collectorRoom.close();}
  });
  await step('admin adjusts only today\'s quota for the collector',async()=>{
   await ap.getByRole('button',{name:'用户与额度'}).click();await ap.locator('.adm-row',{hasText:'t08_collector'}).click();await ap.getByLabel('当天总额度').fill('5');await ap.getByRole('button',{name:'调整',exact:true}).click();await ap.getByText(/今天的总额度调为 5/).waitFor();
@@ -140,7 +196,7 @@ try{
  });
  await step('risk delete clears room placement, candidate and slot; open page keeps loaded scene, refresh shows the result',async()=>{
   await call('/rooms/me/layout','PUT',{baseVersion:0,editSequence:1,name:'藏友小屋',placements:[{id:'p1',assetId,position:[0,0,0],rotation:[0,0,0],scale:1}]},{cookie:collector.cookie,'x-csrf-token':collector['x-csrf-token']});
-  await ap.getByRole('button',{name:'资产与上传'}).click();await ap.getByLabel('GLB 模型').waitFor();assert.deepEqual(await ap.locator('input[type=file]').evaluateAll(inputs=>inputs.map(input=>input.accept)),['.glb,model/gltf-binary']);await ap.locator('.adm-row',{hasText:'资产01'}).click();await ap.getByRole('button',{name:'风险删除…'}).click();await ap.screenshot({path:path.join(out,'08-admin-delete-confirm.png')});
+  await ap.getByRole('button',{name:'资产与上传'}).click();await ap.getByLabel('GLB 模型').waitFor();assert.deepEqual(await ap.locator('input[type=file]').evaluateAll(inputs=>inputs.map(input=>input.accept)),['.glb,model/gltf-binary']);await ap.locator('.adm-row',{hasText:'私藏靠背椅'}).click();await ap.getByRole('button',{name:'风险删除…'}).click();await ap.screenshot({path:path.join(out,'08-admin-delete-confirm.png')});
   await ap.getByRole('button',{name:'确认删除'}).click();await ap.getByText(/已删除。清理 1 间小屋中的 1 处摆放，移出候选库，展位 1 已清空/).waitFor();
   assert.equal((await ui(vp)).exhibits,oldVisitorExhibits,'already-open page keeps its loaded exhibits');
   await enter(vp);await vp.waitForFunction(()=>window.__t10.ui().exhibits===2,null,{timeout:90000});await faceSlot(vp,-7.9,-10,Math.PI/2);await vp.waitForFunction(()=>window.__t10.engine.debugState().target?.id==='T01');await vp.keyboard.press('KeyE');await vp.getByText('虚位以待').waitFor();

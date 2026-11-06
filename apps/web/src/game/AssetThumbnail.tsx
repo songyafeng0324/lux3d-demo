@@ -4,7 +4,7 @@ import { disposeResources } from '../scene/assets.js';
 import { fileUrl, type Asset } from './backpack-api.js';
 import { configurePreview, framePreview, previewScene, readPreviewModel } from './model-preview-scene.js';
 
-type ImageSource = Pick<Asset, 'modelFileId' | 'originalImageId'>;
+type ImageSource = Pick<Asset, 'modelFileId'> & Partial<Pick<Asset, 'originalImageId'>>;
 export type ThumbnailCache = Map<string, Promise<string>>;
 let queue: Promise<unknown> = Promise.resolve();
 

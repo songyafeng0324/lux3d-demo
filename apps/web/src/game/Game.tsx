@@ -4,8 +4,8 @@ import type { ExhibitSlot } from './navigation.js';
 import './game.css';
 import Backpack from './Backpack.js';
 import ModelPreview from './ModelPreview.js';
-import { api, ApiError } from './backpack-api.js';
-import type { ExhibitDetail, GalleryExhibit, GalleryView } from '@aholo/contracts';
+import { api, ApiError, type Me } from './backpack-api.js';
+import type { ExhibitCollectionStatus, ExhibitDetail, GalleryExhibit, GalleryView } from '@aholo/contracts';
 
 type Phase = 'loading' | 'failed' | 'intro' | 'play' | 'paused';
 type Overlay = null | 'menu' | 'account' | 'detail' | 'help';
@@ -34,6 +34,7 @@ export default function Game() {
   const [galleryNotice, setGalleryNotice] = useState('');
   const [detailState, setDetailState] = useState<DetailState | null>(null);
   const grant = useRef<GalleryView['grant'] | null>(null);
+  const returnToExhibit = useRef(false);
   const state = useRef({ phase, overlay, detail, gallery, detailState });
   state.current = { phase, overlay, detail, gallery, detailState };
   const exhibitAt = useCallback((slot: ExhibitSlot | null): GalleryExhibit | null => slot ? state.current.gallery?.slots.find(s => s.slotNo === slotNoOf(slot))?.exhibit ?? null : null, []);
@@ -113,11 +114,22 @@ export default function Game() {
   }, [exhibitAt]);
   /** Closing returns to a paused state; the visitor clicks to re-lock, so nobody walks by accident. */
   const close = useCallback(() => {
+    returnToExhibit.current = false;
     setOverlay(null);
     setDetail(null);
     setDetailState(null);
     setPhase(p => (p === 'play' || p === 'paused' ? 'paused' : p));
   }, []);
+  const loginForExhibit = useCallback(() => {
+    returnToExhibit.current = true;
+    open('account');
+  }, [open]);
+  const closeAccount = useCallback(() => {
+    if (returnToExhibit.current) {
+      returnToExhibit.current = false;
+      setOverlay('detail');
+    } else close();
+  }, [close]);
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -218,7 +230,9 @@ export default function Game() {
         </section>
       </div>}
 
-      <Backpack kind="account" open={overlay === 'account'} close={close} />
+      <Backpack kind="account" open={overlay === 'account'} close={closeAccount} onAccountChange={profile => {
+        if (profile && returnToExhibit.current) closeAccount();
+      }} />
 
       {overlay === 'detail' && detail && <div className="t10-modal-backdrop" onClick={close}>
         <section className={`t10-detail${detailExhibit ? ' t10-exhibit' : ''}`} role="dialog" aria-modal="true" aria-label={detailExhibit ? `${detailExhibit.name}详情` : `展位 ${detail.id}`} onClick={e => e.stopPropagation()}>
@@ -227,7 +241,7 @@ export default function Game() {
             <h2>虚位以待</h2>
             <p>此展位尚未陈列藏品。用户投稿经审核、管理员安排展位后，会在这里公开展出。</p>
             <small>Esc 关闭后点击画面继续</small>
-          </> : detailState?.status === 'ready' ? <ExhibitInfo data={detailState.data} headers={grant.current ? grantHeaders(grant.current) : undefined} />
+          </> : detailState?.status === 'ready' ? <ExhibitInfo data={detailState.data} headers={grant.current ? grantHeaders(grant.current) : undefined} login={loginForExhibit} />
             : detailState?.status === 'failed' ? <><h2>{detailExhibit.name}</h2><p role="alert">{detailState.message}</p></>
             : <><h2>{detailExhibit.name}</h2><p role="status">正在读取藏品资料…</p></>}
         </section>
@@ -237,12 +251,12 @@ export default function Game() {
 }
 
 /** Public exhibit detail: PRD 7.5 fields, source attribution apart from the holder, independent rotate/zoom preview. */
-function ExhibitInfo({ data, headers }: { data: ExhibitDetail; headers?: Record<string, string> }) {
+function ExhibitInfo({ data, headers, login }: { data: ExhibitDetail; headers?: Record<string, string>; login: () => void }) {
   const url = /^https?:\/\//i.test(data.officialUrl) ? data.officialUrl : '';
   return <div className="t10-exhibit-body">
     <ModelPreview fileId={data.model.modelFileId} name={data.name} headers={headers} />
     <div className="t10-exhibit-text">
-      <h2>{data.name}</h2>
+      <div className="t10-exhibit-title"><h2>{data.name}</h2>{headers && <CollectExhibit key={data.candidateId} candidateId={data.candidateId} headers={headers} login={login} />}</div>
       <p className="t10-exhibit-source">{data.sourceNickname === '官方馆藏' ? '官方馆藏' : `投稿 · ${data.sourceNickname}`}</p>
       <p className="t10-exhibit-desc">{data.description}</p>
       <dl className="t10-exhibit-facts">
@@ -256,4 +270,48 @@ function ExhibitInfo({ data, headers }: { data: ExhibitDetail; headers?: Record<
       <small>拖动旋转 · 滚轮缩放 · Esc 关闭后点击画面继续</small>
     </div>
   </div>;
+}
+
+function CollectExhibit({ candidateId, headers, login }: { candidateId: string; headers: Record<string, string>; login: () => void }) {
+  const path = `/gallery/exhibits/${encodeURIComponent(candidateId)}/collection`;
+  const [status, setStatus] = useState<ExhibitCollectionStatus | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState('');
+  const pending = useRef<{ actorId: string; key: string } | null>(null);
+  const lifetime = useRef<AbortController | null>(null);
+  useEffect(() => {
+    const controller = new AbortController();
+    lifetime.current = controller;
+    void api<{ status: ExhibitCollectionStatus }>(path, { signal: controller.signal }).then(result => {
+      if (!controller.signal.aborted) setStatus(result.status);
+    }).catch(reason => {
+      if (controller.signal.aborted) return;
+      if (!(reason instanceof ApiError && reason.status === 401)) setError('暂时无法读取收藏状态，可以点击重试。');
+      setStatus('available');
+    });
+    return () => controller.abort();
+  }, [path]);
+
+  async function collect() {
+    const signal = lifetime.current?.signal;
+    if (busy || status !== 'available' || !signal || signal.aborted) return;
+    setBusy(true); setError('');
+    try {
+      const profile = await api<Me>('/me', { signal });
+      if (signal.aborted) return;
+      if (pending.current?.actorId !== profile.user.id) pending.current = { actorId: profile.user.id, key: crypto.randomUUID() };
+      const result = await api<{ status: ExhibitCollectionStatus }>(path, { method: 'POST', signal, headers: {
+        ...headers, 'X-CSRF-Token': profile.csrfToken, 'Idempotency-Key': pending.current.key,
+      } });
+      if (!signal.aborted) { pending.current = null; setStatus(result.status); }
+    } catch (reason) {
+      if (signal.aborted) return;
+      if (reason instanceof ApiError && reason.status >= 400 && reason.status < 500) pending.current = null;
+      if (reason instanceof ApiError && reason.status === 401) { login(); return; }
+      if (reason instanceof ApiError && reason.code === 'EXHIBIT_UNAVAILABLE') setStatus('unavailable');
+      setError(reason instanceof Error ? reason.message : '收藏失败，请重试。');
+    } finally { if (!signal.aborted) setBusy(false); }
+  }
+  const label = status === 'collected' ? '已收藏' : status === 'owned' ? '已在我的藏品' : status === 'unavailable' ? '暂不可收藏' : '添加到我的藏品';
+  return <div className="t10-exhibit-collect"><button type="button" disabled={busy || status !== 'available'} onClick={() => void collect()}>{busy ? '正在添加…' : label}</button>{error && <p role="alert">{error}</p>}</div>;
 }

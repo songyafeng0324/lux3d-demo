@@ -126,6 +126,33 @@ test('T08 real PostgreSQL/API: submissions, review races, 30-slot publishing, ga
   assert.equal((await call('GET',`/api/v1/files/${a1.original}/content`,undefined,gh)).statusCode,404,'gallery grant never exposes originals');
   assert.equal((await call('GET',`/api/v1/files/${a3.model}/content`,undefined,gh)).statusCode,404);
   assert.equal((await call('POST',`/api/v1/snapshots/${g.id}/renew`,undefined,gh)).statusCode,200);
+  // T13: a collection grants only model access and room placement. Its metadata is live.
+  const collectionPath=id=>`/api/v1/gallery/exhibits/${id}/collection`;
+  const collectionList=async actor=>(await call('GET','/api/v1/collections',undefined,actor.headers)).json().data.items;
+  const bobCollect={...bob.headers,...gh};
+  const collectKey=randomUUID();
+  assert.equal((await call('POST',collectionPath(c1.id),undefined,gh)).statusCode,401);
+  assert.equal((await call('POST',collectionPath(c1.id),undefined,bob.headers)).statusCode,403);
+  assert.equal((await call('POST',collectionPath(randomUUID()),undefined,bobCollect)).statusCode,404);
+  assert.equal((await call('POST',collectionPath(c1.id),undefined,{...alice.headers,...gh})).json().data.status,'owned');
+  const adds=await Promise.all([collectKey,collectKey,randomUUID()].map(key=>call('POST',collectionPath(c1.id),undefined,{...bobCollect,'idempotency-key':key})));
+  for(const add of adds) assert.equal(add.json().data?.status,'collected',add.body);
+  const [collected]=(await collectionList(bob));
+  assert.deepEqual([collected.id,collected.name,collected.authorNickname],[a1.id,detail.json().data.name,'改名后']);
+  assert.equal('originalImageId' in collected,false);
+  assert.equal((await collectionList(bob)).length,1);
+  assert.deepEqual(await collectionList(alice),[]);
+  assert.equal((await call('POST',collectionPath(cOfficial.id),undefined,bobCollect)).json().data.status,'collected');
+  assert.equal((await collectionList(bob)).find(item=>item.id===official).authorNickname,'官方馆藏');
+  assert.equal((await call('GET',`/api/v1/files/${a1.model}/content`,undefined,bob.headers)).statusCode,200);
+  assert.equal((await call('GET',`/api/v1/files/${a1.original}/content`,undefined,bob.headers)).statusCode,404);
+  assert.equal((await call('PATCH',`/api/v1/assets/${a1.id}`,{name:'越权修改'},bob.headers)).statusCode,404);
+  assert.equal((await call('POST',`/api/v1/assets/${a1.id}/submissions`,publicFields(),bob.headers)).statusCode,404);
+  assert.equal((await call('PATCH',`/api/v1/assets/${a1.id}`,{name:'个人背包改名'},alice.headers)).statusCode,200);
+  assert.equal((await call('PATCH','/api/v1/me',{nickname:'作者新昵称'},alice.headers)).statusCode,200);
+  await pool.query("UPDATE candidates SET public_snapshot=jsonb_set(public_snapshot,'{name}',to_jsonb($2::text)) WHERE id=$1",[c1.id,'获审公开名称修订']);
+  const updated=(await collectionList(bob)).find(item=>item.id===a1.id);
+  assert.deepEqual([updated.name,updated.authorNickname],['获审公开名称修订','作者新昵称']);
   // AC36: removing an exhibit (ordinary unpublish) keeps the model and private placements.
   let room=(await call('GET','/api/v1/rooms/me',undefined,alice.headers)).json().data;
   let save=await call('PUT','/api/v1/rooms/me/layout',{baseVersion:room.version,editSequence:1,name:'藏品小屋',placements:[placement(a1.id,'x1',[-1,0,0]),placement(a1.id,'x2',[1,0,0]),placement(a3.id,'y1',[0,0,1]),placement(furniture,'f1',[0,0,-2])]},alice.headers);assert.equal(save.statusCode,200,save.body);
@@ -134,6 +161,27 @@ test('T08 real PostgreSQL/API: submissions, review races, 30-slot publishing, ga
   assert.equal(unpublishedAsset.statusCode,200);assert.equal(unpublishedAsset.json().data.submissionApproved,true);
   assert.equal((await call('GET','/api/v1/rooms/me',undefined,alice.headers)).json().data.placements.length,4);
   assert.equal((await call('GET',`/api/v1/snapshots/${g.id}/details/${c1.id}`,undefined,{authorization:'Bearer '+g.token})).statusCode,200,'old grant keeps its own version');
+  const carol=await account('t13_carol');
+  assert.equal((await call('GET',`/api/v1/files/${a1.model}/content`,undefined,carol.headers)).statusCode,404);
+  assert.equal((await call('POST',collectionPath(c1.id),undefined,{...carol.headers,...gh})).statusCode,409,'old gallery grant cannot add a withdrawn exhibit');
+  assert.equal((await collectionList(bob)).find(item=>item.id===a1.id).name,'获审公开名称修订');
+  const collectedLayout={baseVersion:0,editSequence:1,name:'收藏小屋',placements:[placement(a1.id,'col1'),placement(a1.id,'col2'),placement(b1.id,'own')]};
+  assert.equal((await call('PUT','/api/v1/rooms/me/layout',collectedLayout,bob.headers)).statusCode,200,'saved after ordinary withdrawal');
+  const bobShare=(await call('PUT','/api/v1/rooms/me/share',{enabled:true},bob.headers)).json().data.shareUrl.split('/').at(-1);
+  const oldBobShare=(await call('GET',`/api/v1/shared-rooms/${bobShare}`)).json().data;
+  const oldBobGrant={authorization:'Bearer '+oldBobShare.grant.token,'x-snapshot-grant':oldBobShare.grant.id};
+  const assetFile=`/api/v1/files/${a1.model}/content`;
+  assert.equal((await call('GET',assetFile,undefined,oldBobGrant)).statusCode,200);
+  const removePath=`/api/v1/collections/${collected.collectionId}`,removeKey=randomUUID();
+  assert.equal((await call('DELETE',removePath,undefined,carol.headers)).statusCode,404);
+  const removed=await call('DELETE',removePath,undefined,{...bob.headers,'idempotency-key':removeKey});
+  assert.deepEqual(removed.json().data,{previousVersion:1,roomVersion:2,placementsRemoved:2});
+  assert.deepEqual((await call('GET',`/api/v1/shared-rooms/${bobShare}`)).json().data.placements.map(p=>p.id),['own']);
+  assert.equal((await call('GET',assetFile,undefined,bob.headers)).statusCode,404);
+  assert.equal((await call('GET',assetFile,undefined,oldBobGrant)).statusCode,404);
+  assert.equal((await call('GET',`/api/v1/files/${b1.model}/content`,undefined,oldBobGrant)).statusCode,200);
+  assert.equal((await call('PUT','/api/v1/rooms/me/layout',{...collectedLayout,baseVersion:1},bob.headers)).statusCode,409);
+  assert.equal((await call('PUT','/api/v1/rooms/me/layout',{...collectedLayout,baseVersion:2},bob.headers)).statusCode,422);
   // Official text edit while exhibited: new gallery version, old grant still reads old text.
   assert.equal((await call('PATCH',`/api/v1/admin/assets/${official}`,{...publicFields(),modelFileId:randomUUID()},admin.headers)).statusCode,422);
   const edit=await call('PATCH',`/api/v1/admin/assets/${official}`,{...publicFields({name:'谷纹玉璧（修订）'}),officialUrl:'https://museum.example/b'},admin.headers);assert.equal(edit.statusCode,200,edit.body);assert.equal(edit.json().data.galleryVersion,4);
@@ -141,7 +189,14 @@ test('T08 real PostgreSQL/API: submissions, review races, 30-slot publishing, ga
   const editedExhibit=(await call('GET','/api/v1/gallery')).json().data.slots[4].exhibit;
   assert.equal(editedExhibit.name,'谷纹玉璧（修订）');
   assert.equal(editedExhibit.model.modelFileId,view.slots[4].exhibit.model.modelFileId);
+  assert.equal((await collectionList(bob)).find(item=>item.id===official).name,editedExhibit.name);
   await call('PUT','/api/v1/admin/gallery',{baseVersion:4,slots:arrange({1:c1.id,5:cOfficial.id,12:c3.id})},admin.headers);
+  assert.equal((await call('POST',collectionPath(c1.id),undefined,{...bobCollect,'idempotency-key':collectKey})).json().data.status,'available','replaying the original add cannot undo removal');
+  assert.equal((await call('POST',collectionPath(c1.id),undefined,bobCollect)).json().data.status,'collected');
+  assert.deepEqual((await call('DELETE',removePath,undefined,{...bob.headers,'idempotency-key':removeKey})).json().data,removed.json().data);
+  assert.notEqual((await collectionList(bob)).find(item=>item.id===a1.id).collectionId,collected.collectionId);
+  assert.equal((await call('GET',assetFile,undefined,oldBobGrant)).statusCode,404,'recollecting does not revive the old share grant');
+  assert.equal((await call('PUT','/api/v1/rooms/me/layout',{...collectedLayout,baseVersion:2},bob.headers)).statusCode,200);
 
   // ---- F12 users and today's quota (AC47～AC50) ----
   assert.equal((await call('GET','/api/v1/admin/users',undefined,bob.headers)).statusCode,403);
@@ -171,7 +226,9 @@ test('T08 real PostgreSQL/API: submissions, review races, 30-slot publishing, ga
   room=(await call('GET','/api/v1/rooms/me',undefined,alice.headers)).json().data;const staleBase=room.version,staleKey=randomUUID(),staleBody={baseVersion:staleBase,editSequence:9,name:'藏品小屋',placements:[...room.placements,placement(a1.id,'x3',[2,0,2])]};
   assert.equal((await call('DELETE',`/api/v1/admin/assets/${a1.id}`,undefined,alice.headers)).statusCode,403);
   const del=await call('DELETE',`/api/v1/admin/assets/${a1.id}`,undefined,admin.headers);assert.equal(del.statusCode,200,del.body);
-  assert.deepEqual({...del.json().data,galleryVersion:undefined},{deleted:true,roomsUpdated:1,placementsRemoved:2,submissionsClosed:1,candidateRemoved:true,slotNo:1,galleryVersion:undefined});
+  assert.deepEqual({...del.json().data,galleryVersion:undefined},{deleted:true,roomsUpdated:2,placementsRemoved:4,submissionsClosed:1,candidateRemoved:true,slotNo:1,galleryVersion:undefined});
+  assert.equal((await collectionList(bob)).some(item=>item.id===a1.id),false);
+  assert.deepEqual((await call('GET',`/api/v1/shared-rooms/${bobShare}`)).json().data.placements.map(p=>p.id),['own']);
   const conflict=await call('PUT','/api/v1/rooms/me/layout',staleBody,{...alice.headers,'idempotency-key':staleKey});assert.equal(conflict.statusCode,409,conflict.body);assert.equal(conflict.json().error.currentVersion,staleBase+1,'stale draft with the deleted model reports a version conflict');
   room=(await call('GET','/api/v1/rooms/me',undefined,alice.headers)).json().data;assert.deepEqual(room.placements.map(p=>p.id).sort(),['f1','y1'],'other placements are kept');
   assert.equal((await call('PUT','/api/v1/rooms/me/layout',{...staleBody,baseVersion:room.version},alice.headers)).statusCode,422,'current-version save cannot re-add a deleted model');

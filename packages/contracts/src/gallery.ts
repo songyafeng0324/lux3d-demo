@@ -6,6 +6,9 @@ export interface GalleryExhibit {candidateId:string;name:string;model:RoomModel}
 export interface GallerySlot {slotNo:number;exhibit:GalleryExhibit|null}
 export interface GalleryView {version:number;slots:GallerySlot[];grant:RoomGrant}
 export interface ExhibitDetail extends PublicDetails {candidateId:string;slotNo:number;model:RoomModel}
+export interface CollectedAsset extends RoomModel {collectionId:string;name:string;authorNickname:string}
+export type ExhibitCollectionStatus = 'available' | 'collected' | 'owned' | 'unavailable';
+export interface CollectionRemoval {previousVersion:number;roomVersion:number;placementsRemoved:number}
 export const GALLERY_SLOT_COUNT=30;
 /** Slot n in the database is plinth `T0n` in assets/t10/pavilion-layout.json. */
 export const slotMarker=(slotNo:number)=>`T${String(slotNo).padStart(2,'0')}`;

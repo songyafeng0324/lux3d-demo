@@ -3,8 +3,8 @@ import type pg from 'pg';
 import type {FastifyInstance,FastifyReply,FastifyRequest} from 'fastify';
 import {BusinessError,inputObject,exactFields,textField,requestWrite,transaction,tokenHash,beijingDay,publicFieldsInput,PUBLIC_FIELDS} from '@aholo/domain';
 import type {Config} from '@aholo/domain';
-import {validateGallerySlots,GALLERY_SLOT_COUNT,DEFAULT_DAILY_QUOTA,type GalleryView,type ExhibitDetail,type PublicDetails} from '@aholo/contracts';
-import {grantCredentials} from './rooms.js';
+import {validateGallerySlots,GALLERY_SLOT_COUNT,DEFAULT_DAILY_QUOTA,type GalleryView,type ExhibitDetail,type PublicDetails,type CollectedAsset,type ExhibitCollectionStatus} from '@aholo/contracts';
+import {grantCredentials,removeRoomAsset} from './rooms.js';
 interface Session {user:Record<string,any>;token:string;hash:string}
 interface Context {pool:pg.Pool;config:Config;session:(r:FastifyRequest,write?:boolean)=>Promise<Session>;reauthorize:(c:pg.PoolClient,s:Session,admin?:boolean)=>Promise<void>}
 type Db=pg.Pool|pg.PoolClient;
@@ -55,6 +55,18 @@ export async function validGalleryGrant(c:Db,id:string,token:string,requireAll=t
 export async function galleryFile(pool:pg.Pool,id:string,token:string,fileId:string){
  return (await pool.query(`SELECT f.* FROM snapshot_grants g JOIN gallery_versions v ON v.version=g.gallery_version JOIN LATERAL jsonb_each(v.details_json) d ON true JOIN assets a ON a.id::text=d.value->>'assetId' AND a.state='ready' JOIN files f ON f.id=a.model_file_id AND f.state='committed'
   WHERE g.id=$1 AND g.token_hash=$2 AND g.kind='gallery' AND g.expires_at>now() AND f.id=$3 LIMIT 1`,[id,tokenHash(token),fileId])).rows[0];
+}
+
+async function exhibitCollectionStatus(c:Db, candidateId:string, userId:string):Promise<ExhibitCollectionStatus> {
+ const row=(await c.query(`SELECT (a.source_type='personal' AND a.owner_id=$2) AS owned,
+   ac.id IS NOT NULL AS collected,e.slot_no IS NOT NULL AS on_display
+   FROM candidates c JOIN assets a ON a.id=c.asset_id AND a.state='ready'
+   JOIN files f ON f.id=a.model_file_id AND f.state='committed'
+   LEFT JOIN asset_collections ac ON ac.asset_id=a.id AND ac.collector_id=$2
+   LEFT JOIN exhibit_slots e ON e.candidate_id=c.id WHERE c.id=$1`,[candidateId,userId])).rows[0];
+ if (row?.owned) return 'owned';
+ if (row?.collected) return 'collected';
+ return row?.on_display ? 'available' : 'unavailable';
 }
 
 export async function registerCurationRoutes(app:FastifyInstance,{pool,config,session,reauthorize}:Context){
@@ -169,6 +181,64 @@ export async function registerCurationRoutes(app:FastifyInstance,{pool,config,se
   const detail:ExhibitDetail={...(d.snapshot as PublicDetails),candidateId,slotNo:slot!.slotNo,model:d.model};reply.header('Cache-Control','private, no-store');return ok(request,detail);
  });
 
+ app.get('/api/v1/collections',async(request,reply)=>{
+  const s=await session(request),cursor=cursorOf(request);
+  const rows=(await pool.query(`SELECT ac.id,${cursorAt('ac.created_at')},a.id AS asset_id,a.model_file_id,a.normalization,a.bounds,
+    c.public_snapshot->>'name' AS name,CASE WHEN c.source='official' THEN '官方馆藏' ELSE u.nickname END AS author_nickname
+    FROM asset_collections ac JOIN assets a ON a.id=ac.asset_id AND a.state='ready'
+    JOIN files f ON f.id=a.model_file_id AND f.state='committed'
+    JOIN candidates c ON c.asset_id=a.id LEFT JOIN users u ON u.id=a.owner_id
+    WHERE ac.collector_id=$1 ${cursor?'AND (ac.created_at,ac.id)<($2::timestamptz,$3::uuid)':''}
+    ORDER BY ac.created_at DESC,ac.id DESC LIMIT 51`,cursor?[s.user.id,cursor.at,cursor.id]:[s.user.id])).rows;
+  reply.header('Cache-Control','private, no-store');
+  return ok(request,page<CollectedAsset>(rows,50,r=>({...modelOf(r),collectionId:r.id,name:r.name,authorNickname:r.author_nickname})));
+ });
+
+ app.get('/api/v1/gallery/exhibits/:id/collection',async(request,reply)=>{
+  const s=await session(request),id=uuid((request.params as {id:string}).id);
+  reply.header('Cache-Control','private, no-store');
+  return ok(request,{status:await exhibitCollectionStatus(pool,id,s.user.id)});
+ });
+
+ app.post('/api/v1/gallery/exhibits/:id/collection',async(request,reply)=>{
+  const s=await session(request,true),id=uuid((request.params as {id:string}).id),credentials=grantCredentials(request);
+  if(request.body!==undefined)exactFields(inputObject(request.body),[]);
+  await requestWrite(pool,{actor:s.user.id,method:'POST',path:path(request),key:request.headers['idempotency-key'],body:{},secret:config.appDataKey,authorize:c=>reauthorize(c,s)},async c=>{
+   const grant=await validGalleryGrant(c,credentials.id,credentials.token,false);
+   const exhibit=grant.details_json[id];
+   if (!exhibit) return fail(404,'NOT_FOUND','该展品不在当前参观凭证中');
+   const asset=await lockAsset(c,exhibit.assetId);
+   if (asset?.state!=='ready') return fail(404,'NOT_FOUND','该藏品已不可收藏');
+   const room=(await c.query('SELECT layout_version FROM rooms WHERE owner_id=$1 FOR UPDATE',[s.user.id])).rows[0];
+   if (!room) return fail(404,'NOT_FOUND','未找到个人小屋');
+   // A gallery publish can remove this slot without locking the outgoing asset.
+   await c.query('SELECT version FROM gallery WHERE singleton_id=1 FOR SHARE');
+   const status=await exhibitCollectionStatus(c,id,s.user.id);
+   if (status==='unavailable') return fail(409,'EXHIBIT_UNAVAILABLE','展品已撤下或不可用，请刷新藏宝阁');
+   if (status==='available') {
+    await c.query('INSERT INTO asset_collections(collector_id,asset_id,first_room_version) VALUES($1,$2,$3::bigint+1)',[s.user.id,asset.id,room.layout_version]);
+   }
+   return {status:200,data:null};
+  });
+  reply.header('Cache-Control','private, no-store');
+  return ok(request,{status:await exhibitCollectionStatus(pool,id,s.user.id)});
+ });
+
+ app.delete('/api/v1/collections/:id',async(request,reply)=>{
+  const s=await session(request,true),id=uuid((request.params as {id:string}).id);
+  if(request.body!==undefined)exactFields(inputObject(request.body),[]);
+  return send(reply,request,await requestWrite(pool,{actor:s.user.id,method:'DELETE',path:path(request),key:request.headers['idempotency-key'],body:{},secret:config.appDataKey,authorize:c=>reauthorize(c,s)},async c=>{
+   const collection=(await c.query('SELECT asset_id FROM asset_collections WHERE id=$1 AND collector_id=$2',[id,s.user.id])).rows[0];
+   if (!collection) return fail(404,'NOT_FOUND','该收藏已不存在，请刷新背包');
+   await lockAsset(c,collection.asset_id);
+   const room=(await c.query('SELECT id,layout_version FROM rooms WHERE owner_id=$1 FOR UPDATE',[s.user.id])).rows[0];
+   if (!room) return fail(404,'NOT_FOUND','未找到个人小屋');
+   const deleted=await c.query('DELETE FROM asset_collections WHERE id=$1 AND collector_id=$2',[id,s.user.id]);
+   if (!deleted.rowCount) return fail(404,'NOT_FOUND','该收藏已不存在，请刷新背包');
+   return {status:200,data:await removeRoomAsset(c,room,collection.asset_id)};
+  }));
+ });
+
  // ---- Administrator asset maintenance (F11) and risk deletion (F13) ----
  app.get('/api/v1/admin/assets',async request=>{
   await admin(request);const source=query(request,'source'),q=query(request,'q'),cursor=cursorOf(request);if(source&&!['personal','furniture','official_candidate'].includes(source))fail(422,'INVALID_INPUT','来源筛选不正确');
@@ -246,12 +316,8 @@ export async function riskDelete(c:pg.PoolClient,id:string){
  const rooms=(await c.query(`SELECT r.id,r.layout_version FROM rooms r JOIN room_versions v ON v.room_id=r.id AND v.version=r.layout_version
   WHERE EXISTS(SELECT 1 FROM jsonb_array_elements(v.placements_json) p WHERE p->>'assetId'=$1) ORDER BY r.id FOR UPDATE OF r`,[id])).rows;
  let placementsRemoved=0;
- for(const r of rooms){
-  const v=(await c.query('SELECT * FROM room_versions WHERE room_id=$1 AND version=$2',[r.id,r.layout_version])).rows[0];
-  const kept=(v.placements_json as Array<{assetId:string}>).filter(p=>p.assetId!==id);placementsRemoved+=v.placements_json.length-kept.length;const next=Number(r.layout_version)+1;
-  await c.query('INSERT INTO room_versions(room_id,version,name,scene_version,placements_json) VALUES($1,$2,$3,$4,$5)',[r.id,next,v.name,v.scene_version,JSON.stringify(kept)]);
-  await c.query('UPDATE rooms SET layout_version=$2 WHERE id=$1',[r.id,next]);
- }
+ for(const r of rooms) placementsRemoved+=(await removeRoomAsset(c,r,id)).placementsRemoved;
+ await c.query('DELETE FROM asset_collections WHERE asset_id=$1',[id]);
  // Risk content is not kept as readable public text anywhere: submission snapshots, the official import
  // metadata and every gallery version's detail entry are redacted (versions keep only their slot layout).
  // One UPDATE per row: a second update of a row this transaction already changed re-runs its FK check

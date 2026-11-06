@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState, type FormEvent } from 'react';
-import { DEFAULT_DAILY_QUOTA } from '@aholo/contracts';
+import { DEFAULT_DAILY_QUOTA, type CollectedAsset, type CollectionRemoval } from '@aholo/contracts';
 import ModelPreview from './ModelPreview.js';
 import AssetThumbnail, { type ThumbnailCache } from './AssetThumbnail.js';
 import PasswordField, { credentialError } from './PasswordField.js';
@@ -7,6 +7,8 @@ import { api, ApiError, submissionLabel, type Asset, type GenerationTask, type M
 import './backpack.css';
 
 type Tab = 'assets' | 'tasks' | 'submissions';
+type List = 'assets' | 'tasks' | 'collections';
+const listPaths = { assets: '/assets', tasks: '/generation-tasks', collections: '/collections' } as const;
 type SubmissionChoice = { id: string; asset: Asset; items: Submission[] } | { id: string; error: string };
 type Pending = { path: string; method: string; body: Record<string, unknown> | FormData; key: string; label: string; actorId?: string; success: (data: any) => Promise<void> | void };
 const storageKey = 'aholo:pending-generation';
@@ -46,24 +48,33 @@ interface DrawerProps {
   beforeLogin?: (username: string) => boolean;
   beforeSessionEnd?: () => boolean;
   thumbnailCache?: ThumbnailCache;
+  onCollectionRemoved?: (item: CollectedAsset, result: CollectionRemoval) => void;
 }
 
-export default function Backpack({ open, close, kind = 'backpack', onAccountChange, beforeSessionEnd, beforeLogin, thumbnailCache }: DrawerProps) {
+export default function Backpack({ open, close, kind = 'backpack', onAccountChange, beforeSessionEnd, beforeLogin, thumbnailCache, onCollectionRemoved }: DrawerProps) {
   const account = kind === 'account';
   const title = account ? '账号设置' : '背包';
   const closeLabel = '关闭' + title;
   const accountChanged = useRef(onAccountChange);
   accountChanged.current = onAccountChange;
+  const collectionRemoved = useRef(onCollectionRemoved);
+  collectionRemoved.current = onCollectionRemoved;
   const active = useRef(open); active.current = open;
-  const drawer = useRef<HTMLElement>(null);
+  const drawer = useRef<HTMLDivElement>(null);
+  const previewPanel = useRef<HTMLElement>(null);
   const submissionSelect = useRef<HTMLSelectElement>(null);
   const [me, setMe] = useState<Me | null>(null);
   const meRef = useRef(me); meRef.current = me;
   const [loading, setLoading] = useState(true);
   const [tab, setTab] = useState<Tab>('assets');
+  const [group, setGroup] = useState<'assets' | 'collections'>('assets');
   const [authMode, setAuthMode] = useState<'login' | 'register'>('login');
   const [assets, setAssets] = useState<Asset[]>([]);
   const [assetCursor, setAssetCursor] = useState<string | null>(null);
+  const [collections, setCollections] = useState<CollectedAsset[]>([]);
+  const [collectionCursor, setCollectionCursor] = useState<string | null>(null);
+  const [selectedCollection, setSelectedCollection] = useState<string | null>(null);
+  const [renameId, setRenameId] = useState<string | null>(null);
   const [tasks, setTasks] = useState<GenerationTask[]>([]);
   const [taskCursor, setTaskCursor] = useState<string | null>(null);
   const [selected, setSelected] = useState<string | null>(null);
@@ -71,8 +82,8 @@ export default function Backpack({ open, close, kind = 'backpack', onAccountChan
   const [selectedAsset, setSelectedAsset] = useState<Asset | null>(null);
   const [openingAsset, setOpeningAsset] = useState(false);
   const selectionSequence = useRef(0);
-  const pageDepth = useRef({ assets: 1, tasks: 1 });
-  const listRevision = useRef({ assets: 0, tasks: 0 });
+  const pageDepth = useRef({ assets: 1, tasks: 1, collections: 1 });
+  const listRevision = useRef({ assets: 0, tasks: 0, collections: 0 });
   const reloadSequence = useRef(0);
   const [loadingMore, setLoadingMore] = useState(false);
   const loadingMoreRef = useRef(false);
@@ -110,15 +121,19 @@ export default function Backpack({ open, close, kind = 'backpack', onAccountChan
     return () => { live = false; };
   }, [me?.user.id, tab, open, subsRevision]);
 
-  const clearLists = useCallback(() => {
-    pageDepth.current = { assets: 1, tasks: 1 };
-    listRevision.current.assets++; listRevision.current.tasks++;
+  const closePreview = useCallback(() => {
     selectionSequence.current++;
-    setAssets([]); setTasks([]); setAssetCursor(null); setTaskCursor(null);
     setSelected(null); selectedRef.current = null; setSelectedAsset(null); setOpeningAsset(false);
-    setSubmissionId(''); setSubmissionChoice(null); setHistory([]);
+    setSelectedCollection(null);
   }, []);
-  const reload = useCallback(async (silent = false) => {
+  const clearLists = useCallback(() => {
+    pageDepth.current = { assets: 1, tasks: 1, collections: 1 };
+    listRevision.current.assets++; listRevision.current.tasks++; listRevision.current.collections++;
+    setAssets([]); setTasks([]); setCollections([]); setAssetCursor(null); setTaskCursor(null); setCollectionCursor(null);
+    closePreview(); setRenameId(null);
+    setSubmissionId(''); setSubmissionChoice(null); setHistory([]);
+  }, [closePreview]);
+  const reload = useCallback(async (silent = false, collectionsOnly = false) => {
     const version = epoch.current;
     const sequence = ++reloadSequence.current;
     const revisions = { ...listRevision.current };
@@ -126,11 +141,13 @@ export default function Backpack({ open, close, kind = 'backpack', onAccountChan
     try {
       const profile = await api<Me>('/me');
       const sameActor = meRef.current?.user.id === profile.user.id;
-      const [bag, history] = account ? [null, null] : await Promise.all([
-        loadedPages<Asset>('/assets', sameActor ? depth.assets : 1),
-        loadedPages<GenerationTask>('/generation-tasks', sameActor ? depth.tasks : 1),
+      const onlyCollections = collectionsOnly && sameActor;
+      const [bag, history, favorites] = account ? [null, null, null] : await Promise.all([
+        onlyCollections ? null : loadedPages<Asset>(listPaths.assets, sameActor ? depth.assets : 1),
+        onlyCollections ? null : loadedPages<GenerationTask>(listPaths.tasks, sameActor ? depth.tasks : 1),
+        loadedPages<CollectedAsset>(listPaths.collections, sameActor ? depth.collections : 1),
       ]);
-      const selectedId = sameActor ? selectedRef.current : null;
+      const selectedId = sameActor && !onlyCollections ? selectedRef.current : null;
       let detail: Asset | null = null;
       let missingDetail = false;
       if (selectedId) {
@@ -149,6 +166,10 @@ export default function Backpack({ open, close, kind = 'backpack', onAccountChan
       // A concurrent load-more changes the prefix this request originally read.
       if (bag && (!sameActor || revisions.assets === listRevision.current.assets)) { setAssets(bag.items); setAssetCursor(bag.nextCursor); }
       if (history && (!sameActor || revisions.tasks === listRevision.current.tasks)) { setTasks(history.items); setTaskCursor(history.nextCursor); }
+      if (favorites && (!sameActor || revisions.collections === listRevision.current.collections)) {
+        setCollections(favorites.items); setCollectionCursor(favorites.nextCursor);
+        setSelectedCollection(id => id && favorites.items.some(item => item.collectionId === id) ? id : null);
+      }
       if (selectedId && selectedId === selectedRef.current) {
         if (missingDetail) { setSelected(null); selectedRef.current = null; setSelectedAsset(null); setError('该藏品已不可访问，请刷新背包。'); }
         else if (detail) setSelectedAsset(detail);
@@ -165,21 +186,28 @@ export default function Backpack({ open, close, kind = 'backpack', onAccountChan
     } finally { if (mounted.current && version === epoch.current && sequence === reloadSequence.current) setLoading(false); }
   }, [account, clearLists]);
 
-  async function loadMore(kind: 'assets' | 'tasks') {
-    const cursor = kind === 'assets' ? assetCursor : taskCursor;
+  async function loadMore(kind: List) {
+    const cursor = { assets: assetCursor, tasks: taskCursor, collections: collectionCursor }[kind];
     if (!cursor || loadingMoreRef.current) return;
     const version = epoch.current;
     loadingMoreRef.current = true; setLoadingMore(true);
-    listRevision.current[kind]++;
+    const revision = ++listRevision.current[kind];
+    const url = `${listPaths[kind]}?cursor=${encodeURIComponent(cursor)}`;
+    const valid = () => mounted.current && version === epoch.current && revision === listRevision.current[kind];
     try {
       if (kind === 'assets') {
-        const page = await api<Page<Asset>>(`/assets?cursor=${encodeURIComponent(cursor)}`);
-        if (!mounted.current || version !== epoch.current) return;
+        const page = await api<Page<Asset>>(url);
+        if (!valid()) return;
         setAssets(items => [...items, ...page.items.filter(item => !items.some(existing => existing.id === item.id))]);
         setAssetCursor(page.nextCursor);
+      } else if (kind === 'collections') {
+        const page = await api<Page<CollectedAsset>>(url);
+        if (!valid()) return;
+        setCollections(items => [...items, ...page.items.filter(item => !items.some(existing => existing.collectionId === item.collectionId))]);
+        setCollectionCursor(page.nextCursor);
       } else {
-        const page = await api<Page<GenerationTask>>(`/generation-tasks?cursor=${encodeURIComponent(cursor)}`);
-        if (!mounted.current || version !== epoch.current) return;
+        const page = await api<Page<GenerationTask>>(url);
+        if (!valid()) return;
         setTasks(items => [...items, ...page.items.filter(item => !items.some(existing => existing.id === item.id))]);
         setTaskCursor(page.nextCursor);
       }
@@ -190,7 +218,7 @@ export default function Backpack({ open, close, kind = 'backpack', onAccountChan
 
   async function openAsset(id: string) {
     const version = epoch.current, sequence = ++selectionSequence.current;
-    setTab('assets'); setSelected(id); selectedRef.current = id; setOpeningAsset(true); setError('');
+    setTab('assets'); setGroup('assets'); setSelectedCollection(null); setSelected(id); selectedRef.current = id; setOpeningAsset(true); setError('');
     try {
       const detail = await api<Asset>(`/assets/${encodeURIComponent(id)}`);
       if (!mounted.current || version !== epoch.current || sequence !== selectionSequence.current || selectedRef.current !== id) return;
@@ -206,8 +234,9 @@ export default function Backpack({ open, close, kind = 'backpack', onAccountChan
   useEffect(() => {
     if (account || !open || !me) return;
     const timer = window.setInterval(() => {
-      if (document.hidden || busyRef.current) return;
+      if (document.hidden || busyRef.current || loadingMoreRef.current) return;
       if (meRef.current?.activeTask) { void reload(true); return; }
+      if (tab === 'assets' && group === 'collections') { void reload(true, true); return; }
       if (open) {
         const version = epoch.current;
         void api<Me>('/me').then(profile => {
@@ -218,13 +247,13 @@ export default function Backpack({ open, close, kind = 'backpack', onAccountChan
       }
     }, 5000);
     return () => window.clearInterval(timer);
-  }, [account, me?.user.id, open, reload]);
+  }, [account, me?.user.id, open, reload, tab, group]);
   useEffect(() => {
-    if (!open) return;
+    if (!open) { closePreview(); setRenameId(null); return; }
     setSubmissionChoice(null);
     setLoading(true);
     void reload();
-  }, [open, reload]);
+  }, [open, reload, closePreview]);
 
   async function completedGeneration() {
     forgetGeneration();
@@ -245,9 +274,15 @@ export default function Backpack({ open, close, kind = 'backpack', onAccountChan
   useEffect(() => {
     if (!open) return;
     const previous = document.activeElement as HTMLElement | null;
-    drawer.current?.querySelector<HTMLButtonElement>('.t10-drawer-head button')?.focus();
+    drawer.current?.querySelector<HTMLButtonElement>('.bag-drawer .t10-drawer-head button')?.focus();
     const trap = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') { event.preventDefault(); event.stopPropagation(); close(); return; }
+      if (event.key === 'Escape') {
+        event.preventDefault(); event.stopPropagation();
+        if (document.activeElement?.closest('.bag-card-rename')) setRenameId(null);
+        else if (previewPanel.current) closePreview();
+        else close();
+        return;
+      }
       if (event.key !== 'Tab' || !drawer.current) return;
       const controls = [...drawer.current.querySelectorAll<HTMLElement>('button:not(:disabled), input:not(:disabled), select:not(:disabled), textarea:not(:disabled), a[href], [tabindex="0"]')].filter(element => element.getClientRects().length);
       const first = controls[0], last = controls.at(-1);
@@ -257,7 +292,7 @@ export default function Backpack({ open, close, kind = 'backpack', onAccountChan
     };
     window.addEventListener('keydown', trap, true);
     return () => { window.removeEventListener('keydown', trap, true); if (previous?.isConnected) previous.focus(); };
-  }, [open, close]);
+  }, [open, close, closePreview]);
 
   async function execute(action: Pending) {
     if (busyRef.current || (action.actorId && action.actorId !== meRef.current?.user.id)) return;
@@ -284,7 +319,7 @@ export default function Backpack({ open, close, kind = 'backpack', onAccountChan
       setError(reason instanceof Error ? reason.message : '操作未完成，请重试确认。');
       if (definitive) void reload(true);
     } finally { busyRef.current = false; setBusy(false); }
-    if (succeeded) {
+    if (succeeded && mounted.current && (!action.actorId || action.actorId === meRef.current?.user.id)) {
       try { await action.success(result); }
       catch (reason) { setError(reason instanceof Error ? reason.message : '操作已完成，请刷新查看。'); }
     }
@@ -326,6 +361,9 @@ export default function Backpack({ open, close, kind = 'backpack', onAccountChan
   }
   const locked = busy || pending !== null;
   const asset = selectedAsset?.id === selected ? selectedAsset : assets.find(item => item.id === selected);
+  const favorite = collections.find(item => item.collectionId === selectedCollection);
+  const preview = group === 'collections' ? favorite : asset;
+  const author = group === 'collections' ? favorite?.authorNickname : me?.user.nickname;
   const choice = submissionChoice?.id === submissionId ? submissionChoice : null;
   function chooseSubmission(id: string) {
     if (id === submissionId) return;
@@ -343,10 +381,32 @@ export default function Backpack({ open, close, kind = 'backpack', onAccountChan
       if (next === 'assets') void reload(true);
     }
     setTab(next);
-    setSelected(null);
-    selectedRef.current = null;
-    selectionSequence.current++;
-    setOpeningAsset(false);
+    closePreview(); setRenameId(null);
+  }
+  function changeGroup(next: 'assets' | 'collections') {
+    if (next === group) return;
+    setGroup(next); closePreview(); setRenameId(null);
+    if (next === 'collections') void reload(true, true);
+  }
+  function rename(event: FormEvent<HTMLFormElement>, item: Asset) {
+    event.preventDefault();
+    const name = String(new FormData(event.currentTarget).get('name') ?? '').trim();
+    if (!name) { setError('请输入藏品名称。'); return; }
+    write(`/assets/${item.id}`, { name }, '重试保存藏品名称', async () => {
+      setRenameId(null);
+      await reload();
+      setMessage('藏品名称已保存。');
+    }, 'PATCH');
+  }
+  function uncollect(item: CollectedAsset) {
+    write(`/collections/${item.collectionId}`, {}, '重试取消收藏', (result: CollectionRemoval) => {
+      listRevision.current.collections++;
+      setCollections(items => items.filter(row => row.collectionId !== item.collectionId));
+      setSelectedCollection(id => id === item.collectionId ? null : id);
+      thumbnailCache?.delete(item.modelFileId);
+      collectionRemoved.current?.(item, result);
+      setMessage('已取消收藏。');
+    }, 'DELETE');
   }
   function endSession(message: string) {
     epoch.current++;
@@ -355,8 +415,8 @@ export default function Backpack({ open, close, kind = 'backpack', onAccountChan
     accountChanged.current?.(null, true);
     setMessage(message);
   }
-  return <div className="personal-drawer-layer" hidden={!open} onClick={event => { if (event.target === event.currentTarget) close(); }}>
-    <aside ref={drawer} className="t10-drawer bag-drawer" role="dialog" aria-modal="true" aria-label={title}>
+  return <div ref={drawer} className="personal-drawer-layer" role="dialog" aria-modal="true" aria-label={title} hidden={!open} onClick={event => { if (event.target === event.currentTarget) close(); }}>
+    <aside className="t10-drawer bag-drawer">
     <div className="t10-drawer-head"><div><h2>{account ? title : '我的背包'}</h2><small>{me ? `${me.user.nickname} · ${me.user.username}` : account ? '登录或创建账号' : '收藏从一张图片开始'}</small></div><button type="button" aria-label={closeLabel} onClick={close}>×</button></div>
     <div className="bag-scroll">
       {error && <div className="bag-notice error" role="alert">{error}</div>}
@@ -406,26 +466,38 @@ export default function Backpack({ open, close, kind = 'backpack', onAccountChan
             {me.quota.available === 0 && <p className="bag-muted">今日次数已用完，北京时间 00:00 更新。</p>}
           </>}
         </section>}
-        {tab === 'assets' && (selected && openingAsset && !asset ? <p className="bag-muted" role="status">正在读取藏品…</p> : asset ? <section className="bag-asset-detail" aria-label="藏品详情">
-          <button type="button" className="bag-text-button" onClick={() => { setSelected(null); selectedRef.current = null; selectionSequence.current++; setOpeningAsset(false); }}>← 返回全部藏品</button>
-          {open && <ModelPreview fileId={asset.modelFileId} name={asset.name} />}
-          <form className="bag-form" key={`${asset.id}:${asset.name}:${asset.description}`} onSubmit={event => {
-            event.preventDefault(); const data = new FormData(event.currentTarget);
-            write(`/assets/${asset.id}`, { name: String(data.get('name')), description: String(data.get('description')) }, '重试保存藏品资料', async () => { await reload(); setMessage('藏品资料已保存。'); }, 'PATCH');
-          }}>
-            <label>名称<input name="name" defaultValue={asset.name} required maxLength={80} disabled={locked} /></label>
-            <label>简介<textarea name="description" defaultValue={asset.description} maxLength={2000} rows={4} disabled={locked} /></label>
-            <button type="submit" disabled={locked}>保存资料</button>
-          </form>
-        </section> : <section className="bag-collection" aria-label="个人藏品">
-          <div className="bag-section-heading"><h3>个人藏品 <small>{assets.length}</small></h3><button type="button" className="bag-text-button" disabled={busy} onClick={() => void reload()}>刷新</button></div>
-          {assets.length ? <div className="bag-grid">{assets.map(item => <button type="button" className={item.submissionApproved ? 'bag-asset-card approved' : 'bag-asset-card'} key={item.id} onClick={() => void openAsset(item.id)}>
-            <AssetThumbnail asset={item} cache={thumbnailCache} />
-            <strong className="asset-short-name" title={item.name}>{item.name}</strong>
-            {item.submissionApproved && <span className="bag-approved">已通过</span>}
-          </button>)}</div> : <div className="bag-empty"><span className="t10-seal">囊</span><p>背包还空着</p><small>到「生成任务」上传图片，生成的藏品会在这里出现。</small></div>}
-          {assetCursor && <button type="button" disabled={busy || loadingMore} onClick={() => void loadMore('assets')}>加载更多藏品</button>}
-        </section>)}
+        {tab === 'assets' && <section className="bag-collection" aria-label="个人藏品">
+          <div className="bag-section-heading">
+            <nav className="bag-asset-groups" aria-label="藏品分类">
+              <button type="button" aria-pressed={group === 'assets'} onClick={() => changeGroup('assets')}>我生成的</button>
+              <button type="button" aria-pressed={group === 'collections'} onClick={() => changeGroup('collections')}>我收藏的</button>
+            </nav>
+            <button type="button" className="bag-text-button" disabled={busy} onClick={() => void reload()}>刷新</button>
+          </div>
+          {group === 'assets' ? <>
+            {assets.length ? <div className="bag-grid">{assets.map(item => <article className={`bag-asset-card${item.submissionApproved ? ' approved' : ''}`} key={item.id}>
+              <button type="button" className="bag-card-cover" aria-label={`预览模型：${item.name}`} tabIndex={-1} onClick={() => void openAsset(item.id)}><AssetThumbnail asset={item} cache={thumbnailCache} /></button>
+              {item.submissionApproved && <span className="bag-approved">已通过</span>}
+              {renameId === item.id ? <form className="bag-form bag-card-rename" onSubmit={event => rename(event, item)}>
+                <input name="name" aria-label="藏品名称" defaultValue={item.name} autoFocus required maxLength={80} disabled={locked} />
+                <div><button type="submit" disabled={locked}>保存名称</button><button type="button" disabled={locked} onClick={() => setRenameId(null)}>取消</button></div>
+              </form> : <div className="bag-card-title">
+                <button type="button" className="bag-card-name" title={item.name} onClick={() => void openAsset(item.id)}>{item.name}</button>
+                <button type="button" className="bag-card-pencil" aria-label={`修改名称：${item.name}`} title="修改名称" disabled={locked} onClick={() => setRenameId(item.id)}>
+                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="m14 6 4 4M4 20l4.5-1 11-11a2.8 2.8 0 0 0-4-4l-11 11L4 20Z" /></svg>
+                </button>
+              </div>}
+            </article>)}</div> : <div className="bag-empty"><span className="t10-seal">囊</span><p>还没有生成的藏品</p><small>到「生成任务」上传图片，生成的藏品会在这里出现。</small></div>}
+            {assetCursor && <button type="button" disabled={busy || loadingMore} onClick={() => void loadMore('assets')}>加载更多藏品</button>}
+          </> : <>
+            {collections.length ? <div className="bag-grid">{collections.map(item => <article className="bag-asset-card" key={item.collectionId}>
+              <button type="button" className="bag-card-cover" aria-label={`预览模型：${item.name}`} tabIndex={-1} onClick={() => setSelectedCollection(item.collectionId)}><AssetThumbnail asset={item} cache={thumbnailCache} /></button>
+              <div className="bag-card-title"><button type="button" className="bag-card-name" title={item.name} onClick={() => setSelectedCollection(item.collectionId)}>{item.name}</button></div>
+              <button type="button" className="bag-text-button bag-uncollect" aria-label={`取消收藏：${item.name}`} disabled={locked} onClick={() => uncollect(item)}>取消收藏</button>
+            </article>)}</div> : <div className="bag-empty"><span className="t10-seal">藏</span><p>还没有收藏的展品</p><small>在藏宝阁按 E 查看展品，就能添加到我的藏品。</small></div>}
+            {collectionCursor && <button type="button" disabled={busy || loadingMore} onClick={() => void loadMore('collections')}>加载更多收藏</button>}
+          </>}
+        </section>}
         {tab === 'tasks' && <section className="bag-task-list" aria-label="生成任务列表">
           <div className="bag-section-heading"><h3>生成任务</h3><button type="button" className="bag-text-button" disabled={busy} onClick={() => void reload()}>刷新</button></div>
           {!tasks.length && <p className="bag-muted">还没有生成记录。</p>}
@@ -463,6 +535,10 @@ export default function Backpack({ open, close, kind = 'backpack', onAccountChan
     {account && me?.user.role === 'admin' && <a className="t10-drawer-link" href="/admin">管理后台 →</a>}
     <small className="t10-drawer-foot">Esc 关闭{!account && ' · 藏品仅本人可见'}</small>
     </aside>
+    {open && me && !account && tab === 'assets' && (preview || openingAsset) && <section ref={previewPanel} className="bag-side-preview" aria-label="藏品预览">
+      <div className="t10-drawer-head"><h2>{preview ? `${preview.name}（${author}）` : '正在读取藏品…'}</h2><button type="button" aria-label="关闭藏品预览" onClick={closePreview}>×</button></div>
+      {preview && <ModelPreview fileId={preview.modelFileId} name={preview.name} showHint={false} />}
+    </section>}
   </div>;
 }
 

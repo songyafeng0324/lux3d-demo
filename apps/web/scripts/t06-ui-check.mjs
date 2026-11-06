@@ -20,7 +20,7 @@ await page.route('**/api/v1/**', async route => {
   if (path === '/auth/register') return ok({ user });
   if (path === '/auth/login') { logged = true; return ok({ user, csrfToken: 'csrf-qa' }); }
   if (path === '/me' && method === 'GET') return logged ? ok({ user, roomId: 'room-1', quota: { day: '2026-11-05', total: 10, used: tasks.length, available: 10 - tasks.length }, activeTask: tasks.find(task => task.status === 'processing') ?? null, csrfToken: 'csrf-qa' }) : fail(401, '请先登录');
-  if (path === '/furniture') return ok({ items: [], nextCursor: null });
+  if (path === '/furniture' || path === '/collections') return ok({ items: [], nextCursor: null });
   if (path === '/rooms/me') return ok({ id: 'room-1', name: '藏家小屋', version: 1, sceneVersion: 'courtyard-v1', placements: [], assets: [], shareEnabled: false });
   if (path === '/files/input-1/content') return route.fulfill({ status: 200, contentType: 'image/png', body: await fs.readFile(new URL('../../../tests/fixtures/lux3d-vase.png', import.meta.url)) });
   if (path === '/assets' && method === 'GET') return ok({ items: assets, nextCursor: null });
@@ -101,18 +101,20 @@ try {
   assets = [{ id: 'asset-1', name: '资产01', description: '', modelFileId: 'model-1', originalImageId: 'input-1', createdAt: now, normalization: {}, bounds: {} }];
   await bag.getByRole('button', { name: '刷新', exact: true }).click();
   await bag.getByRole('button', { name: '查看藏品 →' }).click();
-  await bag.getByText('拖动旋转 · 滚轮缩放').waitFor();
+  const preview = bag.getByRole('region', { name: '藏品预览' });
+  await preview.locator('canvas').waitFor();
+  await page.waitForFunction(() => !document.querySelector('.bag-side-preview .bag-preview-status'));
   await shot('02-model-preview.png');
-  const saveAsset = bag.getByRole('button', { name: '保存资料' });
-  const assetForm = bag.locator('form').filter({ has: page.getByRole('button', { name: '保存资料' }) });
-  await assetForm.getByLabel('名称', { exact: true }).fill('我的瓷瓶');
-  await assetForm.getByLabel('简介', { exact: true }).fill('个人收藏');
-  await saveAsset.click();
-  await bag.getByText('藏品资料已保存。').waitFor(); assert.equal(assets[0].name, '我的瓷瓶');
-  await bag.getByRole('button', { name: '← 返回全部藏品' }).click();
+  await bag.getByRole('button', { name: '修改名称：资产01', exact: true }).click();
+  await bag.getByRole('textbox', { name: '藏品名称', exact: true }).fill('我的瓷瓶');
+  assert.equal(await bag.getByLabel('简介', { exact: true }).count(), 0);
+  await bag.getByRole('button', { name: '保存名称', exact: true }).click();
+  await bag.getByText('藏品名称已保存。').waitFor(); assert.equal(assets[0].name, '我的瓷瓶');
+  await preview.getByRole('heading', { name: '我的瓷瓶（藏家）' }).waitFor();
+  await bag.getByRole('button', { name: '关闭藏品预览' }).click();
   await bag.locator('.bag-asset-card img').waitFor();
   await page.waitForFunction(() => document.querySelector('.bag-asset-card img')?.naturalWidth > 0);
-  assert.equal(await bag.locator('.bag-asset-card .asset-short-name').textContent(), '我的瓷瓶');
+  assert.equal(await bag.locator('.bag-card-name').textContent(), '我的瓷瓶');
   await page.keyboard.press('Escape');
   await page.getByRole('button', { name: '菜单', exact: true }).click();
   await page.getByRole('button', { name: '账号设置' }).click();

@@ -49,6 +49,54 @@ test('room save retries a lost response with exactly the original key/body befor
  }finally{h.saver.dispose();}
 });
 
+test('a late layout ACK advances through a confirmed uncollect and preserves other edits',async()=>{
+ const first=deferred();
+ const h=harness(async c=>{
+  if(c.method==='GET')return confirmed();
+  const body=JSON.parse(c.body);
+  return h.puts().length===1?first.promise:{savedVersion:3,editSequence:body.editSequence};
+ });
+ const collected={id:'collected',assetId:randomUUID(),position:[0,0,0],rotation:[0,0,0],scale:1};
+ const own={...collected,id:'own',assetId:randomUUID()};
+ try{
+  await h.saver.load();
+  h.saver.edit('起始布置',[collected]);
+  const flight=h.saver.flush();await settle();
+  h.saver.edit('更新布置',[collected,own]);
+  h.saver.removeCollectedAsset(collected.assetId,{previousVersion:1,roomVersion:2,placementsRemoved:1});
+  assert.deepEqual(h.saver.current.placements.map(p=>p.id),['own']);
+  first.resolve({savedVersion:1,editSequence:JSON.parse(h.puts()[0].body).editSequence});
+  await flight;
+  assert.equal(h.saver.state.version,2);
+  assert.equal(h.saver.state.status,'dirty');
+  await h.advance(100);
+  const next=JSON.parse(h.puts()[1].body);
+  assert.equal(next.baseVersion,2);
+  assert.equal(next.name,'更新布置');
+  assert.deepEqual(next.placements,[own]);
+  assert.equal(h.saver.state.status,'saved');
+ }finally{h.saver.dispose();}
+});
+
+for(const reload of [false,true]) test(`uncollect during ${reload?'reload':'initial load'} fetches the new version before displaying a layout`,async()=>{
+ const stale=deferred(),prepared=[];
+ let reads=0;
+ const h=harness(async()=>{
+  reads++;
+  if(reload&&reads===1)return confirmed(1);
+  return reads===(reload?2:1)?stale.promise:confirmed(2);
+ },{prepare:async room=>{prepared.push(room.version);}});
+ try{
+  if(reload)await h.saver.load();
+  const loading=h.saver.load();await settle();
+  h.saver.removeCollectedAsset(randomUUID(),{previousVersion:1,roomVersion:2,placementsRemoved:1});
+  stale.resolve(confirmed(1));await loading;
+  assert.deepEqual(prepared,reload?[1,2]:[2]);
+  assert.equal(h.saver.state.version,2);
+  assert.equal(h.saver.state.status,'saved');
+ }finally{h.saver.dispose();}
+});
+
 for(const status of [422,413])test(`room save clears a definite ${status} rejection and commits a fresh corrected draft`,async()=>{
  const rejected=deferred();let puts=0;const h=harness(async c=>{if(c.method==='GET')return confirmed();puts++;if(puts===1)return rejected.promise;const b=JSON.parse(c.body);return {savedVersion:1,editSequence:b.editSequence};});
  try{

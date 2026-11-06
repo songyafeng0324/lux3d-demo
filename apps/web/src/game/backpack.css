@@ -27,3 +27,22 @@
 .bag-approved{position:absolute;top:8px;right:8px;padding:2px 6px;border:1px solid #73c9b1;border-radius:4px;background:#193c34;color:#d1f5e9;font-size:11px}
 .bag-submission-choice{margin-bottom:22px}
 .bag-task .bag-history-actions{justify-content:flex-start;margin:0}
+
+.bag-asset-groups{display:flex;gap:8px}
+.bag-drawer .bag-asset-card{position:relative;border:1px solid var(--line);border-radius:6px;background:rgba(214,176,104,.06)}
+.bag-drawer .bag-asset-card:hover,.bag-drawer .bag-asset-card:focus-within{border-color:var(--gold)}
+.bag-card-title{display:flex;align-items:center;gap:5px;width:100%;min-width:0}
+.bag-drawer .bag-card-name{min-width:0;padding:2px 0;border:0;background:none;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;text-align:left}
+.bag-drawer .bag-card-cover,.bag-drawer .bag-card-cover:hover{display:block;width:100%;padding:0;border:0;background:none}
+.bag-approved{pointer-events:none}
+.bag-drawer .bag-card-pencil{display:grid;place-items:center;flex:none;padding:4px;border-color:transparent;background:none;color:var(--gold)}
+.bag-drawer .bag-card-pencil:hover{border-color:var(--line)}
+.bag-drawer .bag-uncollect{margin-top:-4px}
+.bag-card-rename{width:100%;gap:6px;margin:0}
+.bag-card-rename div{display:flex;flex-wrap:wrap;gap:5px}
+.bag-card-rename div button{padding:4px 7px}
+.bag-side-preview{position:absolute;top:50%;right:544px;width:min(640px,calc(100% - 568px));transform:translateY(-50%);padding:20px;border:1px solid var(--line);border-radius:8px;background:rgba(18,13,10,.96);box-shadow:0 14px 40px rgba(0,0,0,.35)}
+.bag-side-preview .t10-drawer-head h2{font-size:18px;overflow-wrap:anywhere}
+.bag-side-preview .bag-preview-wrap{margin:12px 0 0}
+.bag-side-preview .bag-preview{height:min(54vh,480px)}
+@media(max-width:840px){.bag-side-preview{right:16px;left:16px;width:auto;z-index:1}}

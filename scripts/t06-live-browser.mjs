@@ -7,10 +7,10 @@ try{
  await page.goto(base+'/room?backpack=1');const bag=page.getByRole('dialog',{name:'背包',exact:true});
  await bag.getByLabel('用户名',{exact:true}).fill(account.username);await bag.getByLabel('密码',{exact:true}).fill(account.password);await bag.getByRole('button',{name:'登录并打开背包'}).click();await bag.getByRole('region',{name:'个人藏品'}).waitFor();
  const me=await page.request.get(base+'/api/v1/me').then(r=>r.json());assert.equal(me.data.quota.available,Math.max(0,me.data.quota.total-me.data.quota.used));assert.equal(me.data.activeTask,null);
- await bag.getByRole('button',{name:/资产01/}).click();await bag.getByText('拖动旋转 · 滚轮缩放').waitFor({timeout:30000});
+ await bag.getByRole('button',{name:'资产01',exact:true}).click();await bag.locator('.bag-side-preview canvas').waitFor({timeout:30000});await page.waitForFunction(()=>!document.querySelector('.bag-side-preview .bag-preview-status'));
  const canvas=bag.locator('.bag-preview canvas');const start=hash(await canvas.screenshot());const box=await canvas.boundingBox();await page.mouse.move(box.x+box.width*.5,box.y+box.height*.5);await page.mouse.down();await page.mouse.move(box.x+box.width*.7,box.y+box.height*.6,{steps:15});await page.mouse.up();await page.waitForTimeout(300);const rotated=hash(await canvas.screenshot());assert.notEqual(rotated,start);
  await page.mouse.wheel(0,-220);await page.waitForTimeout(300);const zoomed=hash(await canvas.screenshot());assert.notEqual(zoomed,rotated);
- await page.screenshot({path:out+'/backpack-real-model.png'});await page.keyboard.press('Escape');await page.getByRole('button',{name:'背包',exact:true}).click();await canvas.waitFor();
+ await page.screenshot({path:out+'/backpack-real-model.png'});await page.keyboard.press('Escape');await canvas.waitFor({state:'detached'});
  await page.reload();await bag.getByRole('button',{name:'生成任务',exact:true}).click();await bag.getByText('今日可用').waitFor();await bag.getByText('已入背包',{exact:true}).waitFor();await page.screenshot({path:out+'/task-succeeded.png'});
  assert.deepEqual(errors,[]);const report={pass:true,realAPI:true,realGeneratedModel:true,username:account.username,taskId:account.taskId,browser:await browser.version(),quota:me.data.quota,sessionSurvivesReload:true,rotationChangesPixels:true,zoomChangesPixels:true,pageErrors:errors,checkedAt:new Date().toISOString()};await fs.writeFile(out+'/browser.json',JSON.stringify(report,null,2));console.log(JSON.stringify(report,null,2));
 }finally{await browser.close();}
