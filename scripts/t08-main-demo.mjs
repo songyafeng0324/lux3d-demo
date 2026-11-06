@@ -48,7 +48,7 @@ try{
  await vp.keyboard.press('KeyE');await vp.getByRole('dialog',{name:'瓷瓶（演示投稿）详情'}).getByText(`投稿 · ${latest.publicSnapshot?.sourceNickname??demo.nickname}`).waitFor();
  await vp.waitForFunction(()=>!document.querySelector('.t10-exhibit .bag-preview-status'),null,{timeout:90000});await vp.screenshot({path:path.join(out,'main-02-visitor-detail.png')});log('visitor sees the real model and its E detail in Chrome');
  const ap=await (await browser.newContext({viewport:{width:1440,height:900}})).newPage();ap.on('pageerror',e=>errors.push(e.message));
- await ap.goto(base+'/admin');await ap.getByLabel('用户名').fill(admin.username);await ap.getByLabel('密码').fill(admin.password);await ap.getByRole('button',{name:'登录',exact:true}).click();
+ await ap.goto(base+'/admin');await ap.getByLabel('用户名').fill(admin.username);await ap.getByLabel('密码',{exact:true}).fill(admin.password);await ap.getByRole('button',{name:'登录',exact:true}).click();
  await ap.getByRole('button',{name:'候选与展位'}).click();await ap.locator('.adm-slot',{hasText:'瓷瓶（演示投稿）'}).waitFor();await ap.screenshot({path:path.join(out,'main-03-admin-gallery.png')});log('administrator logs into /admin and sees the arrangement');
  assert.deepEqual(errors,[]);result.pass=true;result.chrome=browser.version();
 }catch(e){result.pass=false;result.error=String(e.message??e).slice(0,500);console.error('FAIL',e);process.exitCode=1;}

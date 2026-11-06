@@ -2,7 +2,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import { buildNavWorld, step, supportAt, floorOf, targetSlot, BODY, COLUMNS, UPPER_Y } from '../apps/web/src/game/navigation.ts';
+import { buildNavWorld, step, stepFirstPerson, supportAt, floorOf, targetSlot, BODY, COLUMNS, UPPER_Y } from '../apps/web/src/game/navigation.ts';
 
 const layout = JSON.parse(readFileSync(new URL('../assets/t10/pavilion-layout.json', import.meta.url)));
 const draft = JSON.parse(readFileSync(new URL('../docs/design/t10-a/layout-draft.json', import.meta.url)));
@@ -120,4 +120,25 @@ test('E target: facing a plinth within 3 m, nothing when looking away or too far
   assert.equal(targetSlot(world, [eye[0] + 3, eye[1], eye[2]], d.map(v => v / l)), null);
   assert.equal(floorOf(0), 'ground'); assert.equal(floorOf(2.4), 'stairs'); assert.equal(floorOf(4.8), 'upper');
   assert.deepEqual(step(world, world.entry, still, 0, 1), world.entry);
+});
+
+test('one jump clears the atrium guard, lands on the ground floor and cannot tunnel at 4 FPS', () => {
+  for (const dt of [1 / 60, .25]) {
+    let player = { x: 0, y: UPPER_Y, z: 7.9, velocityY: null }, peak = player.y;
+    for (let t = 0; t < 2; t += dt) {
+      player = stepFirstPerson(world, player, fwd, 0, dt, t === 0);
+      peak = Math.max(peak, player.y);
+    }
+    assert.ok(peak > UPPER_Y + 1.25);
+    assert.ok(player.z < 7.5 && player.y === 0 && player.velocityY === null, JSON.stringify(player));
+  }
+});
+
+test('jumping under a mezzanine beam stops the head at the timber and still lands', () => {
+  const high = { x: 0, z: 7.9, y: 2.4, velocityY: null };
+  let player = stepFirstPerson(world, high, still, 0, .25, true);
+  assert.ok(player.y + BODY.height <= 4.23);
+  for (let t = 0; t < 2; t += .25) player = stepFirstPerson(world, player, still, 0, .25, false);
+  assert.equal(player.y, 0);
+  assert.equal(player.velocityY, null);
 });

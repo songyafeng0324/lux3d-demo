@@ -36,7 +36,7 @@ test('T06 real API: account, cookie/CSRF, idempotency, quota, authorization and 
   assert.equal((await call('POST','/api/v1/auth/login',{username:account.username,password:'wrong-password-123'})).statusCode,401);
   const login=await call('POST','/api/v1/auth/login',{username:account.username,password:account.password});assert.equal(login.statusCode,200,login.body);assert.match(login.headers['set-cookie'],/HttpOnly; SameSite=Strict/);
   const cookie=login.headers['set-cookie'].split(';')[0];const csrf=login.json().data.csrfToken;const headers={cookie,'x-csrf-token':csrf};
-  const me=await call('GET','/api/v1/me',undefined,headers);assert.equal(me.statusCode,200);assert.equal(me.json().data.quota.available,3);assert.equal(me.json().data.activeTask,null);
+  const me=await call('GET','/api/v1/me',undefined,headers);assert.equal(me.statusCode,200);assert.equal(me.json().data.quota.available,10);assert.equal(me.json().data.activeTask,null);
   assert.equal((await call('PATCH','/api/v1/me',{nickname:'新昵称'},{cookie})).statusCode,403);
   assert.equal((await call('PATCH','/api/v1/me',{nickname:'新昵称'},{cookie,'x-csrf-token':'x'.repeat(63)+'é'})).statusCode,403);
   const nick=await call('PATCH','/api/v1/me',{nickname:'新昵称'},headers);assert.equal(nick.statusCode,200,nick.body);assert.equal(nick.json().data.user.username,account.username);
@@ -64,7 +64,7 @@ test('T06 real API: account, cookie/CSRF, idempotency, quota, authorization and 
   try{
    const nextDayQuota=(await call('GET','/api/v1/me',undefined,headers)).json().data.quota;
    assert.notEqual(nextDayQuota.day,day);
-   assert.deepEqual([nextDayQuota.total,nextDayQuota.used,nextDayQuota.available],[3,0,3]);
+   assert.deepEqual([nextDayQuota.total,nextDayQuota.used,nextDayQuota.available],[10,0,10]);
    const activeAcrossDays=await call('POST','/api/v1/generation-tasks',{inputFileId},headers);
    assert.equal(activeAcrossDays.json().error.code,'TASK_IN_PROGRESS');
   }finally{t.mock.timers.reset();}
@@ -85,11 +85,17 @@ test('T06 real API: account, cookie/CSRF, idempotency, quota, authorization and 
   assert.equal(uploadedAgain.statusCode,201);
   const secondInput=uploadedAgain.json().data.inputFileId;
   assert.notEqual(secondInput,inputFileId);
-  await pool.query('UPDATE quota_days SET override_total=2 WHERE user_id=$1 AND quota_day=$2',[uid,day]);
+  await pool.query('UPDATE quota_days SET override_total=NULL,used_net=9 WHERE user_id=$1 AND quota_day=$2',[uid,day]);
   const submitAgain=()=>call('POST','/api/v1/generation-tasks',{inputFileId:secondInput},{...headers,'idempotency-key':randomUUID()});
   const competing=await Promise.all([submitAgain(),submitAgain()]);
   assert.deepEqual(competing.map(r=>r.statusCode).sort(),[202,422]);
   assert.equal(competing.find(r=>r.statusCode===422).json().error.code,'TASK_IN_PROGRESS');
+  const tenth=competing.find(r=>r.statusCode===202).json().data;
+  const full=(await call('GET','/api/v1/me',undefined,headers)).json().data.quota;
+  assert.deepEqual([full.total,full.used,full.available],[10,10,0]);
+  // Clear the fixture's active slot so the next request reaches the quota check.
+  await pool.query("UPDATE generation_tasks SET status='failed' WHERE id=$1",[tenth.id]);
+  assert.equal((await submitAgain()).json().error.code,'QUOTA_EXHAUSTED');
   assert.equal((await call('GET','/api/v1/generation-tasks/'+task.id,undefined,headers)).json().data.status,'succeeded');
   assert.equal((await pool.query("SELECT count(*)::int n FROM quota_events WHERE user_id=$1 AND kind='reserve' AND quota_day=$2",[uid,day])).rows[0].n,2);
   const file=await call('GET',`/api/v1/files/${inputFileId}/content`,undefined,headers);assert.equal(file.statusCode,200);assert.equal(file.headers['cache-control'],'private, no-store');assert.deepEqual(file.rawPayload,image);

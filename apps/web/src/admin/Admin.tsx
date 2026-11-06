@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent, type ReactNode } from 'react';
 import layout from '../../../../assets/t10/pavilion-layout.json';
-import { GALLERY_SLOT_COUNT, slotMarker, type PublicDetails, type RoomModel } from '@aholo/contracts';
+import { DEFAULT_DAILY_QUOTA, GALLERY_SLOT_COUNT, slotMarker, type PublicDetails, type RoomModel } from '@aholo/contracts';
 import ModelPreview from '../game/ModelPreview.js';
+import PasswordField, { credentialError } from '../game/PasswordField.js';
 import { api, ApiError, fileUrl, type Me, type Page, type PublicFields } from '../game/backpack-api.js';
 import '../game/game.css';
 import '../game/backpack.css';
@@ -67,15 +68,18 @@ export default function Admin() {
 
   function login(event: FormEvent<HTMLFormElement>) {
     event.preventDefault(); const d = new FormData(event.currentTarget);
-    write('/auth/login', 'POST', { username: String(d.get('username')), password: String(d.get('password')) }, '重试登录', async () => { await loadMe(); });
+    const username = String(d.get('username')), password = String(d.get('password'));
+    const invalid = credentialError(username, password);
+    if (invalid) { setError(invalid); return; }
+    write('/auth/login', 'POST', { username, password }, '重试登录', async () => { await loadMe(); });
   }
 
   let body: ReactNode;
   if (loading) body = <p className="adm-muted" role="status">正在读取登录状态…</p>;
-  else if (!me) body = <form className="bag-form adm-login" onSubmit={login}>
+  else if (!me) body = <form className="bag-form adm-login" noValidate onSubmit={login}>
     <h2>管理员登录</h2>
-    <label>用户名<input name="username" autoComplete="username" required minLength={3} maxLength={32} disabled={locked} /></label>
-    <label>密码<input name="password" type="password" autoComplete="current-password" required minLength={12} maxLength={128} disabled={locked} /></label>
+    <label>用户名<input name="username" autoComplete="username" required disabled={locked} /></label>
+    <PasswordField autoComplete="current-password" disabled={locked} />
     <button className="bag-primary" type="submit" disabled={locked}>登录</button>
     <p className="adm-muted">管理员由本机 seed:admin 预置；后台不提供注册、找回或重置密码。</p>
   </form>;
@@ -304,7 +308,7 @@ function UsersTab({ write, locked, revision, refresh, setMessage }: TabProps) {
           <form onSubmit={e => { e.preventDefault(); const total = Number(new FormData(e.currentTarget).get('total')); write(`/admin/users/${d.user.id}/quota`, 'PUT', { total }, '确认上次调额', (r: UserDetail['quota']) => { setMessage(`已把 ${d.user.username} 今天的总额度调为 ${r.total}，当前可用 ${r.available}。已用不清零，在途任务不受影响。`); refresh(); }); }}>
             <label>当天总额度<input name="total" type="number" min={0} max={1000} step={1} required defaultValue={d.quota.total} key={d.quota.total} disabled={locked} /></label><button type="submit" disabled={locked}>调整</button>
           </form>
-          <small className="adm-muted">只影响今天；北京时间 00:00 恢复默认 3 次。不提供改资料、编辑小屋、停用账号或重置密码。</small>
+          <small className="adm-muted">只影响今天。北京时间 00:00 恢复默认 {DEFAULT_DAILY_QUOTA} 次。不提供改资料、编辑小屋、停用账号或重置密码。</small>
         </div>
         <h3>最近任务</h3>
         {!d.tasks.length && <p className="adm-muted">没有生成任务。</p>}

@@ -1,10 +1,24 @@
 import {ROOM_BOUNDS,SCENE_VERSION,transformedBoundsCorners,type Bounds,type Vec3} from './scene.js';
+export const ROOM_COURTYARD_BOUNDS: Bounds = { min: [-11, -.4, -9], max: [11, ROOM_BOUNDS.max[1], 9] };
+export const ROOM_PLATFORM_HALF = { x: ROOM_BOUNDS.max[0] + .4, z: ROOM_BOUNDS.max[2] + .4 };
 export interface RoomPlacement {id:string;assetId:string;position:Vec3;rotation:Vec3;scale:number}
 export interface RoomModel {id:string;modelFileId:string;normalization:{scale:number;translation:Vec3};bounds:Bounds}
 export interface PersonalRoom {id:string;name:string;version:number;sceneVersion:typeof SCENE_VERSION;placements:RoomPlacement[];shareEnabled:boolean;shareUrl:string|null;assets:RoomModel[]}
 export interface RoomGrant {id:string;token:string;expiresAt:string}
 export interface SharedRoom {name:string;ownerNickname:string;version:number;sceneVersion:typeof SCENE_VERSION;placements:RoomPlacement[];assets:RoomModel[];grant:RoomGrant}
 export interface RoomSaveReceipt {savedVersion:number;editSequence:number}
+export function roomPlacementBounds(placement: RoomPlacement, bounds: Bounds): Bounds {
+ const min: Vec3 = [Infinity, Infinity, Infinity], max: Vec3 = [-Infinity, -Infinity, -Infinity];
+ for (const corner of transformedBoundsCorners(placement, bounds)) for (let axis = 0; axis < 3; axis++) {
+  min[axis] = Math.min(min[axis], corner[axis]);
+  max[axis] = Math.max(max[axis], corner[axis]);
+ }
+ return { min, max };
+}
+export function roomPlacementFloor({ min, max }: Bounds): number {
+ const { x, z } = ROOM_PLATFORM_HALF;
+ return min[0] < x && max[0] > -x && min[2] < z && max[2] > -z ? ROOM_BOUNDS.min[1] : ROOM_COURTYARD_BOUNDS.min[1];
+}
 export function validateRoomLayout(name:unknown,placements:unknown,bounds:ReadonlyMap<string,Bounds>):string|null {
  if(typeof name!=='string'||name.trim().length<1||name.trim().length>80)return '房间名称须为1～80个字符';
  if(!Array.isArray(placements))return '布局必须是数组';
@@ -14,8 +28,12 @@ export function validateRoomLayout(name:unknown,placements:unknown,bounds:Readon
   if(Object.keys(p).some(k=>!['id','assetId','position','rotation','scale'].includes(k)))return '摆放包含不支持字段';
   if(typeof p.id!=='string'||!/^[a-zA-Z0-9_-]{1,80}$/.test(p.id)||ids.has(p.id))return '摆放标识无效或重复';ids.add(p.id);
   if(typeof p.assetId!=='string'||!bounds.has(p.assetId)||!vec(p.position)||!vec(p.rotation)||typeof p.scale!=='number'||!Number.isFinite(p.scale)||p.scale<=0)return '变换或模型无效';
-  const b=bounds.get(p.assetId)!;
-  for(const corner of transformedBoundsCorners(p,b))for(let axis=0;axis<3;axis++)if(!Number.isFinite(corner[axis])||corner[axis]<ROOM_BOUNDS.min[axis]-1e-6||corner[axis]>ROOM_BOUNDS.max[axis]+1e-6)return '物品超出房屋可用边界';
+  const worldBounds = roomPlacementBounds(p, bounds.get(p.assetId)!);
+  const min: Vec3 = [ROOM_COURTYARD_BOUNDS.min[0], roomPlacementFloor(worldBounds), ROOM_COURTYARD_BOUNDS.min[2]];
+  for (let axis = 0; axis < 3; axis++) {
+   if (!Number.isFinite(worldBounds.min[axis]) || !Number.isFinite(worldBounds.max[axis]) ||
+       worldBounds.min[axis] < min[axis] - 1e-6 || worldBounds.max[axis] > ROOM_COURTYARD_BOUNDS.max[axis] + 1e-6) return '物品超出小屋及庭院可用边界';
+  }
  }
  return null;
 }

@@ -1,5 +1,6 @@
 import * as T from 'three';
 import {mergeGeometries} from 'three/addons/utils/BufferGeometryUtils.js';
+import {ROOM_BOUNDS} from '@aholo/contracts';
 export const palette={wood:0x6d3f2b,edge:0xa97948,red:0x743b31,stone:0xd4d0c4,wall:0xe9e4d6,tile:0x495d59};
 export function material(color:number,roughness=.8){return new T.MeshStandardMaterial({color,roughness});}
 export function box(parent:T.Object3D,w:number,h:number,d:number,x:number,y:number,z:number,mat:T.Material){const m=new T.Mesh(new T.BoxGeometry(w,h,d),mat);m.position.set(x,y,z);m.castShadow=false;m.receiveShadow=true;parent.add(m);return m;}
@@ -23,7 +24,7 @@ export function furniture(id:'table'|'chair'|'cabinet'){
 interface ArchitectureFinish { floor: number[]; base: number; wall: number; wood: number; trim: number }
 export function architecture(gallery=false,finish?: ArchitectureFinish){
  const g=new T.Group(),roof=new T.Group();const wood=material(finish?.wood ?? palette.red),trim=material(finish?.trim ?? palette.edge),wall=material(finish?.wall ?? palette.wall),stone=material(finish?.base ?? palette.stone),tiles=material(palette.tile);
- const w=gallery?24:12,d=gallery?28:9,h=4.8;
+ const w=gallery?24:ROOM_BOUNDS.max[0]*2,d=gallery?28:ROOM_BOUNDS.max[2]*2,h=ROOM_BOUNDS.max[1];
  box(g,w+.8,.28,d+.8,0,-.14,0,stone);box(g,w+.3,.08,d+.3,0,-.32,0,trim);
  const floor=(finish?.floor ?? [0xb5b09a]).map(color=>material(color,finish ? .91 : .8));
  for(let x=0;x<w/1.5;x++)for(let z=0;z<d/1.5;z++){

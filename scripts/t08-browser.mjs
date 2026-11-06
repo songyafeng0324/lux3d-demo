@@ -59,9 +59,15 @@ try{
 
  await step('user submits a backpack model with full public data, withdraws and resubmits',async()=>{
   await up.goto(base+'/room?backpack=1');
-  const bag=up.getByRole('dialog',{name:'背包'});await bag.getByLabel('用户名').fill('t08_collector');await bag.getByLabel('密码').fill(pw);await bag.getByRole('button',{name:'登录并打开背包'}).click();
+  const bag=up.getByRole('dialog',{name:'背包'});await bag.getByLabel('用户名').fill('t08_collector');await bag.getByLabel('密码',{exact:true}).fill(pw);await bag.getByRole('button',{name:'登录并打开背包'}).click();
   await up.waitForFunction(() => document.querySelector('.bag-asset-card img')?.naturalWidth > 0);
-  await bag.getByRole('button',{name:/资产01/}).click();const panel=bag.locator('.bag-submit');await panel.getByLabel('公共名称').waitFor();
+  const card=bag.getByRole('button',{name:'资产01',exact:true});
+  assert.equal(await card.locator('.bag-approved').count(),0);
+  await card.click();await bag.getByRole('button',{name:'保存资料'}).waitFor();
+  assert.equal(await bag.locator('.bag-submit').count(),0);
+  await bag.getByRole('button',{name:'投稿',exact:true}).click();
+  await bag.getByLabel('选择要投稿的藏品').selectOption(assetId);
+  const panel=bag.locator('.bag-submit');await panel.getByLabel('公共名称').waitFor();
   await panel.getByLabel('公共名称').fill('紫檀靠背椅');await panel.getByLabel('简介').fill('清代紫檀靠背椅，背板浮雕卷草纹。');await panel.getByLabel('年代').fill('不详');await panel.getByLabel('材质').fill('紫檀');
   await panel.getByLabel('归属类型').selectOption('personal_collection');await panel.getByLabel('收藏方名称').fill('藏友小周');await panel.getByLabel('所在地').fill('浙江杭州');
   await panel.getByRole('button',{name:'提交审核'}).click();await panel.getByText(/待审核/).waitFor();await up.screenshot({path:path.join(out,'01-user-submitted.png')});
@@ -69,11 +75,24 @@ try{
   await panel.getByRole('button',{name:'提交审核'}).click();await panel.getByText(/待审核/).waitFor();
  });
  await step('admin reviews earliest pending with rotatable model and original, approves into candidates',async()=>{
-  await ap.goto(base+'/admin');await ap.getByLabel('用户名').fill('t08_admin');await ap.getByLabel('密码').fill(pw);await ap.getByRole('button',{name:'登录',exact:true}).click();
+  await ap.goto(base+'/admin');await ap.getByLabel('用户名').fill('t08_admin');await ap.getByLabel('密码',{exact:true}).fill(pw);await ap.getByRole('button',{name:'登录',exact:true}).click();
   await ap.locator('.adm-row',{hasText:'紫檀靠背椅'}).click();await ap.locator('.adm-detail .bag-preview canvas').waitFor();await ap.waitForFunction(()=>!document.querySelector('.adm-detail .bag-preview-status'),null,{timeout:60000});
   assert.ok(await ap.locator('.adm-media img').evaluate(i=>i.complete&&i.naturalWidth>0),'original image visible');assert.equal(await ap.locator('.adm-detail').getByRole('textbox').count(),1,'only the rejection reason is editable');
   await ap.screenshot({path:path.join(out,'02-admin-review.png')});
   await ap.getByRole('button',{name:'通过，进入候选库'}).click();await ap.getByText(/已通过，进入候选库/).waitFor();
+  const bag=up.getByRole('dialog',{name:'背包'});
+  await bag.getByRole('button',{name:'刷新',exact:true}).click();
+  await bag.locator('.bag-submit').getByText(/等待管理员安排展位/).waitFor();
+  await bag.getByRole('button',{name:'藏品',exact:true}).click();
+  await bag.locator('.bag-asset-card.approved').getByText('已通过',{exact:true}).waitFor();
+  await up.screenshot({path:path.join(out,'t12-approved-card.png')});
+
+  const adminRoom=await adminCtx.newPage();
+  try{
+   await adminRoom.goto(base+'/room');
+   await adminRoom.getByRole('textbox',{name:'房间名称'}).waitFor();
+   await adminRoom.waitForFunction(()=>window.__room?.snapshot()?.name==='个人小屋');
+  }finally{await adminRoom.close();}
  });
  await step('admin arranges slots 1/2/19 from more candidates and publishes one gallery version',async()=>{
   await ap.getByRole('button',{name:'候选与展位'}).click();await ap.locator('.adm-slot').first().waitFor();

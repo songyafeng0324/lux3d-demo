@@ -3,9 +3,11 @@ import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { TransformControls } from 'three/addons/controls/TransformControls.js';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
-import { validateRoomLayout, type Bounds, type RoomModel, type RoomPlacement } from '@aholo/contracts';
+import { roomPlacementBounds, roomPlacementFloor, validateRoomLayout, type Bounds, type RoomModel, type RoomPlacement } from '@aholo/contracts';
+import { MOVE_KEYS, playerOverlaps, stepFirstPerson, type FirstPerson } from '../game/navigation.js';
 import { architecture, disposeResources, enableMeshShadows } from '../scene/assets.js';
 import { courtyardGround, courtyardPlants, courtyardSky, horizonColor } from './courtyard.js';
+import { buildRoomWorld, ROOM_EYE_HEIGHT, roomEntrance } from './navigation.js';
 export type RoomMode = 'edit' | 'visit' | 'share';
 export type RoomTool = 'translate' | 'rotate' | 'scale';
 interface Hooks { select: (id: string | null) => void; edit: (placement: RoomPlacement) => void; notice: (message: string) => void }
@@ -29,12 +31,15 @@ export class RoomEngine {
   private sun = new T.DirectionalLight(0xffe1b1, 1.55);
   private mode: RoomMode;
   private placements: RoomPlacement[] = [];
+  private world = buildRoomWorld([], this.bounds);
+  private player: FirstPerson = roomEntrance(this.world);
   private input?: RoomPlacement[];
   private selected: string | null = null;
   private original?: RoomPlacement;
   private moving = false;
   private down = [0, 0];
   private keys = new Set<string>();
+  private jumpQueued = false;
   private yaw = 0;
   private pitch = 0;
   private looking = false;
@@ -91,6 +96,12 @@ export class RoomEngine {
         const old = this.original.scale;
         const scalar = object.scale.toArray().reduce((a, b) => Math.abs(b - old) > Math.abs(a - old) ? b : a, old);
         object.scale.setScalar(scalar);
+      }
+      if (this.transform.mode === 'translate' && ['X', 'Z', 'XZ'].includes(this.transform.axis ?? '')) {
+        const bounds = this.bounds.get(this.original.assetId)!;
+        const oldFloor = roomPlacementFloor(roomPlacementBounds(this.original, bounds));
+        const floor = roomPlacementFloor(roomPlacementBounds(this.readPlacement(this.selected), bounds));
+        object.position.y = this.original.position[1] + floor - oldFloor;
       }
       this.renderer.shadowMap.needsUpdate = true;
       this.outline.box.setFromObject(object);
@@ -160,6 +171,8 @@ export class RoomEngine {
     }
     if (this.selected && !ids.has(this.selected)) this.select(null);
     else if (!this.moving) this.select(this.selected);
+    this.world = buildRoomWorld(this.placements, this.bounds);
+    if (this.mode !== 'edit' && playerOverlaps(this.world.colliders, this.player)) this.home();
   }
   private apply(object: T.Group, placement: RoomPlacement) { object.position.fromArray(placement.position); object.rotation.set(...placement.rotation, 'XYZ'); object.scale.setScalar(placement.scale); object.updateMatrixWorld(true); this.renderer.shadowMap.needsUpdate = true; }
   private readPlacement(id: string): RoomPlacement { const placement = this.placements.find(p => p.id === id)!, object = this.instances.get(id)!; return { ...placement, position: object.position.toArray(), rotation: [object.rotation.x, object.rotation.y, object.rotation.z], scale: object.scale.x }; }
@@ -167,7 +180,19 @@ export class RoomEngine {
   select(id: string | null) { this.selected = id; const object = id ? this.instances.get(id) : undefined; if (object && this.mode === 'edit') { this.transform.attach(object); this.outline.visible = true; this.refreshOutline(); } else { this.transform.detach(); this.outline.visible = false; } this.hooks.select(id); }
   focus(id: string) { this.select(id); const object = this.instances.get(id); if (object && this.mode === 'edit') { const center = new T.Box3().setFromObject(object).getCenter(new T.Vector3()); this.orbit.target.copy(center); this.camera.position.copy(center).add(new T.Vector3(4, 4, 5)); this.orbit.update(); } }
   setTool(tool: RoomTool) { this.transform.setMode(tool); this.transform.setSpace(tool === 'scale' ? 'local' : 'world'); }
-  home() { this.keys.clear(); this.yaw = 0; this.pitch = 0; if (this.mode === 'edit') { this.camera.position.set(14, 8, 19); this.orbit.target.set(0, 1.15, 0); this.orbit.update(); } else { this.camera.position.set(0, 1.65, 3.5); this.camera.rotation.set(0, 0, 0, 'YXZ'); } }
+  home() {
+    this.blur(); this.yaw = 0; this.pitch = 0;
+    if (this.mode === 'edit') {
+      this.camera.position.set(14, 8, 19); this.orbit.target.set(0, 1.15, 0); this.orbit.update();
+    } else {
+      this.player = roomEntrance(this.world);
+      this.placeVisitCamera();
+      this.camera.rotation.set(0, 0, 0, 'YXZ');
+    }
+  }
+  private placeVisitCamera() {
+    this.camera.position.set(this.player.x, this.player.y + ROOM_EYE_HEIGHT, this.player.z);
+  }
   setMode(mode: RoomMode) { if (this.moving || (this.readOnly && mode === 'edit')) return; this.mode = mode; this.keys.clear(); this.looking = false; if (document.pointerLockElement === this.renderer.domElement) document.exitPointerLock(); this.roof.visible = mode !== 'edit'; this.renderer.shadowMap.needsUpdate = true; this.orbit.enabled = mode === 'edit'; this.transform.enabled = mode === 'edit'; this.select(mode === 'edit' ? this.selected : null); this.home(); }
   private pointerDown = (event: PointerEvent) => { this.down = [event.clientX, event.clientY]; if (this.mode !== 'edit' && event.button === 0) { this.looking = true; this.renderer.domElement.focus(); void this.renderer.domElement.requestPointerLock?.().catch(() => {}); } };
   private pointerUp = (event: PointerEvent) => {
@@ -183,15 +208,26 @@ export class RoomEngine {
     if ((event.target as HTMLElement)?.closest('input,textarea,button,select,[role="dialog"]')) return;
     if (event.key === 'Escape') { this.blur(); if (document.pointerLockElement === this.renderer.domElement) document.exitPointerLock(); return; }
     if (this.mode === 'edit' || event.metaKey || event.ctrlKey || event.altKey || document.pointerLockElement !== this.renderer.domElement) return;
-    const key = event.key.toLowerCase(); if (['w', 'a', 's', 'd', 'arrowup', 'arrowleft', 'arrowdown', 'arrowright'].includes(key)) { event.preventDefault(); this.keys.add(key); }
+    if (event.code === 'Space') {
+      event.preventDefault();
+      if (!event.repeat) this.jumpQueued = true;
+    } else if (event.code in MOVE_KEYS) {
+      event.preventDefault(); this.keys.add(event.code);
+    }
   };
-  private keyUp = (event: KeyboardEvent) => { this.keys.delete(event.key.toLowerCase()); if (event.key === 'Meta') this.keys.clear(); };
-  private blur = () => { this.keys.clear(); this.looking = false; };
+  private keyUp = (event: KeyboardEvent) => { this.keys.delete(event.code); if (event.key === 'Meta') this.blur(); };
+  private blur = () => { this.keys.clear(); this.jumpQueued = false; this.looking = false; };
   private lockChange = () => { if (document.pointerLockElement !== this.renderer.domElement) this.blur(); };
   private frame = (now: number) => {
-    if (this.stopped) return; const dt = this.lastTime ? Math.min((now - this.lastTime) / 1000, .05) : 0; this.lastTime = now;
+    if (this.stopped) return; const dt = this.lastTime ? Math.min((now - this.lastTime) / 1000, .25) : 0; this.lastTime = now;
     if (this.mode === 'edit') this.orbit.update();
-    else { const movement = new T.Vector3(); for (const key of this.keys) { if (key === 'a' || key === 'arrowleft') movement.x--; if (key === 'd' || key === 'arrowright') movement.x++; if (key === 'w' || key === 'arrowup') movement.z--; if (key === 's' || key === 'arrowdown') movement.z++; } if (movement.lengthSq()) { movement.normalize().applyAxisAngle(new T.Vector3(0, 1, 0), this.yaw).multiplyScalar(dt * 2.6); this.camera.position.add(movement); this.camera.position.x = T.MathUtils.clamp(this.camera.position.x, -5.6, 5.6); this.camera.position.z = T.MathUtils.clamp(this.camera.position.z, -4.1, 4.1); } }
+    else if (this.keys.size || this.jumpQueued || this.player.velocityY !== null) {
+      let forward = 0, right = 0;
+      for (const key of this.keys) { forward += MOVE_KEYS[key][0]; right += MOVE_KEYS[key][1]; }
+      this.player = stepFirstPerson(this.world, this.player, { forward, right, run: false }, this.yaw, dt, this.jumpQueued);
+      this.jumpQueued = false;
+      this.placeVisitCamera();
+    }
     this.sky.position.copy(this.camera.position);
     this.renderer.render(this.scene, this.camera);
   };
@@ -200,7 +236,7 @@ export class RoomEngine {
     const rect = this.renderer.domElement.getBoundingClientRect();
     const project = (value: T.Vector3) => { value.project(this.camera); return { x: rect.left + (value.x + 1) * rect.width / 2, y: rect.top + (1 - value.y) * rect.height / 2 }; };
     const object = this.selected ? this.instances.get(this.selected) : null;
-    return { mode: this.mode, placements: structuredClone(this.placements), selected: this.selected, moving: this.moving, camera: this.camera.position.toArray(), keys: [...this.keys], models: this.templates.size, instances: this.instances.size, axis: this.transform.axis, orbitEnabled: this.orbit.enabled,
+    return { mode: this.mode, placements: structuredClone(this.placements), selected: this.selected, moving: this.moving, camera: this.camera.position.toArray(), airborne: this.player.velocityY !== null, keys: [...this.keys], models: this.templates.size, instances: this.instances.size, axis: this.transform.axis, orbitEnabled: this.orbit.enabled,
       point: object ? project(object.position.clone()) : null,
       axes: object ? [new T.Vector3(1, 0, 0), new T.Vector3(0, 1, 0), new T.Vector3(0, 0, 1)].map(axis => project(axis.add(object.position))) : [],
       assetBounds: Object.fromEntries([...this.templates].map(([id, template]) => { const bounds = new T.Box3().setFromObject(template); return [id, { min: bounds.min.toArray(), max: bounds.max.toArray() }]; })) };

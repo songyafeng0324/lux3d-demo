@@ -3,7 +3,7 @@ import type pg from 'pg';
 import type {FastifyInstance,FastifyReply,FastifyRequest} from 'fastify';
 import {BusinessError,inputObject,exactFields,textField,requestWrite,transaction,tokenHash,beijingDay,publicFieldsInput,PUBLIC_FIELDS} from '@aholo/domain';
 import type {Config} from '@aholo/domain';
-import {validateGallerySlots,GALLERY_SLOT_COUNT,type GalleryView,type ExhibitDetail,type PublicDetails} from '@aholo/contracts';
+import {validateGallerySlots,GALLERY_SLOT_COUNT,DEFAULT_DAILY_QUOTA,type GalleryView,type ExhibitDetail,type PublicDetails} from '@aholo/contracts';
 import {grantCredentials} from './rooms.js';
 interface Session {user:Record<string,any>;token:string;hash:string}
 interface Context {pool:pg.Pool;config:Config;session:(r:FastifyRequest,write?:boolean)=>Promise<Session>;reauthorize:(c:pg.PoolClient,s:Session,admin?:boolean)=>Promise<void>}
@@ -24,7 +24,7 @@ function page<T>(rows:Record<string,any>[],limit:number,dto:(r:Record<string,any
 function query(request:FastifyRequest,name:string,max=80){const v=(request.query as Record<string,unknown>)[name];if(v===undefined||v==='')return null;if(typeof v!=='string'||v.length>max)fail(422,'INVALID_INPUT','查询条件不正确');return v as string;}
 
 function submissionDto(r:Record<string,any>){return {id:r.id,assetId:r.asset_id,status:r.status as string,submittedAt:iso(r.submitted_at),reviewedAt:iso(r.reviewed_at),rejectionReason:r.rejection_reason??null,publicSnapshot:r.public_snapshot?.redacted?null:r.public_snapshot as PublicDetails,assetName:r.asset_name??null,candidateId:r.candidate_id??null,slotNo:r.slot_no??null};}
-async function quotaOf(c:Db,userId:string){const day=beijingDay();const r=(await c.query('SELECT override_total,used_net FROM quota_days WHERE user_id=$1 AND quota_day=$2',[userId,day])).rows[0];const total=r?.override_total??3,used=r?.used_net??0;return {day,total,used,available:Math.max(0,total-used),adjusted:r?.override_total!=null};}
+async function quotaOf(c:Db,userId:string){const day=beijingDay();const r=(await c.query('SELECT override_total,used_net FROM quota_days WHERE user_id=$1 AND quota_day=$2',[userId,day])).rows[0];const total=r?.override_total??DEFAULT_DAILY_QUOTA,used=r?.used_net??0;return {day,total,used,available:Math.max(0,total-used),adjusted:r?.override_total!=null};}
 
 /**
  * Publishes a whole immutable gallery version from the given 30-slot arrangement.

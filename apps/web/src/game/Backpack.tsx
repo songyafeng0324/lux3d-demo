@@ -1,10 +1,13 @@
 import { useCallback, useEffect, useRef, useState, type FormEvent } from 'react';
+import { DEFAULT_DAILY_QUOTA } from '@aholo/contracts';
 import ModelPreview from './ModelPreview.js';
 import AssetThumbnail, { type ThumbnailCache } from './AssetThumbnail.js';
+import PasswordField, { credentialError } from './PasswordField.js';
 import { api, ApiError, submissionLabel, type Asset, type GenerationTask, type Me, type Page, type Submission } from './backpack-api.js';
 import './backpack.css';
 
 type Tab = 'assets' | 'tasks' | 'submissions';
+type SubmissionChoice = { id: string; asset: Asset; items: Submission[] } | { id: string; error: string };
 type Pending = { path: string; method: string; body: Record<string, unknown> | FormData; key: string; label: string; actorId?: string; success: (data: any) => Promise<void> | void };
 const storageKey = 'aholo:pending-generation';
 const taskLabel = { processing: '生成中', succeeded: '已入背包', failed: '生成失败' };
@@ -53,6 +56,7 @@ export default function Backpack({ open, close, kind = 'backpack', onAccountChan
   accountChanged.current = onAccountChange;
   const active = useRef(open); active.current = open;
   const drawer = useRef<HTMLElement>(null);
+  const submissionSelect = useRef<HTMLSelectElement>(null);
   const [me, setMe] = useState<Me | null>(null);
   const meRef = useRef(me); meRef.current = me;
   const [loading, setLoading] = useState(true);
@@ -84,17 +88,21 @@ export default function Backpack({ open, close, kind = 'backpack', onAccountChan
   const epoch = useRef(0);
   const mounted = useRef(true);
   const setRequest = (value: Pending | null) => { pendingRef.current = value; setPending(value); };
-  // Submissions for the open asset, and the user's full submission history (投稿 tab).
-  const [assetSubs, setAssetSubs] = useState<Submission[] | null>(null);
+  const [submissionId, setSubmissionId] = useState('');
+  const [submissionChoice, setSubmissionChoice] = useState<SubmissionChoice | null>(null);
   const [history, setHistory] = useState<Submission[]>([]);
   const [subsRevision, setSubsRevision] = useState(0);
   useEffect(() => {
-    setAssetSubs(null);
-    if (!me || !selected) return;
+    if (!me || !submissionId || tab !== 'submissions' || !open) return;
     let live = true;
-    void api<Page<Submission>>(`/submissions?assetId=${encodeURIComponent(selected)}`).then(page => { if (live) setAssetSubs(page.items); }).catch(() => { if (live) setAssetSubs([]); });
+    const id = encodeURIComponent(submissionId);
+    void Promise.all([api<Asset>(`/assets/${id}`), api<Page<Submission>>(`/submissions?assetId=${id}`)]).then(([asset, page]) => {
+      if (live) setSubmissionChoice({ id: submissionId, asset, items: page.items });
+    }).catch(reason => {
+      if (live) setSubmissionChoice({ id: submissionId, error: reason instanceof Error ? reason.message : '投稿状态读取失败。' });
+    });
     return () => { live = false; };
-  }, [me?.user.id, selected, subsRevision]);
+  }, [me?.user.id, open, tab, submissionId, subsRevision]);
   useEffect(() => {
     if (!me || tab !== 'submissions' || !open) return;
     let live = true;
@@ -108,7 +116,7 @@ export default function Backpack({ open, close, kind = 'backpack', onAccountChan
     selectionSequence.current++;
     setAssets([]); setTasks([]); setAssetCursor(null); setTaskCursor(null);
     setSelected(null); selectedRef.current = null; setSelectedAsset(null); setOpeningAsset(false);
-    setAssetSubs(null); setHistory([]);
+    setSubmissionId(''); setSubmissionChoice(null); setHistory([]);
   }, []);
   const reload = useCallback(async (silent = false) => {
     const version = epoch.current;
@@ -213,6 +221,7 @@ export default function Backpack({ open, close, kind = 'backpack', onAccountChan
   }, [account, me?.user.id, open, reload]);
   useEffect(() => {
     if (!open) return;
+    setSubmissionChoice(null);
     setLoading(true);
     void reload();
   }, [open, reload]);
@@ -288,8 +297,13 @@ export default function Backpack({ open, close, kind = 'backpack', onAccountChan
     event.preventDefault();
     const values = new FormData(event.currentTarget);
     const username = String(values.get('username')), password = String(values.get('password'));
+    const invalid = credentialError(username, password);
+    if (invalid) { setError(invalid); return; }
     if (authMode === 'register') {
-      write('/auth/register', { username, nickname: String(values.get('nickname')), password, confirmPassword: String(values.get('confirmPassword')) }, '重试注册', async () => {
+      const nickname = String(values.get('nickname')).trim(), confirmPassword = String(values.get('confirmPassword'));
+      if (!nickname || nickname.length > 40) { setError('昵称须为 1～40 个字符。'); return; }
+      if (password !== confirmPassword) { setError('两次密码不一致。'); return; }
+      write('/auth/register', { username, nickname, password, confirmPassword }, '重试注册', async () => {
         setAuthMode('login'); setMessage('注册成功，请用刚才的账号和密码登录。');
       });
     } else {
@@ -312,6 +326,28 @@ export default function Backpack({ open, close, kind = 'backpack', onAccountChan
   }
   const locked = busy || pending !== null;
   const asset = selectedAsset?.id === selected ? selectedAsset : assets.find(item => item.id === selected);
+  const choice = submissionChoice?.id === submissionId ? submissionChoice : null;
+  function chooseSubmission(id: string) {
+    if (id === submissionId) return;
+    setSubmissionId(id);
+    setSubmissionChoice(null);
+  }
+  function refreshSubmissions() {
+    setSubmissionChoice(null);
+    setSubsRevision(version => version + 1);
+    void reload(true);
+  }
+  function changeTab(next: Tab) {
+    if (next !== tab) {
+      setSubmissionChoice(null);
+      if (next === 'assets') void reload(true);
+    }
+    setTab(next);
+    setSelected(null);
+    selectedRef.current = null;
+    selectionSequence.current++;
+    setOpeningAsset(false);
+  }
   function endSession(message: string) {
     epoch.current++;
     setMe(null); meRef.current = null;
@@ -328,14 +364,14 @@ export default function Backpack({ open, close, kind = 'backpack', onAccountChan
       {pending && !busy && !loading && <div className="bag-retry"><p>请先确认上次操作结果，避免重复提交。</p><button type="button" onClick={() => void execute(pending)}>{pending.label}</button></div>}
       {loading ? <p className="bag-muted" role="status">正在读取{title}…</p> : !me ? <>
         <div className="bag-auth-tabs"><button type="button" disabled={locked} aria-pressed={authMode === 'login'} onClick={() => { setAuthMode('login'); setError(''); }}>登录</button><button type="button" disabled={locked} aria-pressed={authMode === 'register'} onClick={() => { setAuthMode('register'); setError(''); }}>注册</button></div>
-        <form className="bag-form" onSubmit={onAuth} key={authMode}>
-          <label>用户名<input name="username" autoComplete="username" required minLength={3} maxLength={32} pattern="[A-Za-z0-9_]{3,32}" disabled={locked} placeholder="3–32 位字母、数字或下划线" /></label>
-          {authMode === 'register' && <label>昵称<input name="nickname" required maxLength={40} autoComplete="nickname" disabled={locked} /></label>}
-          <label>密码<input name="password" type="password" autoComplete={authMode === 'login' ? 'current-password' : 'new-password'} required minLength={12} maxLength={128} disabled={locked} placeholder="12–128 个字符" /></label>
-          {authMode === 'register' && <label>确认密码<input name="confirmPassword" type="password" autoComplete="new-password" required minLength={12} maxLength={128} disabled={locked} /></label>}
+        <form className="bag-form" noValidate onSubmit={onAuth} key={authMode} onChange={() => { if (!locked && error) setError(''); }}>
+          <label>用户名<input name="username" autoComplete="username" required disabled={locked} placeholder="3–32 位字母、数字或下划线" /></label>
+          {authMode === 'register' && <label>昵称<input name="nickname" required autoComplete="nickname" disabled={locked} /></label>}
+          <PasswordField autoComplete={authMode === 'login' ? 'current-password' : 'new-password'} disabled={locked} active={open} placeholder="12–128 个字符" />
+          {authMode === 'register' && <PasswordField name="confirmPassword" label="确认密码" autoComplete="new-password" disabled={locked} active={open} />}
           <button className="bag-primary" type="submit" disabled={locked}>{busy ? '正在处理…' : authMode === 'login' ? account ? '登录账号' : '登录并打开背包' : '创建账号'}</button>
         </form>
-        {!account && <p className="bag-muted">登录后可查看个人藏品、上传图片生成模型。每天按北京时间恢复默认 3 次额度。</p>}
+        {!account && <p className="bag-muted">登录后可查看个人藏品、上传图片生成模型。每天按北京时间恢复默认 {DEFAULT_DAILY_QUOTA} 次额度。</p>}
       </> : account ? <section className="bag-account">
         <form className="bag-form" key={me.user.nickname} onSubmit={event => {
           event.preventDefault();
@@ -361,8 +397,8 @@ export default function Backpack({ open, close, kind = 'backpack', onAccountChan
           write('/auth/logout', {}, '重试退出登录', () => endSession('已退出登录。'));
         }}>退出登录</button>
       </section> : <>
-        <nav className="bag-tabs" aria-label="背包栏目">{(['assets', 'tasks', 'submissions'] as const).map(key => <button key={key} type="button" aria-pressed={tab === key} onClick={() => { setTab(key); setSelected(null); selectedRef.current = null; selectionSequence.current++; setOpeningAsset(false); }}>{key === 'assets' ? '藏品' : key === 'tasks' ? '生成任务' : '投稿'}</button>)}</nav>
-        {(tab === 'assets' || tab === 'tasks') && <section className="bag-generation" aria-label="图片生成">
+        <nav className="bag-tabs" aria-label="背包栏目">{(['assets', 'tasks', 'submissions'] as const).map(key => <button key={key} type="button" aria-pressed={tab === key} onClick={() => changeTab(key)}>{key === 'assets' ? '藏品' : key === 'tasks' ? '生成任务' : '投稿'}</button>)}</nav>
+        {tab === 'tasks' && <section className="bag-generation" aria-label="图片生成">
           <div className="bag-quota"><span>今日可用 <strong>{me.quota.available}</strong> / {me.quota.total}</span><small>{me.quota.day} · 北京时间</small></div>
           {me.activeTask ? <p className="bag-muted">已有任务生成中，可离开等待。完成前不能发起新任务。</p> : <>
             <label className="bag-file"><span className="bag-file-trigger">选择一张图片</span><input ref={fileInput} aria-label="选择生成图片" type="file" accept="image/png,image/jpeg,image/webp" disabled={locked || me.quota.available === 0} onChange={event => { setFile(event.target.files?.[0] ?? null); inputFile.current = null; setError(''); }} /><span>{file?.name ?? 'PNG / JPEG / WebP · 不超过 10 MiB'}</span></label>
@@ -381,12 +417,13 @@ export default function Backpack({ open, close, kind = 'backpack', onAccountChan
             <label>简介<textarea name="description" defaultValue={asset.description} maxLength={2000} rows={4} disabled={locked} /></label>
             <button type="submit" disabled={locked}>保存资料</button>
           </form>
-          <SubmissionPanel asset={asset} subs={assetSubs} locked={locked}
-            submit={fields => write(`/assets/${asset.id}/submissions`, fields, '确认上次投稿', async () => { setSubsRevision(v => v + 1); setMessage('已提交，等待管理员审核。审核期间可以撤回。'); })}
-            withdraw={id => write(`/submissions/${id}/withdraw`, {}, '确认上次撤回', async () => { setSubsRevision(v => v + 1); setMessage('申请已撤回，可修改资料后重新提交。'); })} />
         </section> : <section className="bag-collection" aria-label="个人藏品">
           <div className="bag-section-heading"><h3>个人藏品 <small>{assets.length}</small></h3><button type="button" className="bag-text-button" disabled={busy} onClick={() => void reload()}>刷新</button></div>
-          {assets.length ? <div className="bag-grid">{assets.map(item => <button type="button" className="bag-asset-card" key={item.id} onClick={() => void openAsset(item.id)}><AssetThumbnail asset={item} cache={thumbnailCache} /><strong className="asset-short-name" title={item.name}>{item.name}</strong></button>)}</div> : <div className="bag-empty"><span className="t10-seal">囊</span><p>背包还空着</p><small>上传图片生成第一件藏品，完成后将在这里出现。</small></div>}
+          {assets.length ? <div className="bag-grid">{assets.map(item => <button type="button" className={item.submissionApproved ? 'bag-asset-card approved' : 'bag-asset-card'} key={item.id} onClick={() => void openAsset(item.id)}>
+            <AssetThumbnail asset={item} cache={thumbnailCache} />
+            <strong className="asset-short-name" title={item.name}>{item.name}</strong>
+            {item.submissionApproved && <span className="bag-approved">已通过</span>}
+          </button>)}</div> : <div className="bag-empty"><span className="t10-seal">囊</span><p>背包还空着</p><small>到「生成任务」上传图片，生成的藏品会在这里出现。</small></div>}
           {assetCursor && <button type="button" disabled={busy || loadingMore} onClick={() => void loadMore('assets')}>加载更多藏品</button>}
         </section>)}
         {tab === 'tasks' && <section className="bag-task-list" aria-label="生成任务列表">
@@ -395,15 +432,32 @@ export default function Backpack({ open, close, kind = 'backpack', onAccountChan
           {tasks.map(task => <article className="bag-task" key={task.id}><div><strong>{taskLabel[task.status]}</strong><time>{new Date(task.createdAt).toLocaleString('zh-CN', { hour12: false })}</time></div><small>{task.status === 'processing' ? '正在制作并检查模型，完成后自动入包。' : task.status === 'succeeded' ? '模型已进入个人背包，可旋转、缩放查看。' : failureLabel[task.errorCode ?? ''] ?? '未完成模型交付，已返还原提交日次数。'}</small>{task.status === 'succeeded' && task.assetId && <button type="button" className="bag-text-button" onClick={() => void openAsset(task.assetId!)}>查看藏品 →</button>}</article>)}
           {taskCursor && <button type="button" disabled={busy || loadingMore} onClick={() => void loadMore('tasks')}>加载更多任务</button>}
         </section>}
-        {tab === 'submissions' && <section className="bag-task-list" aria-label="投稿记录">
-          <div className="bag-section-heading"><h3>投稿记录</h3><button type="button" className="bag-text-button" disabled={busy} onClick={() => setSubsRevision(v => v + 1)}>刷新</button></div>
-          <p className="bag-muted">在藏品详情中补齐公共资料即可申请加入藏宝阁；通过后进入候选库，由管理员安排展位。</p>
-          {!history.length && <p className="bag-muted">还没有投稿。</p>}
-          {history.map(item => <article className="bag-task" key={item.id}><div><strong>{submissionLabel[item.status]}</strong><time>{new Date(item.submittedAt).toLocaleString('zh-CN', { hour12: false })}</time></div>
-            <small>{item.publicSnapshot?.name ?? '（模型已按风险规则删除）'}{item.status === 'approved' ? (item.slotNo ? ` · 正在展位 ${item.slotNo} 公开展出` : ' · 等待安排展位') : ''}</small>
-            {item.status === 'rejected' && <small className="bag-reason">驳回原因：{item.rejectionReason}</small>}
-            {item.status !== 'deleted' && <button type="button" className="bag-text-button" onClick={() => void openAsset(item.assetId)}>查看藏品 →</button>}</article>)}
-        </section>}
+        {tab === 'submissions' && <>
+          <section className="bag-submission-choice" aria-label="新建或处理投稿">
+            <div className="bag-form"><label>选择要投稿的藏品<select ref={submissionSelect} value={submissionId} disabled={locked || (!assets.length && !submissionId)} onChange={event => chooseSubmission(event.target.value)}>
+              <option value="">{assets.length ? '请选择个人藏品' : '还没有个人藏品'}</option>
+              {submissionId && !assets.some(item => item.id === submissionId) && <option value={submissionId}>{choice && 'asset' in choice ? choice.asset.name : '记录中的藏品'}</option>}
+              {assets.map(item => <option key={item.id} value={item.id}>{item.name}{item.submissionApproved ? '（已通过）' : ''}</option>)}
+            </select></label>
+            {assetCursor && <button type="button" disabled={busy || loadingMore} onClick={() => void loadMore('assets')}>加载更多藏品</button>}</div>
+            {submissionId && (!choice ? <p className="bag-muted" role="status">正在读取投稿状态…</p> : 'error' in choice ? <p className="bag-notice error" role="alert">{choice.error}</p> :
+              <SubmissionPanel asset={choice.asset} subs={choice.items} locked={locked}
+                submit={fields => write(`/assets/${choice.id}/submissions`, fields, '确认上次投稿', () => { refreshSubmissions(); setMessage('已提交，等待管理员审核。审核期间可以撤回。'); })}
+                withdraw={id => write(`/submissions/${id}/withdraw`, {}, '确认上次撤回', () => { refreshSubmissions(); setMessage('申请已撤回，可修改资料后重新提交。'); })} />)}
+          </section>
+          <section className="bag-task-list" aria-label="投稿记录">
+            <div className="bag-section-heading"><h3>投稿记录</h3><button type="button" className="bag-text-button" disabled={locked} onClick={refreshSubmissions}>刷新</button></div>
+            <p className="bag-muted">申请通过后进入候选库，由管理员安排展位。</p>
+            {!history.length && <p className="bag-muted">还没有投稿。</p>}
+            {history.map(item => <article className="bag-task" key={item.id}><div><strong>{submissionLabel[item.status]}</strong><time>{new Date(item.submittedAt).toLocaleString('zh-CN', { hour12: false })}</time></div>
+              <small>{item.publicSnapshot?.name ?? '（模型已按风险规则删除）'}{item.status === 'approved' ? (item.slotNo ? ` · 正在展位 ${item.slotNo} 公开展出` : ' · 等待安排展位') : ''}</small>
+              {item.status === 'rejected' && <small className="bag-reason">驳回原因：{item.rejectionReason}</small>}
+              {item.status !== 'deleted' && <div className="bag-history-actions">
+                <button type="button" className="bag-text-button" disabled={locked} onClick={() => { chooseSubmission(item.assetId); submissionSelect.current?.focus(); }}>管理该藏品的投稿 →</button>
+                <button type="button" className="bag-text-button" onClick={() => void openAsset(item.assetId)}>查看藏品 →</button>
+              </div>}</article>)}
+          </section>
+        </>}
       </>}
     </div>
     {account && me?.user.role === 'admin' && <a className="t10-drawer-link" href="/admin">管理后台 →</a>}
@@ -412,9 +466,7 @@ export default function Backpack({ open, close, kind = 'backpack', onAccountChan
   </div>;
 }
 
-/** PRD 7.6: apply from the asset detail with the full public data; one pending or candidate per model. */
-function SubmissionPanel({ asset, subs, locked, submit, withdraw }: { asset: Asset; subs: Submission[] | null; locked: boolean; submit: (fields: Record<string, unknown>) => void; withdraw: (id: string) => void }) {
-  if (!subs) return <section className="bag-submit"><h3>申请加入藏宝阁</h3><p className="bag-muted" role="status">正在读取投稿状态…</p></section>;
+function SubmissionPanel({ asset, subs, locked, submit, withdraw }: { asset: Asset; subs: Submission[]; locked: boolean; submit: (fields: Record<string, unknown>) => void; withdraw: (id: string) => void }) {
   const latest = subs[0];
   if (latest?.status === 'pending') return <section className="bag-submit"><h3>申请加入藏宝阁</h3>
     <p className="bag-muted">「{latest.publicSnapshot?.name}」待审核 · 提交于 {new Date(latest.submittedAt).toLocaleString('zh-CN', { hour12: false })}。审核前可以撤回。</p>

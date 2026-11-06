@@ -84,7 +84,7 @@ export default function Room({ shareToken }: { shareToken?: string }) {
     setReloadKey(key => key + 1);
   }
   const allowSessionEnd = () => !saver.current?.unsaved || confirm('小屋还有未保存的修改，结束当前会话会丢失本页草稿。继续吗？');
-  const allowLogin = (username: string) => layoutActor.current?.username.toLowerCase() === username.trim().toLowerCase() || allowSessionEnd();
+  const allowLogin = (username: string) => layoutActor.current?.username.toLowerCase() === username.normalize('NFKC').toLowerCase() || allowSessionEnd();
 
   function openOverlay(next: 'menu' | 'account' | 'backpack') {
     if (engine.current?.transform.dragging) return;
@@ -298,7 +298,7 @@ export default function Room({ shareToken }: { shareToken?: string }) {
         {(loginRequired || loadError || save.status === 'loadFailed' || save.status === 'loading') && <div className="scene-blocked"><div><p>{loadError || save.message || (loginRequired ? '请登录后继续使用小屋。' : '正在读取小屋与模型…')}</p>{loginRequired ? <button type="button" onClick={() => openOverlay('account')}>登录后进入自己的小屋 →</button> : save.status !== 'loading' || loadError ? <button type="button" onClick={() => { if (saver.current && !loadError) void saver.current.load(); else setReloadKey(key => key + 1); }}>重试读取</button> : null}</div></div>}
         <div className="stage-label"><span className="stage-live" />{mode === 'edit' ? '斜俯视布置' : '第一人称参观'}<small>{visitor ? '仅展示主人已摆放并确认的物品' : '固定建筑与摆放物品分离'}</small><small className="desktop-input-hint">请使用配有键盘和鼠标的电脑操作 3D 场景。</small></div>
         {mode === 'edit' && <div className="scene-tools" role="toolbar" aria-label="变换工具">{([['translate', '↔', '移动'], ['rotate', '⟳', '旋转'], ['scale', '⤢', '等比缩放']] as const).map(([value, icon, label]) => <button type="button" key={value} disabled={!canEdit} aria-label={label} aria-pressed={tool === value} className={tool === value ? 'active' : ''} onClick={() => { setTool(value); engine.current?.setTool(value); }}><span>{icon}</span>{label}</button>)}<span className="tool-divider" /><button type="button" onClick={() => engine.current?.home()}>⌂ 全景</button></div>}
-        {mode !== 'edit' && <><div className="visit-actions"><button type="button" onClick={() => engine.current?.home()}>↶ 回到入口</button><span>点击场景锁定鼠标 · WASD / 方向键行走 · Esc 释放</span></div><span className="crosshair" aria-hidden="true">＋</span></>}
+        {mode !== 'edit' && <><div className="visit-actions"><button type="button" onClick={() => engine.current?.home()}>↶ 回到入口</button><span>点击场景锁定鼠标 · WASD / 方向键行走 · 空格跳跃 · Esc 释放</span></div><span className="crosshair" aria-hidden="true">＋</span></>}
         {mode === 'edit' && active && <div className="selection-card"><AssetThumbnail asset={catalogById.get(active.assetId)} cache={thumbnailCache} /><div><strong>{nameOf(active.assetId)}</strong><small>移动、旋转或等比缩放</small></div><button type="button" onClick={() => engine.current?.focus(active.id)}>定位</button><button type="button" aria-label="移除选中摆放" disabled={!canEdit} onClick={() => edit(room!.name, room!.placements.filter(p => p.id !== active.id))}>移除</button></div>}
         {mode === 'edit' && !active && room?.placements.length === 0 && <div className="empty-room"><span>从一件物品开始</span><p>从左侧添加模型或家具<br />通过三轴控件布置小屋</p></div>}
         {notice && <div className="scene-notice" role="alert">{notice}<button type="button" aria-label="收起提示" onClick={() => setNotice('')}>×</button></div>}

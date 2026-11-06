@@ -1,6 +1,8 @@
 export type CheckStatus = 'ok' | 'unavailable';
 export * from './scene.js';
 
+export const DEFAULT_DAILY_QUOTA = 10;
+
 export interface ReadinessData {
   ready: boolean;
   generationReady: boolean;

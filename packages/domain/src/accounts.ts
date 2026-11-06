@@ -1,4 +1,5 @@
 import {randomBytes, scrypt as scryptCb, timingSafeEqual, createHash, createHmac} from 'node:crypto';
+import type {PoolClient} from 'pg';
 export class BusinessError extends Error {
   constructor(readonly status:number, readonly code:string, message:string){ super(message); }
 }
@@ -31,6 +32,14 @@ export async function verifyPassword(password:string,stored:string){
   const parts=stored.split('$');
   if(parts.length!==6 || parts.slice(0,4).join('$')!=='scrypt$131072$8$1' || !/^[a-f0-9]{32}$/.test(parts[4]) || !/^[a-f0-9]{128}$/.test(parts[5])) return false;
   const candidate=await derive(password,Buffer.from(parts[4],'hex'));return timingSafeEqual(candidate,Buffer.from(parts[5],'hex'));
+}
+export async function createPersonalRoom(c:PoolClient,ownerId:string){
+  await c.query(`WITH created AS (
+    INSERT INTO rooms(owner_id,name,scene_version) VALUES($1,'个人小屋','courtyard-v1')
+    RETURNING id,name,scene_version
+  )
+  INSERT INTO room_versions(room_id,version,name,scene_version,placements_json)
+  SELECT id,0,name,scene_version,'[]' FROM created`,[ownerId]);
 }
 export const tokenHash=(token:string)=>createHash('sha256').update(token).digest('hex');
 export const csrfFor=(token:string,key:string)=>createHmac('sha256',key).update(`csrf:${token}`).digest('hex');

@@ -158,7 +158,7 @@ export default function Game() {
         {walking && hud.target && <div className="t10-prompt" role="status"><kbd>E</kbd>{targetExhibit ? <>查看 <b>{targetExhibit.name}</b><small>{slotLabel(hud.target)}</small></> : <>查看 {slotLabel(hud.target)}</>}</div>}
         {galleryNotice && !overlay && <div className="t10-notice" role="status">{galleryNotice}</div>}
         <footer className="t10-hud-bottom">
-          <span>WASD 行走 · Shift 快走 · 鼠标环顾 · Esc 释放鼠标</span>
+          <span>WASD 行走 · Shift 快走 · 空格跳跃 · 鼠标环顾 · Esc 释放鼠标</span>
           <span className="t10-meta">{gallery ? `展出 ${shown} / 30` : '展陈读取中'} · {hud.fps} FPS</span>
         </footer>
       </>}
@@ -182,7 +182,7 @@ export default function Game() {
         <h1>藏宝阁</h1>
         <p className="t10-sub">二层古阁 · 三十展位</p>
         <button type="button" className="t10-primary" onClick={play} autoFocus>进入藏宝阁</button>
-        <p className="t10-hint">点击后锁定鼠标环顾 · WASD 行走 · 北侧楼梯可上二层</p>
+        <p className="t10-hint">点击后锁定鼠标环顾 · WASD 行走 · 空格跳跃 · 北侧楼梯可上二层</p>
         <p className="desktop-input-hint">请使用配有键盘和鼠标的电脑操作 3D 场景。</p>
       </div>}
 

@@ -1,8 +1,10 @@
 import * as T from 'three';
+import { ROOM_COURTYARD_BOUNDS } from '@aholo/contracts';
 import { box, material } from '../scene/assets.js';
+import { PORCH_STEP } from './navigation.js';
 
 export const horizonColor = 0x85b2d4;
-const courtyardLevel = -.4;
+const [edgeX, courtyardLevel, edgeZ] = ROOM_COURTYARD_BOUNDS.min;
 
 export function courtyardGround() {
   const canvas = document.createElement('canvas');
@@ -26,7 +28,7 @@ export function courtyardGround() {
   const group = new T.Group();
   const terrain = [
     { size: [180, 180], height: courtyardLevel - .012, color: 0x62734f, map: turf, name: 'outer-meadow' },
-    { size: [22, 18], height: courtyardLevel, color: 0x98846c, map: grain, name: 'courtyard-gravel' },
+    { size: [-2 * edgeX, -2 * edgeZ], height: courtyardLevel, color: 0x98846c, map: grain, name: 'courtyard-gravel' },
   ];
   for (const { size, height, color, map, name } of terrain) {
     const surface = material(color, .98);
@@ -39,6 +41,10 @@ export function courtyardGround() {
     group.add(plane);
   }
   const pathStone = material(0x77756c, .92);
+  const stepHeight = PORCH_STEP.y - courtyardLevel;
+  const porch = box(group, PORCH_STEP.x1 - PORCH_STEP.x0, stepHeight, PORCH_STEP.z1 - PORCH_STEP.z0, 0,
+    courtyardLevel + stepHeight / 2, (PORCH_STEP.z0 + PORCH_STEP.z1) / 2, pathStone);
+  porch.castShadow = true;
   for (let z = 5.4; z <= 9.4; z += .92) {
     const stone = box(group, 2.05, .045, .82, 0, courtyardLevel + .016, z, pathStone);
     stone.castShadow = true;

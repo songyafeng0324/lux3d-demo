@@ -13,15 +13,21 @@
 export interface Rect { x0: number; x1: number; z0: number; z1: number }
 /** Flat surface (y) or a ramp along Z: y goes from y0 at z=zA to y1 at z=zB. */
 export interface Surface extends Rect { id: string; y?: number; ramp?: { zA: number; zB: number; y0: number; y1: number } }
-export interface BoxCollider extends Rect { id: string; kind: 'box'; y0: number; y1: number }
+export interface BoxCollider extends Rect { id: string; kind: 'box'; y0: number; y1: number; solid?: boolean }
 export interface CircleCollider { id: string; kind: 'circle'; x: number; z: number; r: number; y0: number; y1: number }
 export type Collider = BoxCollider | CircleCollider;
 export interface ExhibitSlot { id: string; floor: number; position: [number, number, number]; footprint: [number, number] }
-export interface NavWorld { surfaces: Surface[]; colliders: Collider[]; slots: ExhibitSlot[]; entry: Player }
+export interface WalkingWorld { surfaces: Surface[]; colliders: Collider[]; airColliders: Collider[]; entry: Player; walkSpeed?: number }
+export interface NavWorld extends WalkingWorld { slots: ExhibitSlot[] }
 export interface Player { x: number; y: number; z: number }
+export interface FirstPerson extends Player { velocityY: number | null }
 export interface MoveInput { forward: number; right: number; run: boolean }
+export const MOVE_KEYS: Record<string, [number, number]> = {
+  KeyW: [1, 0], ArrowUp: [1, 0], KeyS: [-1, 0], ArrowDown: [-1, 0],
+  KeyA: [0, -1], ArrowLeft: [0, -1], KeyD: [0, 1], ArrowRight: [0, 1],
+};
 
-export const BODY = { radius: 0.3, height: 1.7, eye: 1.6, stepUp: 0.3, maxDrop: 0.45, walk: 3.0, run: 5.2, substep: 0.05 } as const;
+export const BODY = { radius: 0.3, height: 1.7, eye: 1.6, stepUp: 0.3, maxDrop: 0.45, walk: 3.0, run: 5.2, substep: 0.05, jump: 6.9, gravity: 14 } as const;
 export const UPPER_Y = 4.8;
 const RAIL_TOP = 1.15 + 0.1; // rail(): top beam at height, posts +0.07, caps +0.09
 const STAIR_RAIL_TOP = 1.05 + 0.1;
@@ -86,7 +92,13 @@ export function buildNavWorld(slots: ExhibitSlot[]): NavWorld {
       return box(`slot-${s.id}`, x - hx, x + hx, z - hz, z + hz, y, y + 1.2);
     }),
   ];
-  return { surfaces, colliders, slots, entry: { x: 0, y: 0, z: 12.2 } };
+  // Use the solid undersides during a jump, keeping the grounded stair path as before.
+  const airColliders = surfaces.filter(s => s.y === up).map(s => box(s.id, s.x0, s.x1, s.z0, s.z1, up - 0.3, up));
+  airColliders.push(box('west-mezzanine-beam', -6.64, -6.16, -13.7, 13.7, 4.225, 4.575),
+    box('east-mezzanine-beam', 6.16, 6.64, -13.7, 13.7, 4.225, 4.575),
+    box('north-mezzanine-beam', -6.4, 6.4, -5.12, -4.68, 4.23, 4.53),
+    box('south-mezzanine-beam', -6.4, 6.4, 7.68, 8.12, 4.23, 4.53));
+  return { surfaces, colliders, airColliders, slots, entry: { x: 0, y: 0, z: 12.2 } };
 }
 
 function surfaceY(s: Surface, z: number): number {
@@ -97,7 +109,7 @@ function surfaceY(s: Surface, z: number): number {
 const inRect = (r: Rect, x: number, z: number) => x >= r.x0 && x <= r.x1 && z >= r.z0 && z <= r.z1;
 
 /** Highest walkable surface under (x,z) that feet at y can step onto; null = void. */
-export function supportAt(world: NavWorld, x: number, z: number, y: number): number | null {
+export function supportAt(world: WalkingWorld, x: number, z: number, y: number): number | null {
   let best: number | null = null;
   for (const s of world.surfaces) {
     if (!inRect(s, x, z)) continue;
@@ -107,10 +119,11 @@ export function supportAt(world: NavWorld, x: number, z: number, y: number): num
   return best;
 }
 
-const activeAt = (c: Collider, y: number) => c.y1 > y + BODY.stepUp && c.y0 < y + BODY.height;
+const EPSILON = 1e-6;
+const activeAt = (c: Collider, y: number) => c.y1 > y + (c.kind === 'box' && c.solid ? EPSILON : BODY.stepUp) && c.y0 < y + BODY.height;
 
 /** Push the body circle out of every collider overlapping its vertical span. */
-function resolve(world: NavWorld, x: number, z: number, y: number): [number, number] {
+function resolve(world: WalkingWorld, x: number, z: number, y: number): [number, number] {
   const r = BODY.radius;
   for (let pass = 0; pass < 4; pass++) {
     let moved = false;
@@ -137,23 +150,24 @@ function resolve(world: NavWorld, x: number, z: number, y: number): [number, num
   return [x, z];
 }
 
-function overlapsAny(world: NavWorld, x: number, z: number, y: number): boolean {
+function overlapsFootprint(c: Collider, x: number, z: number): boolean {
   const r = BODY.radius - 1e-3;
-  return world.colliders.some(c => {
-    if (!activeAt(c, y)) return false;
-    if (c.kind === 'circle') return Math.hypot(x - c.x, z - c.z) < r + c.r;
-    const cx = Math.min(c.x1, Math.max(c.x0, x)), cz = Math.min(c.z1, Math.max(c.z0, z));
-    return Math.hypot(x - cx, z - cz) < r;
-  });
+  if (c.kind === 'circle') return Math.hypot(x - c.x, z - c.z) < r + c.r;
+  const cx = Math.min(c.x1, Math.max(c.x0, x)), cz = Math.min(c.z1, Math.max(c.z0, z));
+  return Math.hypot(x - cx, z - cz) < r;
+}
+
+export function playerOverlaps(colliders: readonly Collider[], { x, y, z }: Player): boolean {
+  return colliders.some(c => c.y1 > y + EPSILON && c.y0 < y + BODY.height - EPSILON && overlapsFootprint(c, x, z));
 }
 
 /** One tiny move; returns the new player or null if the target is a wall/void/ledge. */
-function tryMove(world: NavWorld, p: Player, dx: number, dz: number): Player | null {
+function tryMove(world: WalkingWorld, p: Player, dx: number, dz: number): Player | null {
   const [x, z] = resolve(world, p.x + dx, p.z + dz, p.y);
   if (Math.hypot(x - p.x, z - p.z) > Math.hypot(dx, dz) + 0.02) return null; // never let push-out teleport
   const ground = supportAt(world, x, z, p.y);
   if (ground === null || ground < p.y - BODY.maxDrop) return null; // anti-fall: no stepping off edges
-  if (overlapsAny(world, x, z, ground)) return null; // new height must also be clear
+  if (world.colliders.some(c => activeAt(c, ground) && overlapsFootprint(c, x, z))) return null;
   return { x, y: ground, z };
 }
 
@@ -161,20 +175,80 @@ function tryMove(world: NavWorld, p: Player, dx: number, dz: number): Player | n
  * Advance the player by `dt` seconds of input. Movement is swept in ≤5 cm
  * substeps whatever the frame rate, so low FPS cannot tunnel through rails.
  */
-export function step(world: NavWorld, p: Player, input: MoveInput, yaw: number, dt: number): Player {
-  let f = input.forward, rt = input.right;
-  const len = Math.hypot(f, rt);
-  if (!len) return p;
-  f /= len; rt /= len;
-  const dist = (input.run ? BODY.run : BODY.walk) * Math.min(dt, 0.25);
-  const dirX = -Math.sin(yaw) * f + Math.cos(yaw) * rt, dirZ = -Math.cos(yaw) * f - Math.sin(yaw) * rt;
-  const n = Math.max(1, Math.ceil(dist / BODY.substep)), sx = dirX * dist / n, sz = dirZ * dist / n;
+function velocity(world: WalkingWorld, input: MoveInput, yaw: number): [number, number] {
+  const { forward: f, right: r } = input;
+  const speed = (input.run ? BODY.run : world.walkSpeed ?? BODY.walk) / (Math.hypot(f, r) || 1);
+  return [(-Math.sin(yaw) * f + Math.cos(yaw) * r) * speed, (-Math.cos(yaw) * f - Math.sin(yaw) * r) * speed];
+}
+
+export function step(world: WalkingWorld, p: Player, input: MoveInput, yaw: number, dt: number): Player {
+  if (!input.forward && !input.right) return p;
+  const [vx, vz] = velocity(world, input, yaw);
+  const elapsed = Math.min(dt, 0.25);
+  const n = Math.max(1, Math.ceil(Math.hypot(vx, vz) * elapsed / BODY.substep));
+  const sx = vx * elapsed / n, sz = vz * elapsed / n;
   let cur = p;
   for (let i = 0; i < n; i++) {
     // full move, else slide along whichever axis is still free
     cur = tryMove(world, cur, sx, sz) ?? tryMove(world, cur, sx, 0) ?? tryMove(world, cur, 0, sz) ?? cur;
   }
   return cur;
+}
+
+function moveInAir(world: WalkingWorld, colliders: readonly Collider[], p: FirstPerson, dx: number, dz: number): FirstPerson {
+  const tryAir = (x: number, z: number) => world.surfaces.some(surface => inRect(surface, x, z)) &&
+    !playerOverlaps(colliders, { x, y: p.y, z }) ? { ...p, x, z } : null;
+  return tryAir(p.x + dx, p.z + dz) ?? tryAir(p.x + dx, p.z) ?? tryAir(p.x, p.z + dz) ?? p;
+}
+
+function verticalMove(world: WalkingWorld, colliders: readonly Collider[], p: FirstPerson, previous: Player, dt: number): FirstPerson {
+  const velocityY = p.velocityY ?? 0;
+  const nextVelocity = velocityY - BODY.gravity * dt;
+  const y = p.y + (velocityY + nextVelocity) * 0.5 * dt;
+  if (y > p.y) {
+    let ceiling: number | null = null;
+    for (const c of colliders) {
+      const headStop = c.y0 - BODY.height;
+      if (headStop >= p.y - EPSILON && headStop <= y && (ceiling === null || headStop < ceiling) && overlapsFootprint(c, p.x, p.z)) ceiling = headStop;
+    }
+    return ceiling === null ? { ...p, y, velocityY: nextVelocity } : { ...p, y: ceiling, velocityY: 0 };
+  }
+  let floor: number | null = null;
+  const consider = (h: number, previousHeight: number) => {
+    if (h >= y && previousHeight <= previous.y + EPSILON && (floor === null || h > floor)) floor = h;
+  };
+  for (const surface of world.surfaces) {
+    if (!inRect(surface, p.x, p.z)) continue;
+    const height = surfaceY(surface, p.z);
+    // An uphill ramp can rise above the feet during the same slice as the descent.
+    consider(height, inRect(surface, previous.x, previous.z) ? surfaceY(surface, previous.z) : height);
+  }
+  for (const c of colliders) if (overlapsFootprint(c, p.x, p.z)) consider(c.y1, c.y1);
+  return floor === null ? { ...p, y, velocityY: nextVelocity } : { ...p, y: floor, velocityY: null };
+}
+
+/** Preserve grounded navigation and use swept 3D collisions for a deliberate jump or a step off an object. */
+export function stepFirstPerson(world: WalkingWorld, p: FirstPerson, input: MoveInput, yaw: number, dt: number, jump: boolean): FirstPerson {
+  const moving = Boolean(input.forward || input.right);
+  if (p.velocityY === null && !jump) {
+    if (!moving) return p;
+    const standingOnSurface = supportAt(world, p.x, p.z, p.y - BODY.stepUp + EPSILON);
+    if (standingOnSurface !== null && Math.abs(standingOnSurface - p.y) <= EPSILON) {
+      return { ...step(world, p, input, yaw, dt), velocityY: null };
+    }
+  }
+
+  const colliders = [...world.colliders, ...world.airColliders];
+  const [vx, vz] = velocity(world, input, yaw);
+  const elapsed = Math.min(dt, 0.25);
+  const n = Math.max(1, Math.ceil(elapsed * 120)), slice = elapsed / n;
+  let current = p.velocityY === null && jump ? { ...p, velocityY: BODY.jump } : p;
+  for (let i = 0; i < n; i++) {
+    const previous = current;
+    if (moving) current = moveInAir(world, colliders, current, vx * slice, vz * slice);
+    current = verticalMove(world, colliders, current, previous, slice);
+  }
+  return current;
 }
 
 export function floorOf(y: number): 'ground' | 'stairs' | 'upper' {

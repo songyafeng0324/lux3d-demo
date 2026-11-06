@@ -163,6 +163,23 @@ try {
   await page.keyboard.press('KeyM'); await page.getByRole('button', { name: '回到入口' }).click();
   s = await st(page); assert.deepEqual(s.player, { x: 0, y: 0, z: 12.2 }); assert.equal(s.ui.phase, 'play');
 
+  // Start at the south guard after validating the complete stair route, then use real Space + W.
+  await page.evaluate(() => window.__t10.engine.debugPlace(0, 7.9, 4.8, 0, -.2));
+  await page.keyboard.down('KeyW');
+  try {
+    await page.keyboard.press('Space');
+    await page.waitForFunction(() => {
+      const { player, airborne } = window.__t10.engine.debugState();
+      return airborne && player.y > 5.7;
+    });
+    await page.waitForFunction(() => {
+      const { player, airborne } = window.__t10.engine.debugState();
+      return !airborne && player.y === 0 && player.z < 7.5;
+    });
+    results.atriumJump = { landed: (await st(page)).player };
+  } finally { await page.keyboard.up('KeyW'); }
+  await page.evaluate(() => window.__t10.engine.resetToEntry());
+
   // Pointer-lock loss (Esc in a real browser) pauses; only if the browser granted the lock.
   if (s.locked) {
     await page.evaluate(() => document.exitPointerLock()); await page.waitForTimeout(150);
@@ -211,4 +228,4 @@ try {
   await fs.writeFile(new URL('browser-check.json', OUT), JSON.stringify(results, null, 2) + '\n');
   await browser.close();
 }
-console.log(JSON.stringify({ pass: results.pass, walk: { seconds: results.walk?.seconds, maxY: results.walk?.maxY }, probe: results.surfaceProbe?.checked, performance: results.performance }, null, 2));
+console.log(JSON.stringify({ pass: results.pass, walk: { seconds: results.walk?.seconds, maxY: results.walk?.maxY }, probe: results.surfaceProbe?.checked, jump: results.atriumJump, performance: results.performance }, null, 2));

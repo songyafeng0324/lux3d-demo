@@ -125,11 +125,40 @@ try {
   await page.getByRole('button', { name: '移除摆放3', exact: true }).click(); await saved(page);
   assert.equal(await page.evaluate(() => window.__room.engine.debug().instances), 2, 'removal must retain the other same-source placement');
   assert.deepEqual(await page.evaluate(() => window.__room.engine.debug().assetBounds['asset-1']), models[0].bounds, 'normalization must match server bounds');
+  await page.evaluate(() => {
+    const [first, second] = window.__room.snapshot().placements;
+    window.__room.replace([{ ...first, position: [0, 0, 1.75], scale: 2 }, { ...second, position: [7.5, -.4, 0] }]);
+  });
+  await saved(page);
+  const lock = async target => {
+    await target.locator('.scene-canvas canvas').click();
+    await target.waitForFunction(() => Boolean(document.pointerLockElement));
+  };
+  const keyUntil = async (target, key, predicate) => {
+    await target.keyboard.down(key);
+    try { await target.waitForFunction(predicate); } finally { await target.keyboard.up(key); }
+  };
+  const checkJump = async target => {
+    await target.keyboard.press('Space');
+    await target.waitForFunction(() => window.__room.engine.debug().airborne && window.__room.engine.debug().camera[1] > 2);
+    await target.waitForFunction(() => !window.__room.engine.debug().airborne && window.__room.engine.debug().camera[1] === 1.65);
+  };
+  const checkAssetBlocks = async target => {
+    await target.keyboard.down('w');
+    try { await target.waitForFunction(() => window.__room.engine.debug().camera[2] < 3.2); await target.waitForTimeout(450); }
+    finally { await target.keyboard.up('w'); }
+    const [, , z] = await target.evaluate(() => window.__room.engine.debug().camera);
+    assert.ok(z >= 3.03 && z < 3.2, 'scaled asset stops first-person movement before its front face');
+  };
   await page.getByRole('button', { name: '第一人称参观', exact: true }).click();
-  await page.locator('.scene-canvas canvas').click(); await page.waitForFunction(() => Boolean(document.pointerLockElement));
-  const beforeWalk = await page.evaluate(() => window.__room.engine.debug().camera);
-  await page.keyboard.down('w'); await page.waitForTimeout(200); await page.keyboard.up('w');
-  assert.notDeepEqual(await page.evaluate(() => window.__room.engine.debug().camera), beforeWalk);
+  await lock(page);
+  await checkAssetBlocks(page);
+  await checkJump(page);
+  await keyUntil(page, 's', () => window.__room.engine.debug().camera[2] > 8.6);
+  const outside = await page.evaluate(() => window.__room.engine.debug().camera);
+  assert.ok(outside[2] <= 8.7 && outside[1] < 1.3, 'player reaches the visible dirt edge at outdoor floor height');
+  await keyUntil(page, 'w', () => window.__room.engine.debug().camera[2] < 4.8);
+  assert.equal((await page.evaluate(() => window.__room.engine.debug().camera))[1], 1.65, 'porch step allows walking back indoors');
   await page.keyboard.press('Escape'); await page.waitForFunction(() => document.pointerLockElement === null);
   await page.getByRole('button', { name: '回到入口', exact: false }).click();
   assert.deepEqual(await page.evaluate(() => window.__room.engine.debug().camera), [0, 1.65, 3.5]);
@@ -145,6 +174,10 @@ try {
   assert.deepEqual(await canvasRect(viewer), [0, 0, 1440, 900]);
   assert.equal(await viewer.locator('.scene-sidebar,input,[role=toolbar]').count(), 0); assert.equal(await viewer.getByRole('button', { name: '移动', exact: true }).count(), 0);
   assert.equal(await viewer.evaluate(() => window.__room.save), null);
+  await lock(viewer);
+  await checkAssetBlocks(viewer);
+  await checkJump(viewer);
+  await viewer.keyboard.press('Escape');
   await shot(viewer, 'shared-room.png');
   const visitorHeaders = modelReads.slice(modelStart); assert.ok(visitorHeaders.length > 0); for (const headers of visitorHeaders) { assert.equal(headers.authorization, 'Bearer grant-token'); assert.equal(headers['x-snapshot-grant'], 'grant-1'); }
   const sharedAtLoad = sharedReadCount;

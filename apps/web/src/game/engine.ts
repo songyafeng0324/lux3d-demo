@@ -3,7 +3,7 @@ import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import pavilionUrl from '../../../../assets/t10/pavilion-v1.glb?url';
 import layout from '../../../../assets/t10/pavilion-layout.json';
-import { buildNavWorld, step, targetSlot, floorOf, BODY, type ExhibitSlot, type Player, type NavWorld } from './navigation.js';
+import { buildNavWorld, stepFirstPerson, targetSlot, floorOf, BODY, MOVE_KEYS, type ExhibitSlot, type FirstPerson, type NavWorld } from './navigation.js';
 import { exhibitFit, slotMarker, EXHIBIT_FIT, type GallerySlot, type RoomModel } from '@aholo/contracts';
 import { disposeResources } from '../scene/assets.js';
 
@@ -18,10 +18,6 @@ export interface EngineHooks {
 }
 interface LightMarker { position: [number, number, number]; color: [number, number, number]; power: number; type: string }
 
-const MOVE_KEYS: Record<string, [number, number]> = {
-  KeyW: [1, 0], ArrowUp: [1, 0], KeyS: [-1, 0], ArrowDown: [-1, 0],
-  KeyA: [0, -1], ArrowLeft: [0, -1], KeyD: [0, 1], ArrowRight: [0, 1],
-};
 export const ENTRY_YAW = 0;
 
 /** Full-viewport first-person pavilion. React owns the HUD; this owns WebGL, input and walking. */
@@ -33,11 +29,12 @@ export class PavilionEngine {
   private building = new T.Group();
   private exhibits = new T.Group();
   private exhibitToken = 0;
-  private player: Player = { ...this.world.entry };
+  private player: FirstPerson = { ...this.world.entry, velocityY: null };
   private yaw = ENTRY_YAW;
   private pitch = 0.05;
   private eyeY = BODY.eye;
   private keys = new Set<string>();
+  private jumpQueued = false;
   private enabled = false;
   private dragging = false;
   private closed = false;
@@ -200,7 +197,7 @@ export class PavilionEngine {
     if (document.pointerLockElement === this.renderer.domElement) document.exitPointerLock();
   }
   resetToEntry() {
-    this.player = { ...this.world.entry };
+    this.player = { ...this.world.entry, velocityY: null };
     this.yaw = ENTRY_YAW; this.pitch = 0.05; this.eyeY = BODY.eye;
     this.clearKeys();
     this.placeCamera();
@@ -210,10 +207,15 @@ export class PavilionEngine {
     this.pitch = T.MathUtils.clamp(pitch, -1.35, 1.35);
   }
 
-  private clearKeys = () => { this.keys.clear(); this.dragging = false; };
+  private clearKeys = () => { this.keys.clear(); this.jumpQueued = false; this.dragging = false; };
   private keyDown = (e: KeyboardEvent) => {
     if ((e.target as HTMLElement | null)?.closest?.('input,textarea,select,[contenteditable="true"]')) return;
     if (!this.enabled || e.metaKey || e.ctrlKey || e.altKey) return; // Cmd+key on macOS can swallow keyup
+    if (e.code === 'Space' && !(e.target as HTMLElement | null)?.closest?.('button,a')) {
+      e.preventDefault();
+      if (!e.repeat) this.jumpQueued = true;
+      return;
+    }
     if (e.code in MOVE_KEYS || e.code === 'ShiftLeft' || e.code === 'ShiftRight') { e.preventDefault(); this.keys.add(e.code); }
   };
   private keyUp = (e: KeyboardEvent) => { this.keys.delete(e.code); if (e.key === 'Meta') this.keys.clear(); };
@@ -245,11 +247,12 @@ export class PavilionEngine {
   private frame = (now: number) => {
     if (this.closed) return;
     const dt = Math.min(this.clock.getDelta(), 0.25);
-    if (this.enabled && this.keys.size) {
+    if (this.enabled && (this.keys.size || this.jumpQueued || this.player.velocityY !== null)) {
       let forward = 0, right = 0;
       for (const k of this.keys) { const v = MOVE_KEYS[k]; if (v) { forward += v[0]; right += v[1]; } }
       const run = this.keys.has('ShiftLeft') || this.keys.has('ShiftRight');
-      this.player = step(this.world, this.player, { forward, right, run }, this.yaw, dt);
+      this.player = stepFirstPerson(this.world, this.player, { forward, right, run }, this.yaw, dt, this.jumpQueued);
+      this.jumpQueued = false;
     }
     this.placeCamera();
     this.renderer.render(this.scene, this.camera);
@@ -325,8 +328,9 @@ export class PavilionEngine {
 
   /** Read-only state for local checks (scripts/t10-game-browser.mjs). */
   debugState() {
+    const { x, y, z, velocityY } = this.player;
     return {
-      player: { ...this.player }, yaw: this.yaw, pitch: this.pitch, enabled: this.enabled, keys: [...this.keys],
+      player: { x, y, z }, airborne: velocityY !== null, yaw: this.yaw, pitch: this.pitch, enabled: this.enabled, keys: [...this.keys],
       locked: document.pointerLockElement === this.renderer.domElement, ...this.hud(),
       meshes: this.building.children.length, exhibits: this.exhibits.children.map(o => ({ ...o.userData, position: o.position.toArray(), scale: o.scale.x, bounds: (b => [b.min.toArray(), b.max.toArray()])(new T.Box3().setFromObject(o)) })),
       triangles: this.renderer.info.render.triangles,
@@ -335,7 +339,7 @@ export class PavilionEngine {
   }
   /** Screenshot framing only (never used by the walking check): place the camera on a valid surface. */
   debugPlace(x: number, z: number, y: number, yaw: number, pitch: number) {
-    this.player = { x, y, z };
+    this.player = { x, y, z, velocityY: null };
     this.look(yaw, pitch);
     this.placeCamera();
   }

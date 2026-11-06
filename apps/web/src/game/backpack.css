@@ -16,3 +16,14 @@
 .asset-thumbnail img{width:100%;height:100%;min-height:0;object-fit:contain}
 .asset-thumbnail-fallback{width:24px;height:24px;opacity:.7}
 .asset-short-name{display:block;width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:13px;font-weight:500}
+
+.bag-password{display:grid;gap:8px}
+.bag-password-input{position:relative}
+.bag-password-input input{padding-right:52px}
+.bag-form .bag-password-toggle{position:absolute;inset:3px 3px 3px auto;display:grid;place-items:center;width:42px;padding:0;border:0;border-radius:4px;background:transparent;color:var(--muted);cursor:pointer}
+.bag-form .bag-password-toggle:hover,.bag-form .bag-password-toggle[aria-pressed=true]{color:var(--gold);background:rgba(214,176,104,.1)}
+.bag-drawer .bag-asset-card.approved{position:relative;border-color:#73c9b1}
+.bag-drawer .bag-asset-card.approved:hover{border-color:#a2e5d2}
+.bag-approved{position:absolute;top:8px;right:8px;padding:2px 6px;border:1px solid #73c9b1;border-radius:4px;background:#193c34;color:#d1f5e9;font-size:11px}
+.bag-submission-choice{margin-bottom:22px}
+.bag-task .bag-history-actions{justify-content:flex-start;margin:0}

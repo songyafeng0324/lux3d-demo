@@ -26,6 +26,19 @@ test('T08 real PostgreSQL/API: submissions, review races, 30-slot publishing, ga
   async function account(username){const r=await call('POST','/api/v1/auth/register',{username,nickname:username+'昵称',password,confirmPassword:password});assert.equal(r.statusCode,201,r.body);return login(username);}
   const alice=await account('t08_alice'),bob=await account('t08_bob');
   assert.equal((await seedAdmin(pool,{username:'t08_admin',nickname:'管理员',password})).created,true);const admin=await login('t08_admin');assert.equal(admin.user.role,'admin');
+  const adminRoom=(await call('GET','/api/v1/rooms/me',undefined,admin.headers)).json().data;
+  assert.equal(adminRoom.version,0);assert.deepEqual(adminRoom.placements,[]);
+  assert.equal((await seedAdmin(pool,{username:'t08_admin',nickname:'另一昵称',password})).created,false);
+  const legacyId=randomUUID(),systemId=randomUUID();
+  await pool.query("INSERT INTO users(id,username_key,username_display,nickname,password_hash,role) SELECT $1,'t08_legacy','t08_legacy','旧管理员',password_hash,'admin' FROM users WHERE id=$2",[legacyId,admin.user.id]);
+  await pool.query("INSERT INTO users(id,username_key,username_display,nickname,password_hash,role) VALUES($1,'t08_system','t08_system','系统来源','system:no-login','admin')",[systemId]);
+  const backfill=await fs.readFile(new URL('../migrations/005_admin_rooms.sql',import.meta.url),'utf8');
+  await pool.query(backfill);await pool.query(backfill);
+  const legacy=await login('t08_legacy');
+  const migratedRoom=(await call('GET','/api/v1/rooms/me',undefined,legacy.headers)).json().data;
+  assert.equal(migratedRoom.version,0);assert.deepEqual(migratedRoom.placements,[]);
+  assert.equal((await call('GET','/api/v1/rooms/me',undefined,admin.headers)).json().data.id,adminRoom.id);
+  assert.equal((await pool.query('SELECT id FROM rooms WHERE owner_id=$1',[systemId])).rowCount,0);
   async function file(ownerId,purpose,bytes){const id=randomUUID(),hash=sha(bytes),staged=await store.putStaged(bytes);await store.commit(staged,id,hash);await pool.query("INSERT INTO files(id,owner_id,purpose,object_key,sha256,byte_size,mime,state) VALUES($1::uuid,$2,$3,$1::text,$4,$5,$6,'committed')",[id,ownerId,purpose,hash,bytes.length,purpose==='model'?'model/gltf-binary':'image/png']);return id;}
   // SQL fixtures model already-delivered personal assets; the generation pipeline itself is covered by T06.
   async function personal(ownerId){const id=randomUUID(),task=randomUUID(),model=await file(ownerId,'model',Buffer.from('model-'+id)),original=await file(ownerId,'input_image',Buffer.from('original-'+id));const c=await pool.connect();try{await c.query('BEGIN');await c.query("INSERT INTO generation_tasks(id,user_id,input_file_id,submitted_day,policy_version) VALUES($1,$2,$3,'2026-11-05','t08-fixture')",[task,ownerId,original]);await c.query("INSERT INTO assets(id,owner_id,source_type,generation_task_id,model_file_id,original_image_id,name,normalization,bounds) VALUES($1,$2,'personal',$3,$4,$5,$6,$7,$8)",[id,ownerId,task,model,original,'资产-'+id.slice(0,4),{scale:1,translation:[0,0,0]},{min:[-.4,0,-.4],max:[.4,.8,.4]}]);await c.query("UPDATE generation_tasks SET status='succeeded',result_asset_id=$2 WHERE id=$1",[task,id]);await c.query('COMMIT');}catch(e){await c.query('ROLLBACK');throw e;}finally{c.release();}return {id,model,original};}
@@ -48,6 +61,8 @@ test('T08 real PostgreSQL/API: submissions, review races, 30-slot publishing, ga
   // Resubmit after withdrawal; a second model later; admin sees earliest first.
   const sub2=(await call('POST',`/api/v1/assets/${a1.id}/submissions`,publicFields(),alice.headers)).json().data;await new Promise(r=>setTimeout(r,15));
   const sub3=(await call('POST',`/api/v1/assets/${a2.id}/submissions`,publicFields({name:'铜镜'}),alice.headers)).json().data;
+  const pendingAsset=await call('GET',`/api/v1/assets/${a2.id}`,undefined,alice.headers);
+  assert.equal(pendingAsset.json().data.submissionApproved,false);
   assert.equal((await call('GET','/api/v1/admin/submissions',undefined,alice.headers)).statusCode,403);
   const queue=(await call('GET','/api/v1/admin/submissions',undefined,admin.headers)).json().data.items;assert.deepEqual(queue.map(s=>s.id),[sub2.id,sub3.id]);assert.equal(queue[0].applicant.username,'t08_alice');assert.ok(queue[0].model.modelFileId&&queue[0].originalImageId);
   assert.equal((await call('GET',`/api/v1/files/${queue[0].originalImageId}/content`,undefined,admin.headers)).statusCode,200,'admin can view the submitted original');
@@ -73,6 +88,8 @@ test('T08 real PostgreSQL/API: submissions, review races, 30-slot publishing, ga
   assert.equal((await call('PATCH','/api/v1/me',{nickname:'改名后'},alice.headers)).statusCode,200);assert.equal((await call('PATCH',`/api/v1/assets/${a1.id}`,{name:'个人新名',description:''},alice.headers)).statusCode,200);
   let candidates=(await call('GET','/api/v1/admin/candidates',undefined,admin.headers)).json().data.items;const c1=candidates.find(c=>c.assetId===a1.id),c3=candidates.find(c=>c.assetId===a2.id);
   assert.equal(c1.publicSnapshot.sourceNickname,'t08_alice昵称');assert.notEqual(c1.publicSnapshot.name,'个人新名');assert.equal(c1.slotNo,null,'approval does not auto-exhibit');
+  const collection=(await call('GET','/api/v1/assets',undefined,alice.headers)).json().data.items;
+  assert.deepEqual(Object.fromEntries(collection.map(a=>[a.id,a.submissionApproved])),{[a1.id]:true,[a2.id]:true,[a3.id]:false});
 
   // ---- F11 imports: official candidate vs furniture (AC43～AC46) ----
   const missingOfficial=multi({sourceType:'official_candidate',name:'玉璧',description:'x',era:'',material:'玉',ownershipType:'museum',holderName:'馆',location:'京'},Buffer.from('glb'),'m.glb');
@@ -113,7 +130,9 @@ test('T08 real PostgreSQL/API: submissions, review races, 30-slot publishing, ga
   let room=(await call('GET','/api/v1/rooms/me',undefined,alice.headers)).json().data;
   let save=await call('PUT','/api/v1/rooms/me/layout',{baseVersion:room.version,editSequence:1,name:'藏品小屋',placements:[placement(a1.id,'x1',[-1,0,0]),placement(a1.id,'x2',[1,0,0]),placement(a3.id,'y1',[0,0,1]),placement(furniture,'f1',[0,0,-2])]},alice.headers);assert.equal(save.statusCode,200,save.body);
   const unpublish=await call('PUT','/api/v1/admin/gallery',{baseVersion:2,slots:arrange({5:cOfficial.id,12:c3.id})},admin.headers);assert.equal(unpublish.json().data.publishedVersion,3);
-  assert.equal((await call('GET',`/api/v1/assets/${a1.id}`,undefined,alice.headers)).statusCode,200);assert.equal((await call('GET','/api/v1/rooms/me',undefined,alice.headers)).json().data.placements.length,4);
+  const unpublishedAsset=await call('GET',`/api/v1/assets/${a1.id}`,undefined,alice.headers);
+  assert.equal(unpublishedAsset.statusCode,200);assert.equal(unpublishedAsset.json().data.submissionApproved,true);
+  assert.equal((await call('GET','/api/v1/rooms/me',undefined,alice.headers)).json().data.placements.length,4);
   assert.equal((await call('GET',`/api/v1/snapshots/${g.id}/details/${c1.id}`,undefined,{authorization:'Bearer '+g.token})).statusCode,200,'old grant keeps its own version');
   // Official text edit while exhibited: new gallery version, old grant still reads old text.
   assert.equal((await call('PATCH',`/api/v1/admin/assets/${official}`,{...publicFields(),modelFileId:randomUUID()},admin.headers)).statusCode,422);
@@ -129,6 +148,8 @@ test('T08 real PostgreSQL/API: submissions, review races, 30-slot publishing, ga
   const users=(await call('GET','/api/v1/admin/users',undefined,admin.headers)).json().data.items;assert.ok(users.some(x=>x.username==='t08_alice'));assert.ok(users.every(x=>!('password_hash' in x)));
   const day=new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Shanghai',year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date());
   await pool.query('INSERT INTO quota_days(user_id,quota_day,used_net) VALUES($1,$2,2)',[bob.user.id,day]);
+  const beforeOverride=(await call('GET',`/api/v1/admin/users/${bob.user.id}`,undefined,admin.headers)).json().data.quota;
+  assert.deepEqual([beforeOverride.total,beforeOverride.used,beforeOverride.available,beforeOverride.adjusted],[10,2,8,false]);
   const activeTask=randomUUID();
   await pool.query("INSERT INTO generation_tasks(id,user_id,input_file_id,submitted_day,policy_version) VALUES($1,$2,$3,$4,'t09-quota-fixture')",[activeTask,bob.user.id,b1.original,day]);
   assert.equal((await call('PUT',`/api/v1/admin/users/${bob.user.id}/quota`,{total:5},alice.headers)).statusCode,403,'users cannot adjust quota');
