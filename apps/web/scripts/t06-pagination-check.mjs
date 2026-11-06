@@ -9,13 +9,13 @@ const now = new Date().toISOString();
 const assets = Array.from({ length: 65 }, (_, i) => ({ id: 'asset-' + (i + 1), name: '藏品' + (i + 1), description: '', modelFileId: 'model-1', originalImageId: null, createdAt: now, normalization: {}, bounds: {} }));
 const tasks = Array.from({ length: 65 }, (_, i) => ({ id: 'task-' + (i + 1), status: i === 0 ? 'processing' : 'succeeded', submittedDay: '2026-11-05', createdAt: now, assetId: i === 30 ? 'asset-65' : assets[i].id, errorCode: null }));
 const counts = new Map();
-let generationReady = true;
 await page.route('**/api/v1/**', async route => {
   const url = new URL(route.request().url()), path = url.pathname.replace('/api/v1', '');
   counts.set(path + url.search, (counts.get(path + url.search) || 0) + 1);
   const ok = data => route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ data, requestId: 'qa' }) });
-  if (path === '/health/ready') return ok({ ready: true, generationReady, checkedAt: now, checks: { database: 'ok', storage: 'ok', worker: 'ok' }, generation: { configured: true, stage: generationReady ? 'integrated' : 'disabled' } });
   if (path === '/me') return ok({ user: { id: 'user-1', username: 'qa_user', nickname: '分页藏家', role: 'user' }, roomId: 'room-1', quota: { day: '2026-11-05', total: 3, used: 1, available: 2 }, activeTask: tasks[0], csrfToken: 'qa-csrf' });
+  if (path === '/furniture') return ok({ items: [], nextCursor: null });
+  if (path === '/rooms/me') return ok({ id: 'room-1', name: '分页小屋', version: 1, sceneVersion: 'courtyard-v1', placements: [], assets: [], shareEnabled: false });
   if (path === '/assets' || path === '/generation-tasks') {
     const collection = path === '/assets' ? assets : tasks, offset = Number(url.searchParams.get('cursor') || 0);
     return ok({ items: collection.slice(offset, offset + 30), nextCursor: offset + 30 < collection.length ? String(offset + 30) : null });
@@ -26,9 +26,7 @@ await page.route('**/api/v1/**', async route => {
 });
 try {
   const base = process.env.T06_UI_BASE || 'http://localhost:5173';
-  await page.goto(base);
-  await page.getByRole('button', { name: '进入藏宝阁', exact: true }).click();
-  await page.keyboard.press('KeyB');
+  await page.goto(base + '/room?backpack=1');
   const bag = page.getByRole('dialog', { name: '背包', exact: true });
   await page.waitForFunction(() => document.querySelectorAll('.bag-asset-card').length === 30);
   await bag.getByRole('button', { name: '加载更多藏品' }).click();
@@ -66,11 +64,6 @@ try {
   assert.equal(await bag.getByRole('button', { name: '加载更多藏品' }).count(), 0, 'tail cursor must remain exhausted');
   await bag.getByRole('button', { name: '生成任务', exact: true }).click();
   assert.equal(await bag.locator('.bag-task').count(), 60, 'task pagination must survive repeated polls');
-  await page.goto(base + '/workbench');
-  await page.getByText('生成入口：可用', { exact: false }).waitFor();
-  generationReady = false;
-  await page.getByRole('button', { name: '重新检查' }).click();
-  await page.getByText('生成入口：未启用或暂未就绪', { exact: false }).waitFor();
   assert.deepEqual(errors, []);
-  console.log(JSON.stringify({ pass: true, scope: 'UI with intercepted APIs; no supplier call', checks: ['loaded 60/65 assets survive polling', '31st/61st selection survives polling', 'task opens off-page asset via GET detail', 'off-page detail survives polling', 'loaded 60 tasks survive polling', 'exhausted cursor stays exhausted', 'generationReady true/false reflected by workbench'], pageErrors: errors }, null, 2));
+  console.log(JSON.stringify({ pass: true, scope: 'UI with intercepted APIs; no supplier call', checks: ['loaded 60/65 assets survive polling', '31st/61st selection survives polling', 'task opens off-page asset via GET detail', 'off-page detail survives polling', 'loaded 60 tasks survive polling', 'exhausted cursor stays exhausted'], pageErrors: errors }, null, 2));
 } finally { await browser.close(); }

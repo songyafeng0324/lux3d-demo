@@ -13,6 +13,7 @@ const errors = [], writes = [], receipts = new Map(), modelReads = [], renewals 
 let roomVersion = 0, roomName = '初始小屋', placements = [{ id: 'placement-1', assetId: 'asset-1', position: [0, 0, 0], rotation: [0, 0, 0], scale: 1 }];
 let shareEnabled = false, loseSave = true, rejectSave = 0, loadFailed = false, delaySave = null, releaseAck;
 let sharedReadCount = 0;
+let signedIn = true, expireSave = false;
 const models = Array.from({ length: 32 }, (_, i) => ({ id: 'asset-' + (i + 1), name: '个人藏品' + (i + 1), description: '', modelFileId: 'model-' + (i + 1), originalImageId: null, createdAt: new Date().toISOString(), normalization: { scale: .5, translation: [0, 0, 0] }, bounds: { min: [-.5, 0, -.5], max: [.5, 1, .5] } }));
 const furniture = { ...models[0], id: 'furniture-1', name: '官方长案' };
 const all = [...models, furniture];
@@ -26,7 +27,9 @@ await context.route('**/api/v1/**', async route => {
   const request = route.request(), url = new URL(request.url()), path = url.pathname.replace('/api/v1', ''), method = request.method();
   const ok = data => route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ data, requestId: 'room-qa' }) });
   const fail = (status, message) => route.fulfill({ status, contentType: 'application/json', body: JSON.stringify({ error: { code: 'QA', message }, requestId: 'room-qa' }) });
-  if (path === '/me') return ok({ user: { id: 'user-1', username: 'qa_user', nickname: '藏家', role: 'user' }, roomId: 'room-1', quota: { day: '2026-11-05', total: 3, used: 0, available: 3 }, activeTask: null, csrfToken: 'csrf-room' });
+  const user = { id: 'user-1', username: 'qa_user', nickname: '藏家', role: 'user' };
+  if (path === '/me') return signedIn ? ok({ user, roomId: 'room-1', quota: { day: '2026-11-05', total: 3, used: 0, available: 3 }, activeTask: null, csrfToken: 'csrf-room' }) : fail(401, '请先登录');
+  if (path === '/auth/login') { signedIn = true; return ok({ user, csrfToken: 'csrf-room' }); }
   if (path === '/assets') { const offset = Number(url.searchParams.get('cursor') || 0); return ok({ items: models.slice(offset, offset + 30), nextCursor: offset + 30 < models.length ? String(offset + 30) : null }); }
   if (path === '/furniture') return ok({ items: [furniture], nextCursor: null });
   if (path === '/rooms/me' && method === 'GET') return loadFailed ? fail(503, '临时读取失败') : ok(ownerRoom());
@@ -34,6 +37,7 @@ await context.route('**/api/v1/**', async route => {
   if (path === '/rooms/me/layout') {
     assert.equal(request.headers()['x-csrf-token'], 'csrf-room');
     const key = request.headers()['idempotency-key'], body = request.postDataJSON(); writes.push({ key, body });
+    if (expireSave) { expireSave = false; signedIn = false; return fail(401, '登录已失效'); }
     if (receipts.has(key)) return ok(receipts.get(key));
     if (rejectSave) { const status = rejectSave; rejectSave = 0; return fail(status, '确定拒绝此布局'); }
     if (body.baseVersion !== roomVersion) return fail(409, '版本冲突');
@@ -58,10 +62,29 @@ try {
   assert.equal(await page.getByRole('complementary', { name: '物品抽屉' }).count(), 0, 'catalog drawer starts closed');
   await page.getByRole('button', { name: '打开物品库', exact: true }).click();
   assert.deepEqual(await canvasRect(page), [0, 0, 1440, 900], 'opening drawer must not shrink canvas');
-  assert.equal(await page.locator('.room-catalog-item').count(), 33, 'all personal pages plus furniture must load');
+  assert.equal(await page.locator('.room-catalog .room-asset-card').count(), 33, 'all personal pages plus furniture must load');
+  await page.waitForFunction(() => document.querySelector('.room-catalog .asset-thumbnail img')?.naturalWidth === 192);
+  assert.equal(await page.locator('.room-catalog .asset-short-name').first().textContent(), '个人藏品1');
   await page.getByLabel('房间名称').fill('第一次保存'); await page.getByRole('button', { name: '重试保存', exact: true }).waitFor();
   await page.getByLabel('房间名称').fill('网络失败后继续编辑'); await page.getByRole('button', { name: '重试保存', exact: true }).click(); await saved(page);
   assert.equal(writes[0].key, writes[1].key); assert.deepEqual(writes[0].body, writes[1].body); assert.notEqual(writes[1].key, writes[2].key); assert.equal(roomName, '网络失败后继续编辑');
+  expireSave = true;
+  await page.getByLabel('房间名称').fill('会话过期保留的草稿');
+  await page.getByRole('button', { name: /登录后进入自己的小屋/ }).click();
+  const account = page.getByRole('dialog', { name: '账号设置' });
+  await account.getByLabel('用户名').fill('qa_user');
+  assert.equal(await page.getByLabel('房间名称').inputValue(), '会话过期保留的草稿');
+  assert.equal(await page.getByLabel('房间名称').isDisabled(), true);
+  const expired = writes.at(-1);
+  await account.getByLabel('密码', { exact: true }).fill('password-123456');
+  await account.getByRole('button', { name: '登录账号' }).click();
+  await account.getByText('已登录。').waitFor();
+  await page.keyboard.press('Escape');
+  await page.getByRole('button', { name: '重试保存' }).click();
+  await saved(page);
+  assert.deepEqual(writes.at(-1), expired, 'reauthenticated owner replays the exact pending draft');
+  assert.equal(roomName, '会话过期保留的草稿');
+  await page.getByRole('button', { name: '打开物品库', exact: true }).click();
   await page.evaluate(() => { window.__room.engine.home(); window.__room.engine.select('placement-1'); });
   await page.getByRole('button', { name: '移动', exact: true }).click();
   delaySave = true; await page.getByLabel('房间名称').fill('等待旧回执');
@@ -96,6 +119,9 @@ try {
     return geometries.length === 2 && geometries[0] === geometries[1];
   }), true, 'same-source placements must share geometry');
   await page.getByRole('button', { name: '房间物品', exact: false }).click();
+  await page.waitForFunction(() => [...document.querySelectorAll('.placement-list img')].filter(image => image.complete && image.naturalWidth === 192).length === 3);
+  const copies = page.locator('.placement-list .room-placement-card').filter({ hasText: '个人藏品1' });
+  assert.equal(await copies.nth(0).locator('img').getAttribute('src'), await copies.nth(1).locator('img').getAttribute('src'));
   await page.getByRole('button', { name: '移除摆放3', exact: true }).click(); await saved(page);
   assert.equal(await page.evaluate(() => window.__room.engine.debug().instances), 2, 'removal must retain the other same-source placement');
   assert.deepEqual(await page.evaluate(() => window.__room.engine.debug().assetBounds['asset-1']), models[0].bounds, 'normalization must match server bounds');
@@ -128,5 +154,5 @@ try {
   loadFailed = true; const failedPage = await context.newPage(); failedPage.on('pageerror', error => errors.push(error.message)); const writesBefore = writes.length; await failedPage.goto(BASE + '/room'); await failedPage.getByRole('button', { name: '重试读取', exact: true }).waitFor(); assert.equal(await failedPage.getByLabel('房间名称').isDisabled(), true); await failedPage.waitForTimeout(650); assert.equal(writes.length, writesBefore);
   loadFailed = false; await failedPage.getByRole('button', { name: '重试读取', exact: true }).click(); await saved(failedPage);
   assert.deepEqual(errors, []);
-  console.log(JSON.stringify({ pass: true, scope: 'intercepted APIs; no supplier calls', checks: ['owner/visitor full viewport and overlay drawer', 'all catalog pages', 'initial load never PUT', 'response-loss same-key retry followed by new draft', 'real mouse gizmo drag does not orbit or snap on ACK', '413/422 clear rejected request', '409 retains draft until explicit reload', 'dynamic UUID placement', 'same-source clone and removal share resources', 'server normalization matches geometry', 'real pointer-lock visit walk and return', 'stable share link reopen', 'visitor has no editor/backpack/details', 'visitor files carry grant scope', 'renewal retries same key and keeps snapshot', 'load failure never PUT'], pageErrors: errors }, null, 2));
+  console.log(JSON.stringify({ pass: true, scope: 'intercepted APIs; no supplier calls', checks: ['owner/visitor full viewport and overlay drawer', 'all catalog pages', 'static GLB thumbnails reused across placement copies', 'initial load never PUT', 'response-loss same-key retry followed by new draft', 'session expiry preserves draft and same-key replay after login', 'real mouse gizmo drag does not orbit or snap on ACK', '413/422 clear rejected request', '409 retains draft until explicit reload', 'dynamic UUID placement', 'same-source clone and removal share resources', 'server normalization matches geometry', 'real pointer-lock visit walk and return', 'stable share link reopen', 'visitor has no editor/backpack/details', 'visitor files carry grant scope', 'renewal retries same key and keeps snapshot', 'load failure never PUT'], pageErrors: errors }, null, 2));
 } finally { await context.close(); await browser.close(); }

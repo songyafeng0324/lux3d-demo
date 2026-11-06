@@ -72,7 +72,7 @@ async function verifyMain(base) {
 
   try {
     const owner = await page();
-    await owner.goto(base + '/?backpack=1');
+    await owner.goto(base + '/room?backpack=1');
     const bag = owner.getByRole('dialog', { name: '背包' });
     await bag.getByLabel('用户名', { exact: true }).fill(demo.username);
     await bag.getByLabel('密码', { exact: true }).fill(demo.password);
@@ -299,7 +299,7 @@ async function sampleRoom(base) {
       const heapBefore = await heap();
       const reentryMs = [];
       for (let repeat = 0; repeat < 5; repeat++) {
-        await page.goto(base + '/workbench');
+        await page.goto('about:blank');
         reentryMs.push(await open(count));
       }
       cases.push({ placements: count, firstLoadMs, reentryMs, heapBefore, heapAfter: await heap(), ...metrics });

@@ -7,7 +7,7 @@ import {randomUUID,randomBytes} from 'node:crypto';import pg from 'pg';import sh
 import {loadConfig,createPool,LocalFileStore,seedAdmin,GenerationWorker,validateModel,sha256} from '@aholo/domain';
 import {migrate} from './migrate.mjs';
 import {buildApp} from '../apps/api/dist/app.js';
-const port=13008,base=`http://127.0.0.1:${port}`,out='docs/validation/evidence/t08';await fs.mkdir(out,{recursive:true});
+const port=13008,base=`http://127.0.0.1:${port}`,out=process.env.T08_EVIDENCE_DIR || 'docs/validation/evidence/t08';await fs.mkdir(out,{recursive:true});
 const main=loadConfig(),creds=JSON.parse(await fs.readFile(path.join(os.homedir(),'Library/Application Support/aholo-lux3d/local-db.json'),'utf8'));
 const bootstrap=new pg.Client({host:'127.0.0.1',port:creds.port,user:'aholo_bootstrap',password:creds.adminPassword,database:'postgres'});await bootstrap.connect();
 const db='aholo_t08b_'+randomUUID().replaceAll('-','');await bootstrap.query(`CREATE DATABASE ${db} OWNER aholo_app`);
@@ -58,8 +58,9 @@ try{
  const faceSlot=async(p,x,z,yaw)=>{await p.evaluate(([x,z,yaw])=>{window.__t10.engine.debugPlace(x,z,0,yaw,-.22);},[x,z,yaw]);};
 
  await step('user submits a backpack model with full public data, withdraws and resubmits',async()=>{
-  await up.goto(base+'/?backpack=1');await up.waitForFunction(()=>window.__t10?.ui().phase==='intro',null,{timeout:90000});
+  await up.goto(base+'/room?backpack=1');
   const bag=up.getByRole('dialog',{name:'背包'});await bag.getByLabel('用户名').fill('t08_collector');await bag.getByLabel('密码').fill(pw);await bag.getByRole('button',{name:'登录并打开背包'}).click();
+  await up.waitForFunction(() => document.querySelector('.bag-asset-card img')?.naturalWidth > 0);
   await bag.getByRole('button',{name:/资产01/}).click();const panel=bag.locator('.bag-submit');await panel.getByLabel('公共名称').waitFor();
   await panel.getByLabel('公共名称').fill('紫檀靠背椅');await panel.getByLabel('简介').fill('清代紫檀靠背椅，背板浮雕卷草纹。');await panel.getByLabel('年代').fill('不详');await panel.getByLabel('材质').fill('紫檀');
   await panel.getByLabel('归属类型').selectOption('personal_collection');await panel.getByLabel('收藏方名称').fill('藏友小周');await panel.getByLabel('所在地').fill('浙江杭州');
@@ -88,7 +89,28 @@ try{
   await faceSlot(vp,-7.9,-10,Math.PI/2);await vp.waitForFunction(()=>window.__t10.engine.debugState().target?.id==='T01');await vp.locator('.t10-prompt').getByText('紫檀靠背椅').waitFor();await vp.screenshot({path:path.join(out,'04-visitor-prompt.png')});
   await vp.keyboard.press('KeyE');const dlg=vp.getByRole('dialog',{name:'紫檀靠背椅详情'});await dlg.getByText('投稿 · 藏友小周').waitFor();
   for(const t of ['不详','紫檀','个人收藏','藏友小周','浙江杭州'])await dlg.getByText(t,{exact:true}).first().waitFor();
-  await vp.waitForFunction(()=>!document.querySelector('.t10-exhibit .bag-preview-status'),null,{timeout:60000});await vp.screenshot({path:path.join(out,'05-visitor-detail.png')});
+  await vp.waitForFunction(()=>!document.querySelector('.t10-exhibit .bag-preview-status'),null,{timeout:60000});
+  const layout = await dlg.evaluate(dialog => {
+    const preview = dialog.querySelector('.bag-preview-wrap').getBoundingClientRect();
+    const details = dialog.querySelector('.t10-exhibit-text');
+    const rect = dialog.getBoundingClientRect();
+    return {width:rect.width/innerWidth,height:rect.height/innerHeight,ratio:preview.width/details.clientWidth,previewHeight:preview.height};
+  });
+  assert.ok(layout.width > .96 && layout.width < .98 && Math.abs(layout.height - .83) < .01);
+  assert.ok(Math.abs(layout.ratio - 3) < .05 && layout.previewHeight > 600);
+  await vp.screenshot({path:path.join(out,'05-visitor-detail.png')});
+  const text = dlg.locator('.t10-exhibit-text');
+  const shortDescription = await text.locator('.t10-exhibit-desc').textContent();
+  await text.locator('.t10-exhibit-desc').evaluate(element => { element.textContent = element.textContent.repeat(100); });
+  assert.ok(await text.evaluate(element => { element.scrollTop = element.scrollHeight; return element.scrollTop > 0; }), 'long details scroll inside the right column');
+  await text.locator('.t10-exhibit-desc').evaluate((element, value) => { element.textContent = value; }, shortDescription);
+  await vp.setViewportSize({width:390,height:844});
+  assert.equal(await dlg.evaluate(dialog => {
+    const preview = dialog.querySelector('.bag-preview-wrap').getBoundingClientRect();
+    const details = dialog.querySelector('.t10-exhibit-text').getBoundingClientRect();
+    return details.top >= preview.bottom && dialog.scrollWidth <= dialog.clientWidth;
+  }), true, 'narrow detail stacks the model and text without horizontal overflow');
+  await vp.setViewportSize({width:1440,height:900});
   await vp.keyboard.press('Escape');await vp.waitForFunction(()=>window.__t10.ui().overlay===null);
   await vp.locator('.t10-canvas').click();await vp.waitForFunction(()=>window.__t10.ui().phase==='play');await faceSlot(vp,-6.6,-8.6,Math.PI*.5);await vp.evaluate(()=>window.__t10.engine.look(Math.PI*.5,-.12));await vp.waitForTimeout(500);await vp.screenshot({path:path.join(out,'06-visitor-hall.png')});
   oldVisitorExhibits=(await ui(vp)).exhibits;

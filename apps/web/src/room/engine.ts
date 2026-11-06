@@ -4,7 +4,8 @@ import { TransformControls } from 'three/addons/controls/TransformControls.js';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
 import { validateRoomLayout, type Bounds, type RoomModel, type RoomPlacement } from '@aholo/contracts';
-import { architecture, material, disposeResources } from '../scene/assets.js';
+import { architecture, disposeResources, enableMeshShadows } from '../scene/assets.js';
+import { courtyardGround, courtyardPlants, courtyardSky, horizonColor } from './courtyard.js';
 export type RoomMode = 'edit' | 'visit' | 'share';
 export type RoomTool = 'translate' | 'rotate' | 'scale';
 interface Hooks { select: (id: string | null) => void; edit: (placement: RoomPlacement) => void; notice: (message: string) => void }
@@ -24,6 +25,8 @@ export class RoomEngine {
   private environment: T.WebGLRenderTarget;
   private observer: ResizeObserver;
   private roof: T.Group;
+  private sky = courtyardSky();
+  private sun = new T.DirectionalLight(0xffe1b1, 1.55);
   private mode: RoomMode;
   private placements: RoomPlacement[] = [];
   private input?: RoomPlacement[];
@@ -42,20 +45,39 @@ export class RoomEngine {
     this.mode = readOnly ? 'share' : 'edit';
     this.renderer = new T.WebGLRenderer({ antialias: true });
     this.renderer.setPixelRatio(Math.min(devicePixelRatio, 1.5));
-    this.renderer.setClearColor(0xe7e5db);
+    this.renderer.setClearColor(horizonColor);
     this.renderer.toneMapping = T.ACESFilmicToneMapping;
-    this.renderer.toneMappingExposure = .95;
+    this.renderer.toneMappingExposure = .82;
+    this.renderer.shadowMap.enabled = true;
+    this.renderer.shadowMap.type = T.PCFShadowMap;
+    this.renderer.shadowMap.autoUpdate = false;
+    this.renderer.shadowMap.needsUpdate = true;
     this.renderer.domElement.tabIndex = 0;
     this.renderer.domElement.setAttribute('aria-label', readOnly ? '只读小屋三维场景' : '小屋三维编辑场景');
     host.appendChild(this.renderer.domElement);
     const pmrem = new T.PMREMGenerator(this.renderer), room = new RoomEnvironment();
     this.environment = pmrem.fromScene(room, .04); room.dispose(); pmrem.dispose();
     this.scene.environment = this.environment.texture;
-    this.scene.fog = new T.Fog(0xe7e5db, 30, 95);
-    this.scene.add(new T.HemisphereLight(0xfff9e8, 0x8c998b, 1.6));
-    const sun = new T.DirectionalLight(0xffe8c7, 2.1); sun.position.set(7, 12, 6); this.scene.add(sun);
-    const shell = architecture(); this.roof = shell.roof; this.scene.add(shell.group);
-    const ground = new T.Mesh(new T.PlaneGeometry(160, 160), material(0xc9cdbb)); ground.rotation.x = -Math.PI / 2; ground.position.y = -.4; this.scene.add(ground);
+    this.scene.environmentIntensity = .36;
+    this.scene.fog = new T.Fog(horizonColor, 38, 105);
+    this.scene.add(new T.HemisphereLight(0xc4dcf1, 0x504238, .83));
+    this.sun.position.set(-7, 12, 8);
+    this.sun.castShadow = true;
+    this.sun.shadow.mapSize.set(2048, 2048);
+    Object.assign(this.sun.shadow.camera, { left: -14, right: 14, top: 13, bottom: -13, near: .3, far: 42 });
+    this.sun.shadow.camera.updateProjectionMatrix();
+    this.sun.shadow.bias = -.00018;
+    this.sun.shadow.normalBias = .018;
+    this.sun.shadow.intensity = .9;
+    this.scene.add(this.sun, this.sun.target);
+
+    const shell = architecture(false, {
+      floor: [0x606e76, 0x56636b, 0x65717a, 0x59666e],
+      base: 0x454e52, wall: 0xa69b88, wood: 0x663d30, trim: 0x986a42,
+    });
+    enableMeshShadows(shell.group);
+    this.roof = shell.roof;
+    this.scene.add(shell.group, courtyardGround(), this.sky, courtyardPlants());
     this.orbit = new OrbitControls(this.camera, this.renderer.domElement);
     this.orbit.enableDamping = true; this.orbit.maxPolarAngle = Math.PI * .46; this.orbit.minDistance = 2; this.orbit.maxDistance = 35;
     this.transform = new TransformControls(this.camera, this.renderer.domElement);
@@ -70,6 +92,7 @@ export class RoomEngine {
         const scalar = object.scale.toArray().reduce((a, b) => Math.abs(b - old) > Math.abs(a - old) ? b : a, old);
         object.scale.setScalar(scalar);
       }
+      this.renderer.shadowMap.needsUpdate = true;
       this.outline.box.setFromObject(object);
       (this.outline.material as T.LineBasicMaterial).color.set(validateRoomLayout('校验', [this.readPlacement(this.selected)], this.bounds) ? 0xc33d32 : 0xbe8c45);
     });
@@ -111,6 +134,7 @@ export class RoomEngine {
       manager.setURLModifier(url => { if (url.startsWith('blob:') || url.startsWith('data:')) return url; throw new Error('模型包含外部资源。'); });
       const source = (await new GLTFLoader(manager).parseAsync(await response.arrayBuffer(), '')).scene;
       if (this.stopped) { disposeResources([source]); return; }
+      enableMeshShadows(source);
       const translated = new T.Group(); translated.position.fromArray(profile.normalization.translation); translated.add(source);
       const normalized = new T.Group(); normalized.scale.setScalar(profile.normalization.scale); normalized.add(translated);
       const template = new T.Group(); template.add(normalized); this.templates.set(id, template);
@@ -120,6 +144,7 @@ export class RoomEngine {
   }
   setPlacements(placements: RoomPlacement[]) {
     if (placements === this.input) return; this.input = placements; this.placements = structuredClone(placements);
+    this.renderer.shadowMap.needsUpdate = true;
     const ids = new Set(placements.map(placement => placement.id));
     for (const [id, object] of this.instances) if (!ids.has(id)) { object.removeFromParent(); this.instances.delete(id); }
     for (const placement of placements) {
@@ -136,14 +161,14 @@ export class RoomEngine {
     if (this.selected && !ids.has(this.selected)) this.select(null);
     else if (!this.moving) this.select(this.selected);
   }
-  private apply(object: T.Group, placement: RoomPlacement) { object.position.fromArray(placement.position); object.rotation.set(...placement.rotation, 'XYZ'); object.scale.setScalar(placement.scale); object.updateMatrixWorld(true); }
+  private apply(object: T.Group, placement: RoomPlacement) { object.position.fromArray(placement.position); object.rotation.set(...placement.rotation, 'XYZ'); object.scale.setScalar(placement.scale); object.updateMatrixWorld(true); this.renderer.shadowMap.needsUpdate = true; }
   private readPlacement(id: string): RoomPlacement { const placement = this.placements.find(p => p.id === id)!, object = this.instances.get(id)!; return { ...placement, position: object.position.toArray(), rotation: [object.rotation.x, object.rotation.y, object.rotation.z], scale: object.scale.x }; }
   private refreshOutline() { const object = this.selected ? this.instances.get(this.selected) : undefined; if (object) this.outline.box.setFromObject(object); (this.outline.material as T.LineBasicMaterial).color.setHex(0xbe8c45); }
   select(id: string | null) { this.selected = id; const object = id ? this.instances.get(id) : undefined; if (object && this.mode === 'edit') { this.transform.attach(object); this.outline.visible = true; this.refreshOutline(); } else { this.transform.detach(); this.outline.visible = false; } this.hooks.select(id); }
   focus(id: string) { this.select(id); const object = this.instances.get(id); if (object && this.mode === 'edit') { const center = new T.Box3().setFromObject(object).getCenter(new T.Vector3()); this.orbit.target.copy(center); this.camera.position.copy(center).add(new T.Vector3(4, 4, 5)); this.orbit.update(); } }
   setTool(tool: RoomTool) { this.transform.setMode(tool); this.transform.setSpace(tool === 'scale' ? 'local' : 'world'); }
-  home() { this.keys.clear(); this.yaw = 0; this.pitch = 0; if (this.mode === 'edit') { this.camera.position.set(13, 13, 17); this.orbit.target.set(0, 1, 0); this.orbit.update(); } else { this.camera.position.set(0, 1.65, 3.5); this.camera.rotation.set(0, 0, 0, 'YXZ'); } }
-  setMode(mode: RoomMode) { if (this.moving || (this.readOnly && mode === 'edit')) return; this.mode = mode; this.keys.clear(); this.looking = false; if (document.pointerLockElement === this.renderer.domElement) document.exitPointerLock(); this.roof.visible = mode !== 'edit'; this.orbit.enabled = mode === 'edit'; this.transform.enabled = mode === 'edit'; this.select(mode === 'edit' ? this.selected : null); this.home(); }
+  home() { this.keys.clear(); this.yaw = 0; this.pitch = 0; if (this.mode === 'edit') { this.camera.position.set(14, 8, 19); this.orbit.target.set(0, 1.15, 0); this.orbit.update(); } else { this.camera.position.set(0, 1.65, 3.5); this.camera.rotation.set(0, 0, 0, 'YXZ'); } }
+  setMode(mode: RoomMode) { if (this.moving || (this.readOnly && mode === 'edit')) return; this.mode = mode; this.keys.clear(); this.looking = false; if (document.pointerLockElement === this.renderer.domElement) document.exitPointerLock(); this.roof.visible = mode !== 'edit'; this.renderer.shadowMap.needsUpdate = true; this.orbit.enabled = mode === 'edit'; this.transform.enabled = mode === 'edit'; this.select(mode === 'edit' ? this.selected : null); this.home(); }
   private pointerDown = (event: PointerEvent) => { this.down = [event.clientX, event.clientY]; if (this.mode !== 'edit' && event.button === 0) { this.looking = true; this.renderer.domElement.focus(); void this.renderer.domElement.requestPointerLock?.().catch(() => {}); } };
   private pointerUp = (event: PointerEvent) => {
     this.looking = false;
@@ -167,6 +192,7 @@ export class RoomEngine {
     if (this.stopped) return; const dt = this.lastTime ? Math.min((now - this.lastTime) / 1000, .05) : 0; this.lastTime = now;
     if (this.mode === 'edit') this.orbit.update();
     else { const movement = new T.Vector3(); for (const key of this.keys) { if (key === 'a' || key === 'arrowleft') movement.x--; if (key === 'd' || key === 'arrowright') movement.x++; if (key === 'w' || key === 'arrowup') movement.z--; if (key === 's' || key === 'arrowdown') movement.z++; } if (movement.lengthSq()) { movement.normalize().applyAxisAngle(new T.Vector3(0, 1, 0), this.yaw).multiplyScalar(dt * 2.6); this.camera.position.add(movement); this.camera.position.x = T.MathUtils.clamp(this.camera.position.x, -5.6, 5.6); this.camera.position.z = T.MathUtils.clamp(this.camera.position.z, -4.1, 4.1); } }
+    this.sky.position.copy(this.camera.position);
     this.renderer.render(this.scene, this.camera);
   };
   debugTransform(id: string, patch: Partial<RoomPlacement>) { if (this.readOnly || this.mode !== 'edit') return '参观模式不允许编辑'; const original = this.placements.find(p => p.id === id); if (!original) throw new Error('Unknown placement'); const placement = { ...original, ...patch }, error = validateRoomLayout('检查', [placement], this.bounds); if (error) return error; this.placements = this.placements.map(p => p.id === id ? placement : p); this.apply(this.instances.get(id)!, placement); this.hooks.edit(placement); this.refreshOutline(); return null; }
@@ -183,6 +209,6 @@ export class RoomEngine {
     if (this.stopped) return; this.stopped = true; this.abort.abort(); this.renderer.setAnimationLoop(null); this.observer.disconnect(); this.blur(); if (document.pointerLockElement === this.renderer.domElement) document.exitPointerLock();
     this.host.removeEventListener('pointerdown', this.pointerDown); this.host.removeEventListener('pointerup', this.pointerUp); this.host.removeEventListener('pointermove', this.pointerMove); this.host.removeEventListener('contextmenu', this.contextMenu);
     window.removeEventListener('keydown', this.keyDown); window.removeEventListener('keyup', this.keyUp); window.removeEventListener('blur', this.blur); document.removeEventListener('pointerlockchange', this.lockChange);
-    this.transform.detach(); this.transform.dispose(); this.orbit.dispose(); disposeResources([this.scene, ...this.templates.values()]); this.environment.dispose(); this.renderer.renderLists.dispose(); this.renderer.dispose(); this.renderer.forceContextLoss(); this.renderer.domElement.remove(); this.templates.clear(); this.instances.clear();
+    this.transform.detach(); this.transform.dispose(); this.orbit.dispose(); disposeResources([this.scene, ...this.templates.values()]); this.environment.dispose(); this.sun.shadow.dispose(); this.renderer.renderLists.dispose(); this.renderer.dispose(); this.renderer.forceContextLoss(); this.renderer.domElement.remove(); this.templates.clear(); this.instances.clear();
   }
 }

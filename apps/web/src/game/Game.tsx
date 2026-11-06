@@ -8,7 +8,7 @@ import { api, ApiError } from './backpack-api.js';
 import type { ExhibitDetail, GalleryExhibit, GalleryView } from '@aholo/contracts';
 
 type Phase = 'loading' | 'failed' | 'intro' | 'play' | 'paused';
-type Overlay = null | 'menu' | 'bag' | 'detail' | 'help';
+type Overlay = null | 'menu' | 'account' | 'detail' | 'help';
 const FLOOR = { ground: '一层 · 中庭', stairs: '楼梯 · 半层', upper: '二层 · 回廊' } as const;
 
 declare global { interface Window { __t10?: { engine: PavilionEngine; ui: () => { phase: Phase; overlay: Overlay; detail: string | null; galleryVersion: number | null; exhibits: number; detailName: string | null } } } }
@@ -44,7 +44,7 @@ export default function Game() {
     try {
       instance = new PavilionEngine(host.current, {
         progress: setProgress,
-        ready: () => { setPhase('intro'); if (new URLSearchParams(location.search).get('backpack') === '1') setOverlay('bag'); void loadGallery(instance); },
+        ready: () => { setPhase('intro'); void loadGallery(instance); },
         failed: message => { setError(message); setPhase('failed'); },
         hud: setHud,
         // Esc while walking: the browser releases the mouse; we pause until the visitor clicks back in.
@@ -126,7 +126,6 @@ export default function Game() {
       const { phase: p, overlay: o } = state.current;
       if (p !== 'play' && p !== 'paused') return;
       if (e.code === 'Escape') { if (o) { e.preventDefault(); close(); } return; }
-      if (e.code === 'KeyB') { e.preventDefault(); if (o === 'bag') close(); else if (!o) open('bag'); return; }
       if (e.code === 'KeyM') { e.preventDefault(); if (o === 'menu') close(); else if (!o) open('menu'); return; }
       if (e.code === 'KeyE' && p === 'play' && !o) {
         const target = engine.current?.debugState().target;
@@ -152,7 +151,6 @@ export default function Game() {
             <div><strong>藏宝阁</strong><small data-testid="floor">{FLOOR[hud.floor]}</small></div>
           </div>
           <nav className="t10-actions" aria-label="游戏菜单">
-            <button type="button" onClick={() => open('bag')}>背包<kbd>B</kbd></button>
             <button type="button" onClick={() => open('menu')}>菜单<kbd>M</kbd></button>
           </nav>
         </header>
@@ -199,7 +197,7 @@ export default function Game() {
           <button type="button" onClick={() => { engine.current?.resetToEntry(); play(); }}>回到入口</button>
           <button type="button" onClick={() => setOverlay('help')}>操作说明</button>
           <a href="/room">个人小屋</a>
-          <a href="/workbench">本地工作台</a>
+          <button type="button" onClick={() => open('account')}>账号设置</button>
           <small>Esc 关闭</small>
         </section>
       </div>}
@@ -212,7 +210,6 @@ export default function Game() {
             <div><dt>Shift</dt><dd>快走</dd></div>
             <div><dt>鼠标</dt><dd>环顾（点击画面锁定）</dd></div>
             <div><dt>E</dt><dd>对准展台时查看</dd></div>
-            <div><dt>B</dt><dd>背包</dd></div>
             <div><dt>M</dt><dd>菜单</dd></div>
             <div><dt>Esc</dt><dd>关闭浮层 / 释放鼠标</dd></div>
           </dl>
@@ -221,7 +218,7 @@ export default function Game() {
         </section>
       </div>}
 
-      <Backpack open={overlay === 'bag'} close={close} />
+      <Backpack kind="account" open={overlay === 'account'} close={close} />
 
       {overlay === 'detail' && detail && <div className="t10-modal-backdrop" onClick={close}>
         <section className={`t10-detail${detailExhibit ? ' t10-exhibit' : ''}`} role="dialog" aria-modal="true" aria-label={detailExhibit ? `${detailExhibit.name}详情` : `展位 ${detail.id}`} onClick={e => e.stopPropagation()}>

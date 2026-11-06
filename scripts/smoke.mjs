@@ -1,5 +1,4 @@
 import {spawn} from 'node:child_process';
-import fs from 'node:fs/promises';
 import assert from 'node:assert/strict';
 import {setTimeout as delay} from 'node:timers/promises';
 import {chromium} from '@playwright/test';
@@ -22,9 +21,9 @@ try{
  for(const p of ['/api/v1/missing','/api','/api%2Fv1%2Fmissing','/missing.js']){const r=await fetch(origin+p,{headers:{accept:'text/html'}});assert.equal(r.status,404);assert.match(r.headers.get('content-type'),/json/);}
  browser=await chromium.launch({headless:true,executablePath:process.env.CHROME_EXECUTABLE||'/Applications/Google Chrome.app/Contents/MacOS/Google Chrome'});
  const page=await browser.newPage({viewport:{width:1360,height:900}});const errors=[];page.on('pageerror',e=>errors.push(e.message));
- await page.goto(origin+'/workbench');await page.getByText('基础服务可用',{exact:true}).waitFor({timeout:10000});
- await fs.mkdir('docs/validation/evidence',{recursive:true});await page.screenshot({path:'docs/validation/evidence/T05-local-workbench.png',fullPage:true});assert.deepEqual(errors,[]);
- await page.goto(origin+'/room');await page.getByRole('link',{name:'登录后进入自己的小屋 →'}).waitFor();
+ await page.goto(origin+'/');await page.getByRole('button',{name:'进入藏宝阁',exact:true}).waitFor({timeout:45000});
+ assert.deepEqual(errors,[]);
+ await page.goto(origin+'/room');await page.getByRole('button',{name:'登录后进入自己的小屋 →'}).waitFor();
  await page.goto(origin+'/shared/invalid-token');await page.getByText('此分享链接不可访问，可能已关闭或不存在。',{exact:true}).waitFor();assert.deepEqual(errors,[]);
  console.log(JSON.stringify({result:'PASS',browser:await browser.version(),live:true,workerAbsence503:true,ready:true,generationReady:false,apiFallback:true,roomLoginGate:true,invalidShareGate:true,pageErrors:errors.length}));
  await stop(worker);worker=undefined;await wait(async()=>{const r=await fetch(origin+'/api/v1/health/ready');assert.equal(r.status,503);});

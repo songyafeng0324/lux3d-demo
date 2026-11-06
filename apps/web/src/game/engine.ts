@@ -56,7 +56,10 @@ export class PavilionEngine {
     this.renderer.toneMapping = T.ACESFilmicToneMapping;
     this.renderer.toneMappingExposure = 1.15;
     this.renderer.shadowMap.enabled = true;
-    this.renderer.shadowMap.type = T.PCFSoftShadowMap;
+    this.renderer.shadowMap.type = T.PCFShadowMap;
+    // Casters are static between building/exhibit changes.
+    this.renderer.shadowMap.autoUpdate = false;
+    this.renderer.shadowMap.needsUpdate = true;
     const canvas = this.renderer.domElement;
     canvas.tabIndex = 0;
     canvas.setAttribute('aria-label', '藏宝阁三维场景');
@@ -88,13 +91,31 @@ export class PavilionEngine {
     sky.castShadow = true;
     sky.shadow.mapSize.set(2048, 2048);
     Object.assign(sky.shadow.camera, { left: -17, right: 17, top: 19, bottom: -19, near: 0.5, far: 60 });
+    sky.shadow.camera.updateProjectionMatrix();
     sky.shadow.bias = -0.0003;
     sky.shadow.normalBias = 0.015;
     this.scene.add(sky, sky.target);
     for (const m of (layout.lightMarkers as unknown as LightMarker[]).filter(m => m.type === 'POINT')) {
-      const light = new T.PointLight(new T.Color(...m.color), m.power * 0.25, 12, 2);
+      const [x, y, z] = m.position;
+      const color = new T.Color(...m.color);
+      // Two lanterns on each level also light the floor from below its ceiling.
+      const floorLamp = (y < 4 && z > 0) || (y > 7 && x !== 0 && z < 0);
+      const light = new T.PointLight(color, m.power * (floorLamp ? .11 : .25), 12, 2);
       light.position.fromArray(m.position);
       this.scene.add(light);
+      if (floorLamp) {
+        const key = new T.SpotLight(color, m.power * .20, 12, Math.PI / 2.8, .40, 2);
+        key.position.copy(light.position);
+        key.target.position.set(x * .9, y < 4 ? 0 : 4.8, z * .75);
+        key.castShadow = true;
+        key.shadow.mapSize.set(1024, 1024);
+        key.shadow.camera.near = .2;
+        key.shadow.camera.far = 12;
+        key.shadow.bias = -.00016;
+        key.shadow.normalBias = .012;
+        key.shadow.intensity = .9;
+        this.scene.add(key, key.target);
+      }
     }
     for (const x of [-10, 10]) {
       const fill = new T.PointLight(0xb8d2eb, 170, 30, 2);
@@ -122,6 +143,7 @@ export class PavilionEngine {
       const gltf = await new GLTFLoader().parseAsync(bytes.buffer, '');
       if (this.closed) return;
       this.mergeByMaterial(gltf.scene);
+      this.renderer.shadowMap.needsUpdate = true;
       this.hooks.progress(1);
       this.hooks.ready();
     } catch (error) {
@@ -263,6 +285,7 @@ export class PavilionEngine {
     const token = ++this.exhibitToken;
     const old = [...this.exhibits.children];
     this.exhibits.clear();
+    this.renderer.shadowMap.needsUpdate = true;
     disposeResources(old);
     const byMarker = new Map(this.world.slots.map(s => [s.id, s]));
     const queue = slots.filter(s => s.exhibit && byMarker.has(slotMarker(s.slotNo)));
@@ -281,6 +304,7 @@ export class PavilionEngine {
         holder.add(source);
         source.traverse(o => { const m = o as T.Mesh; if (m.isMesh) { m.castShadow = true; m.receiveShadow = true; } });
         this.exhibits.add(holder);
+        this.renderer.shadowMap.needsUpdate = true;
         loaded++;
       } catch { if (token === this.exhibitToken) failed++; }
     };
@@ -342,8 +366,7 @@ export class PavilionEngine {
     this.scene.traverse(o => {
       const mesh = o as T.Mesh;
       if (mesh.isMesh) { mesh.geometry.dispose(); (mesh.material as T.Material).dispose(); }
-      const light = o as T.DirectionalLight;
-      if (light.isDirectionalLight) light.shadow.dispose();
+      if (o instanceof T.DirectionalLight || o instanceof T.SpotLight) o.shadow.dispose();
     });
     this.renderer.renderLists.dispose();
     this.renderer.dispose();

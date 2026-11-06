@@ -101,10 +101,15 @@ try {
   // Input exclusion: drawers/menus stop walking; closing leaves a click-to-resume pause.
   const start = (await st(page)).player;
   const holdW = async () => { await page.keyboard.down('KeyW'); await page.waitForTimeout(Math.max(600, frameMs * 4)); await page.keyboard.up('KeyW'); return (await st(page)).player; };
+  assert.equal(await page.locator('.t10-actions button').count(), 1);
   await page.keyboard.press('KeyB');
-  s = await st(page); assert.equal(s.ui.overlay, 'bag'); assert.equal(s.enabled, false);
-  await shot(page, '02-bag.png');
-  assert.deepEqual(await holdW(), start, 'walked with bag open');
+  assert.equal((await st(page)).ui.overlay, null);
+  await page.keyboard.press('KeyM');
+  await page.getByRole('button', { name: '账号设置' }).click();
+  s = await st(page); assert.equal(s.ui.overlay, 'account'); assert.equal(s.enabled, false);
+  await page.getByRole('dialog', { name: '账号设置' }).getByLabel('用户名').waitFor();
+  await shot(page, '02-account.png');
+  assert.deepEqual(await holdW(), start, 'walked with account settings open');
   await page.keyboard.press('Escape');
   s = await st(page); assert.equal(s.ui.overlay, null); assert.equal(s.ui.phase, 'paused');
   assert.deepEqual(await holdW(), start, 'walked while paused');
@@ -117,7 +122,7 @@ try {
   await page.evaluate(() => { const i = document.createElement('input'); i.id = 'probe-input'; document.body.append(i); i.focus(); });
   assert.deepEqual(await holdW(), start, 'walked while typing');
   await page.evaluate(() => { document.getElementById('probe-input').remove(); document.querySelector('.t10-canvas canvas').focus(); });
-  results.inputExclusion = 'bag, paused, menu and focused input all blocked movement';
+  results.inputExclusion = 'account settings, paused, menu and focused input all blocked movement';
 
   // Real walk: entry → east aisle → stairs up → whole upper ring → stairs down → entry.
   const trace = [], legs = [];
@@ -192,9 +197,10 @@ try {
 
   // Other routes still mount.
   const other = await browser.newPage();
-  await other.goto(BASE + '/workbench');
-  results.workbenchRoute = await other.getByRole('link', { name: /进入藏宝阁/ }).isVisible();
-  assert.equal(results.workbenchRoute, true);
+  await other.goto(BASE + '/?backpack=1');
+  await other.waitForURL('**/room?backpack=1');
+  await other.getByRole('dialog', { name: '背包' }).getByLabel('用户名').waitFor();
+  results.legacyBackpackOpensRoom = true;
   await other.close();
 
   results.pass = true;

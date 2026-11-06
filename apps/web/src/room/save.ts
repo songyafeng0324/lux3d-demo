@@ -12,7 +12,7 @@ export class PersonalRoomSave {
   private stopped = false;
   private loaded = false;
   private abort?: AbortController;
-  constructor(private csrf: () => string, private prepare: (room: PersonalRoom) => Promise<void>, private changed: (room: PersonalRoom | null, state: RoomSaveState) => void) {}
+  constructor(private csrf: () => string, private prepare: (room: PersonalRoom) => Promise<void>, private changed: (room: PersonalRoom | null, state: RoomSaveState) => void, private unauthorized: () => void) {}
   private emit(status: RoomSaveStatus, message = '') { if (this.stopped) return; this.state = { ...this.state, status, message }; this.changed(this.current, { ...this.state }); }
   async load() {
     if (this.flight || this.reading || this.stopped) return;
@@ -39,11 +39,13 @@ export class PersonalRoomSave {
   async flush() {
     if (this.stopped || this.flight || !this.loaded || !this.current || ['loading', 'loadFailed', 'saved', 'conflict'].includes(this.state.status)) return;
     clearTimeout(this.timer);
+    const csrf = this.csrf();
+    if (!csrf) { this.emit('failed', '登录已失效，本页草稿保留，请重新登录后重试。'); return; }
     if (!this.pending) this.pending = { key: crypto.randomUUID(), sequence: this.state.sequence, body: { baseVersion: this.state.version, editSequence: this.state.sequence, name: this.current.name, placements: structuredClone(this.current.placements) } };
     const request = this.pending; this.flight = true; this.abort = new AbortController(); this.emit('saving');
     const timeout = setTimeout(() => this.abort?.abort(), 8000);
     try {
-      const result = await api<RoomSaveReceipt>('/rooms/me/layout', { method: 'PUT', headers: { 'Content-Type': 'application/json', 'Idempotency-Key': request.key, 'X-CSRF-Token': this.csrf() }, body: JSON.stringify(request.body), signal: this.abort.signal });
+      const result = await api<RoomSaveReceipt>('/rooms/me/layout', { method: 'PUT', headers: { 'Content-Type': 'application/json', 'Idempotency-Key': request.key, 'X-CSRF-Token': csrf }, body: JSON.stringify(request.body), signal: this.abort.signal });
       if (this.stopped) return;
       if (result.editSequence !== request.sequence || !Number.isSafeInteger(result.savedVersion) || result.savedVersion < this.state.version) throw new Error('保存回执无效。');
       this.state.version = result.savedVersion; this.current.version = result.savedVersion; this.pending = undefined;
@@ -54,7 +56,10 @@ export class PersonalRoomSave {
       else if (error instanceof ApiError && [400, 413, 422].includes(error.status)) {
         this.pending = undefined;
         this.emit(this.state.sequence > request.sequence ? 'dirty' : 'rejected', error.message);
-      } else this.emit('failed', error instanceof ApiError && error.status === 401 ? '登录已失效，本页草稿保留，请重新登录后重试。' : '保存未获确认，本页修改保留；重试会确认同一次请求。');
+      } else if (error instanceof ApiError && error.status === 401) {
+        this.emit('failed', '登录已失效，本页草稿保留，请重新登录后重试。');
+        this.unauthorized();
+      } else this.emit('failed', '保存未获确认，本页修改保留；重试会确认同一次请求。');
     } finally { clearTimeout(timeout); this.flight = false; if (!this.stopped && this.state.status === 'dirty') this.timer = setTimeout(() => void this.flush(), 100); }
   }
   updateShare(enabled: boolean, shareUrl: string) { if (this.current) this.current = { ...this.current, shareEnabled: enabled, shareUrl }; this.changed(this.current, { ...this.state }); }

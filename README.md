@@ -5,7 +5,7 @@
 ## 从这里开始
 当前在MacBook本地开发，云资源、区域和预算暂缓。完整启动、停止、管理员种子、测试和备份步骤见 [本地运行说明](docs/本地运行.md)。
 
-1. 根目录执行 `npm ci`、`npm run local:setup`、`npm run dev`，打开 [localhost:5173](http://localhost:5173/) 即进入全屏藏宝阁；服务健康工作台在 [/workbench](http://localhost:5173/workbench)。
+1. 根目录执行 `npm ci`、`npm run local:setup`、`npm run dev`，打开 [localhost:5173](http://localhost:5173/) 即进入全屏藏宝阁；在藏宝阁菜单打开个人小屋，在小屋打开背包。服务状态见 [健康接口](http://localhost:5173/api/v1/health/ready)。
 2. 用 [T02 技术方案](docs/architecture/MVP技术方案.md)、[数据/API 契约](docs/contracts/数据与接口契约.md) 和 [验收计划](docs/validation/MVP验收计划.md) 指导实现。
 3. 打开 [T04场景验证页](http://localhost:5173/lab/t04)，体验家具和真实模型编辑、自动保存、第一人称及30展位。正式业务按T06～T09推进。
 

@@ -20,11 +20,16 @@ export function furniture(id:'table'|'chair'|'cabinet'){
  }
  mergeOpaque(g);return g;
 }
-export function architecture(gallery=false){
- const g=new T.Group(),roof=new T.Group();const wood=material(palette.red),trim=material(palette.edge),wall=material(palette.wall),stone=material(palette.stone),tiles=material(palette.tile);
+interface ArchitectureFinish { floor: number[]; base: number; wall: number; wood: number; trim: number }
+export function architecture(gallery=false,finish?: ArchitectureFinish){
+ const g=new T.Group(),roof=new T.Group();const wood=material(finish?.wood ?? palette.red),trim=material(finish?.trim ?? palette.edge),wall=material(finish?.wall ?? palette.wall),stone=material(finish?.base ?? palette.stone),tiles=material(palette.tile);
  const w=gallery?24:12,d=gallery?28:9,h=4.8;
  box(g,w+.8,.28,d+.8,0,-.14,0,stone);box(g,w+.3,.08,d+.3,0,-.32,0,trim);
- const floor=material(0xb5b09a);for(let x=-w/2;x<w/2;x+=1.5)for(let z=-d/2;z<d/2;z+=1.5)box(g,1.48,.025,1.48,x+.75,.0125,z+.75,floor);
+ const floor=(finish?.floor ?? [0xb5b09a]).map(color=>material(color,finish ? .91 : .8));
+ for(let x=0;x<w/1.5;x++)for(let z=0;z<d/1.5;z++){
+  const tile=floor[((x*13+z*7)^(x*z+z))%floor.length];
+  box(g,1.48,.025,1.48,x*1.5-w/2+.75,.0125,z*1.5-d/2+.75,tile);
+ }
  box(g,w,.9,.16,0,.45,-d/2,wall);box(g,.16,.9,d,-w/2,.45,0,wall);box(g,.16,.9,d,w/2,.45,0,wall);
  for(const x of [-w/2,w/2])for(let z=-d/2;z<=d/2+.1;z+=d/4){const p=new T.Mesh(new T.CylinderGeometry(.13,.17,h,12),wood);p.position.set(x,h/2,z);g.add(p);box(g,.54,.15,.5,x,h-.18,z,trim);box(g,.38,.19,.38,x,h-.37,z,wood);}
  for(let x=-w/2;x<=w/2+.1;x+=w/4){const p=new T.Mesh(new T.CylinderGeometry(.13,.17,h,12),wood);p.position.set(x,h/2,-d/2);g.add(p);box(g,.5,.18,.38,x,h-.23,-d/2,trim);}
@@ -44,6 +49,13 @@ export function disposeResources(roots:T.Object3D[]){
  for(const mat of materials)for(const v of Object.values(mat))if(v instanceof T.Texture)textures.add(v);
  for(const t of textures){const image=t.source?.data;if(typeof ImageBitmap!=='undefined'&&image instanceof ImageBitmap)image.close();t.dispose();}
  for(const m of materials)m.dispose();for(const g of geometries)g.dispose();
+}
+
+export function enableMeshShadows(root: T.Object3D) {
+ root.traverse(object => {
+  const mesh = object as T.Mesh;
+  if (mesh.isMesh) mesh.castShadow = mesh.receiveShadow = true;
+ });
 }
 
 // Merge static pieces by material; source models keep their shared resources.
