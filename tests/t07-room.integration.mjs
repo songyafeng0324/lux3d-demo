@@ -11,7 +11,7 @@ import {buildApp} from '../apps/api/dist/app.js';
 const sha=bytes=>createHash('sha256').update(bytes).digest('hex');
 const placement=(assetId,id='p1',position=[0,0,0])=>({id,assetId,position,rotation:[0,0,0],scale:1});
 
-test('T07 real PostgreSQL/API: CAS layouts, arbitrary counts, stable encrypted sharing and scoped snapshot files',async()=>{
+test('T07/T14 real PostgreSQL/API: CAS layouts, scoped shares, ranked discovery and unique likes',async()=>{
  const base=loadConfig(),creds=JSON.parse(await fs.readFile(path.join(os.homedir(),'Library/Application Support/aholo-lux3d/local-db.json'),'utf8'));
  const admin=new pg.Client({host:'127.0.0.1',port:creds.port,user:'aholo_bootstrap',password:creds.adminPassword,database:'postgres'});await admin.connect();const db='aholo_t07_'+randomUUID().replaceAll('-','');await admin.query(`CREATE DATABASE ${db} OWNER aholo_app`);
  const root=await fs.mkdtemp(path.join(os.tmpdir(),'aholo-t07-'));const u=new URL(base.databaseUrl);u.pathname='/'+db;const pool=createPool(u.href);let app;const store=new LocalFileStore(root);await store.initialize();
@@ -43,6 +43,36 @@ test('T07 real PostgreSQL/API: CAS layouts, arbitrary counts, stable encrypted s
   const receipts=(await pool.query('SELECT response::text FROM write_receipts')).rows;assert.ok(receipts.every(r=>!r.response.includes(token)));
   const entered=await call('GET','/api/v1/shared-rooms/'+token);assert.equal(entered.statusCode,200,entered.body);assert.equal(entered.headers['cache-control'],'private, no-store');const snapshot=entered.json().data;assert.equal(snapshot.version,3);assert.equal(snapshot.ownerNickname,'room_owner');assert.equal(snapshot.placements.length,2);assert.deepEqual(Object.keys(snapshot).sort(),['assets','grant','name','ownerNickname','placements','sceneVersion','version'].sort());assert.deepEqual(Object.keys(snapshot.assets[0]).sort(),['bounds','id','modelFileId','normalization'].sort());assert.ok(!entered.body.includes(a.original));assert.ok(!entered.body.includes('私有名称'));assert.ok(!entered.body.includes('私有简介'));assert.ok(!entered.body.includes(b.modelFile));
   const grantHeaders={authorization:'Bearer '+snapshot.grant.token,'x-snapshot-grant':snapshot.grant.id};const getFile=(id,h=grantHeaders)=>call('GET','/api/v1/files/'+id+'/content',undefined,h);
+  const directoryUrl='/api/v1/rooms/discover';
+  const likeUrl='/api/v1/snapshots/'+snapshot.grant.id+'/room-like';
+  const likeHeaders={...grantHeaders,...other.headers};
+  const ranking=async()=>{const r=await call('GET',directoryUrl,undefined,other.headers);assert.equal(r.statusCode,200,r.body);assert.equal(r.headers['cache-control'],'private, no-store');return r.json().data.items;};
+  assert.equal((await call('GET',directoryUrl)).statusCode,401);
+  assert.deepEqual(await ranking(),[{id:roomId,name:'分享前布局',ownerNickname:'room_owner',popularity:0,shareUrl:'/shared/'+token}]);
+  const otherShare=(await call('PUT','/api/v1/rooms/me/share',{enabled:true},other.headers)).json().data.shareUrl;
+  assert.deepEqual((await ranking()).map(item=>item.ownerNickname),['room_owner','room_other']);
+  const otherRoom=(await call('GET','/api/v1/shared-rooms/'+otherShare.split('/').at(-1))).json().data;
+  const otherLikeUrl='/api/v1/snapshots/'+otherRoom.grant.id+'/room-like';
+  const otherGrantHeaders={authorization:'Bearer '+otherRoom.grant.token,'x-snapshot-grant':otherRoom.grant.id};
+  const boosted=await call('PUT',otherLikeUrl,undefined,{...otherGrantHeaders,...owner.headers});
+  assert.equal(boosted.statusCode,200,boosted.body);
+  assert.deepEqual((await ranking()).map(item=>[item.ownerNickname,item.popularity]),[['room_other',1],['room_owner',0]]);
+  assert.deepEqual((await call('GET',likeUrl,undefined,grantHeaders)).json().data,{popularity:0,state:'guest'});
+  assert.deepEqual((await call('GET',likeUrl,undefined,likeHeaders)).json().data,{popularity:0,state:'available',csrfToken:other.headers['x-csrf-token']});
+  assert.equal((await call('PUT',likeUrl,undefined,grantHeaders)).statusCode,401);
+  assert.equal((await call('PUT',likeUrl,undefined,{...grantHeaders,cookie:other.headers.cookie})).statusCode,403);
+  assert.equal((await call('PUT',likeUrl,undefined,{...otherGrantHeaders,...other.headers})).statusCode,403);
+  assert.equal((await call('PUT',likeUrl,undefined,{...grantHeaders,...owner.headers})).json().error.code,'ROOM_SELF_LIKE');
+  const likeKey=randomUUID();
+  const likes=await Promise.all([
+   call('PUT',likeUrl,undefined,{...likeHeaders,'idempotency-key':likeKey}),
+   call('PUT',likeUrl,undefined,{...likeHeaders,'idempotency-key':likeKey}),
+   call('PUT',likeUrl,undefined,likeHeaders),
+  ]);
+  for(const r of likes){assert.equal(r.statusCode,200,r.body);assert.deepEqual(r.json().data,{popularity:1});}
+  assert.deepEqual((await call('GET',likeUrl,undefined,likeHeaders)).json().data,{popularity:1,state:'liked'});
+  assert.deepEqual((await ranking()).map(item=>[item.ownerNickname,item.popularity]),[['room_owner',1],['room_other',1]]);
+  assert.equal((await pool.query('SELECT count(*)::int AS n FROM room_likes WHERE room_id=$1',[roomId])).rows[0].n,1);
   assert.deepEqual(snapshot.placements[1].position, outdoor, 'courtyard placement survives server save and shared snapshot');
   const visible=await getFile(a.modelFile);assert.equal(visible.statusCode,200,visible.body);assert.equal(visible.headers['cache-control'],'private, no-store');assert.deepEqual(visible.rawPayload,a.modelBytes);
   for(const id of [a.original,b.modelFile,foreign.modelFile])assert.equal((await getFile(id,{...grantHeaders,...owner.headers})).statusCode,404);
@@ -56,11 +86,23 @@ test('T07 real PostgreSQL/API: CAS layouts, arbitrary counts, stable encrypted s
   await pool.query("UPDATE snapshot_grants SET expires_at=now()+interval '2 minutes' WHERE id=$1",[snapshot.grant.id]);const renewKey=randomUUID(),renewUrl='/api/v1/snapshots/'+snapshot.grant.id+'/renew';const renewed=await Promise.all([call('POST',renewUrl,undefined,{...grantHeaders,'idempotency-key':renewKey}),call('POST',renewUrl,undefined,{...grantHeaders,'idempotency-key':renewKey})]);for(const r of renewed)assert.equal(r.statusCode,200,r.body);assert.deepEqual(renewed[0].json().data,renewed[1].json().data);assert.equal(renewed[0].json().data.grant.id,snapshot.grant.id);assert.equal(renewed[0].json().data.grant.token,snapshot.grant.token);assert.equal((await pool.query('SELECT version FROM snapshot_grants WHERE id=$1',[snapshot.grant.id])).rows[0].version,'3');assert.equal((await getFile(a.modelFile)).statusCode,200);
   assert.equal((await call('POST',renewUrl,undefined,{...grantHeaders,'idempotency-key':''})).statusCode,422);
   const still=await call('PUT','/api/v1/rooms/me/share',{enabled:true},owner.headers);assert.equal(still.json().data.shareUrl,shareUrl);assert.equal((await pool.query('SELECT share_epoch FROM rooms WHERE id=$1',[roomId])).rows[0].share_epoch,'1');assert.equal((await getFile(a.modelFile)).statusCode,200);
-  assert.equal((await call('PUT','/api/v1/rooms/me/share',{enabled:false},owner.headers)).statusCode,200);assert.equal((await getFile(a.modelFile)).statusCode,404);assert.equal((await call('POST',renewUrl,undefined,{...grantHeaders,'idempotency-key':renewKey})).statusCode,404);assert.equal((await call('GET','/api/v1/shared-rooms/'+token)).statusCode,404);
+  const lateVoter=await account('late_voter');
+  const [closed,racingLike]=await Promise.all([
+   call('PUT','/api/v1/rooms/me/share',{enabled:false},owner.headers),
+   call('PUT',likeUrl,undefined,{...grantHeaders,...lateVoter.headers}),
+  ]);
+  assert.equal(closed.statusCode,200,closed.body);assert.ok([200,404].includes(racingLike.statusCode),racingLike.body);
+  const preservedPopularity=racingLike.statusCode===200?2:1;
+  assert.equal((await call('PUT',likeUrl,undefined,{...likeHeaders,'idempotency-key':likeKey})).statusCode,404);
+  assert.deepEqual((await ranking()).map(item=>item.ownerNickname),['room_other']);
+  assert.equal((await getFile(a.modelFile)).statusCode,404);assert.equal((await call('POST',renewUrl,undefined,{...grantHeaders,'idempotency-key':renewKey})).statusCode,404);assert.equal((await call('GET','/api/v1/shared-rooms/'+token)).statusCode,404);
   assert.equal((await getFile(a.modelFile,{...grantHeaders,range:'bytes=0-2'})).statusCode,404);
   me=await call('GET','/api/v1/rooms/me',undefined,owner.headers);assert.equal(me.json().data.shareEnabled,false);assert.equal(me.json().data.shareUrl,shareUrl);
   const reopened=await call('PUT','/api/v1/rooms/me/share',{enabled:true},owner.headers);assert.equal(reopened.json().data.shareUrl,shareUrl);assert.equal((await pool.query('SELECT share_epoch FROM rooms WHERE id=$1',[roomId])).rows[0].share_epoch,'3');assert.equal((await getFile(a.modelFile)).statusCode,404);assert.equal((await call('POST',renewUrl,undefined,grantHeaders)).statusCode,404);
   const fresh=(await call('GET','/api/v1/shared-rooms/'+token)).json().data;const freshHeaders={authorization:'Bearer '+fresh.grant.token,'x-snapshot-grant':fresh.grant.id};assert.equal((await getFile(b.modelFile,freshHeaders)).statusCode,200);
+  assert.equal((await call('PUT',likeUrl,undefined,likeHeaders)).statusCode,404,'reopening does not revive an old grant');
+  assert.deepEqual((await call('GET','/api/v1/snapshots/'+fresh.grant.id+'/room-like',undefined,{...freshHeaders,...other.headers})).json().data,{popularity:preservedPopularity,state:'liked'});
+  assert.deepEqual((await ranking()).map(item=>[item.name,item.ownerNickname,item.popularity]),[['新布局','新主人昵称',preservedPopularity],['个人小屋','room_other',1]]);
   await pool.query("UPDATE snapshot_grants SET expires_at=now()-interval '1 second' WHERE id=$1",[fresh.grant.id]);assert.equal((await getFile(b.modelFile,freshHeaders)).statusCode,404);assert.equal((await call('POST','/api/v1/snapshots/'+fresh.grant.id+'/renew',undefined,freshHeaders)).statusCode,404);
   const deletedGrant=(await call('GET','/api/v1/shared-rooms/'+token)).json().data;const deletedHeaders={authorization:'Bearer '+deletedGrant.grant.token,'x-snapshot-grant':deletedGrant.grant.id};await pool.query("UPDATE assets SET state='deleted',deleted_at=now() WHERE id=$1",[b.id]);assert.equal((await getFile(b.modelFile,deletedHeaders)).statusCode,404);assert.equal((await call('POST','/api/v1/snapshots/'+deletedGrant.grant.id+'/renew',undefined,deletedHeaders)).statusCode,404);
   // Current readiness is checked even before replaying a previously successful save.

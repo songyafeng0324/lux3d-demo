@@ -85,6 +85,7 @@ try{
  await step('admin reviews earliest pending with rotatable model and original, approves into candidates',async()=>{
   await ap.goto(base+'/admin');await ap.getByLabel('用户名').fill('t08_admin');await ap.getByLabel('密码',{exact:true}).fill(pw);await ap.getByRole('button',{name:'登录',exact:true}).click();
   await ap.locator('.adm-row',{hasText:'紫檀靠背椅'}).click();await ap.locator('.adm-detail .bag-preview canvas').waitFor();await ap.waitForFunction(()=>!document.querySelector('.adm-detail .bag-preview-status'),null,{timeout:60000});
+  await ap.getByText('简介：清代紫檀靠背椅，背板浮雕卷草纹。',{exact:true}).waitFor();
   assert.ok(await ap.locator('.adm-media img').evaluate(i=>i.complete&&i.naturalWidth>0),'original image visible');assert.equal(await ap.locator('.adm-detail').getByRole('textbox').count(),1,'only the rejection reason is editable');
   await ap.screenshot({path:path.join(out,'02-admin-review.png')});
   await ap.getByRole('button',{name:'通过，进入候选库'}).click();await ap.getByText(/已通过，进入候选库/).waitFor();
@@ -114,7 +115,8 @@ try{
   const st=await vp.evaluate(()=>window.__t10.engine.debugState());const e1=st.exhibits.find(e=>e.slotNo===1);const [min,max]=e1.bounds;
   assert.ok(Math.abs(min[1]-1.17)<.02,'rests on plinth top '+min[1]);assert.ok(Math.abs((min[0]+max[0])/2+9.6)<.05&&Math.abs((min[2]+max[2])/2+10)<.05,'centred on T01');assert.ok(Math.max(max[0]-min[0],max[1]-min[1],max[2]-min[2])<=.801,'fitted size');
   await faceSlot(vp,-7.9,-10,Math.PI/2);await vp.waitForFunction(()=>window.__t10.engine.debugState().target?.id==='T01');await vp.locator('.t10-prompt').getByText('紫檀靠背椅').waitFor();await vp.screenshot({path:path.join(out,'04-visitor-prompt.png')});
-  await vp.keyboard.press('KeyE');const dlg=vp.getByRole('dialog',{name:'紫檀靠背椅详情'});await dlg.getByText('投稿 · 藏友小周').waitFor();
+  await vp.keyboard.press('KeyE');const dlg=vp.getByRole('dialog',{name:'紫檀靠背椅详情'});await dlg.getByText('作者：藏友小周',{exact:true}).waitFor();
+  await dlg.getByText('简介：清代紫檀靠背椅，背板浮雕卷草纹。',{exact:true}).waitFor();
   for(const t of ['不详','紫檀','个人收藏','藏友小周','浙江杭州'])await dlg.getByText(t,{exact:true}).first().waitFor();
   await vp.waitForFunction(()=>!document.querySelector('.t10-exhibit .bag-preview-status'),null,{timeout:60000});
   const layout = await dlg.evaluate(dialog => {
@@ -146,6 +148,11 @@ try{
   await dlg.getByRole('button',{name:'添加到我的藏品'}).click();
   await dlg.getByRole('button',{name:'已收藏',exact:true}).waitFor();
   await vp.keyboard.press('Escape');await vp.waitForFunction(()=>window.__t10.ui().overlay===null);
+  await vp.keyboard.press('KeyB');
+  const bag=vp.getByRole('dialog',{name:'背包',exact:true});
+  await bag.getByRole('button',{name:'生成任务',exact:true}).click();
+  await bag.getByText('图片最好不要有背景，将背景处理为白色效果更好。',{exact:true}).waitFor();
+  await vp.keyboard.press('Escape');await bag.waitFor({state:'hidden'});
   await vp.locator('.t10-canvas').click();await vp.waitForFunction(()=>window.__t10.ui().phase==='play');await faceSlot(vp,-6.6,-8.6,Math.PI*.5);await vp.evaluate(()=>window.__t10.engine.look(Math.PI*.5,-.12));await vp.waitForTimeout(500);await vp.screenshot({path:path.join(out,'06-visitor-hall.png')});
   oldVisitorExhibits=(await ui(vp)).exhibits;
  });
@@ -202,6 +209,71 @@ try{
   await enter(vp);await vp.waitForFunction(()=>window.__t10.ui().exhibits===2,null,{timeout:90000});await faceSlot(vp,-7.9,-10,Math.PI/2);await vp.waitForFunction(()=>window.__t10.engine.debugState().target?.id==='T01');await vp.keyboard.press('KeyE');await vp.getByText('虚位以待').waitFor();
   const room=(await call('/rooms/me','GET',undefined,{cookie:collector.cookie})).data;assert.equal(room.placements.length,0);assert.equal((await fetch(base+'/api/v1/assets/'+assetId,{headers:{cookie:collector.cookie}})).status,404);
   await vp.screenshot({path:path.join(out,'09-visitor-after-delete.png')});
+ });
+ await step('T14 room shortcut, porch entrance, signed-in directory and irreversible likes',async()=>{
+  const guest=await browser.newPage({viewport:{width:1440,height:900}});
+  guest.on('pageerror',error=>errors.push('guest: '+error.message));
+  const entrance=page=>page.evaluate(()=>window.__room.engine.debug().camera.map(n=>Number(n.toFixed(3))));
+  async function switchAccount(page,username){
+   const response=await page.request.post(base+'/api/v1/auth/login',{headers:{origin:base},data:{username,password:pw}});
+   assert.equal(response.status(),200);
+   await page.bringToFront();
+   await page.evaluate(()=>window.dispatchEvent(new Event('focus')));
+  }
+  try{
+   await up.goto(base+'/room');
+   const roomName=up.getByRole('textbox',{name:'房间名称'});
+   await roomName.fill('庭前小屋');
+   await roomName.press('KeyB');
+   assert.equal(await up.getByRole('dialog',{name:'背包',exact:true}).count(),0);
+   await roomName.fill('庭前小屋');
+   await up.waitForFunction(()=>window.__room?.save?.state.status==='saved');
+   await up.getByRole('button',{name:'第一人称参观',exact:true}).click();
+   assert.deepEqual(await entrance(up),[0,1.425,5.1]);
+   await up.locator('.scene-canvas canvas').click();
+   await up.waitForFunction(()=>Boolean(document.pointerLockElement));
+   await up.keyboard.press('KeyB');
+   const bag=up.getByRole('dialog',{name:'背包',exact:true});
+   await bag.getByRole('button',{name:'生成任务',exact:true}).click();
+   await bag.getByText('图片最好不要有背景，将背景处理为白色效果更好。',{exact:true}).waitFor();
+   assert.equal(await up.evaluate(()=>document.pointerLockElement),null);
+   await up.keyboard.press('Escape');
+   await up.getByRole('button',{name:'开启分享',exact:true}).click();
+   const link=up.locator('.room-share-panel a');
+   await link.waitFor();
+   const href=await link.getAttribute('href');
+   await guest.goto(base+'/room');
+   await guest.getByRole('button',{name:/登录后进入自己的小屋/}).waitFor();
+   assert.equal(await guest.getByRole('button',{name:'逛一逛',exact:true}).isDisabled(),true);
+   await guest.goto(href);
+   assert.equal(await guest.getByRole('button',{name:'登录后可点赞',exact:true}).isDisabled(),true);
+   assert.deepEqual(await entrance(guest),[0,1.425,5.1]);
+   await switchAccount(guest,'t13_visitor');
+   assert.equal(await guest.getByRole('button',{name:'点赞',exact:true}).isEnabled(),true);
+   await vp.goto(base+'/room');
+   await vp.getByRole('button',{name:'逛一逛',exact:true}).click();
+   const directory=vp.getByRole('dialog',{name:'逛一逛',exact:true});
+   await directory.getByRole('link',{name:'访问 庭前小屋',exact:true}).waitFor();
+   await vp.screenshot({path:path.join(out,'t14-directory.png')});
+   await vp.keyboard.press('Escape');await directory.waitFor({state:'hidden'});
+   await vp.getByRole('button',{name:'逛一逛',exact:true}).click();
+   await directory.getByRole('link',{name:'访问 庭前小屋',exact:true}).click();
+   await vp.getByRole('button',{name:'点赞',exact:true}).click();
+   const liked=vp.getByRole('button',{name:'已点赞',exact:true});
+   await liked.waitFor();
+   assert.equal(await liked.isDisabled(),true);
+   await vp.getByLabel('小屋人气').getByRole('status').getByText('1',{exact:true}).waitFor();
+   await vp.screenshot({path:path.join(out,'t14-liked-room.png')});
+   await vp.reload();await liked.waitFor();
+   await switchAccount(vp,'t08_admin');
+   assert.equal(await vp.getByRole('button',{name:'点赞',exact:true}).isEnabled(),true);
+   await switchAccount(vp,'t13_visitor');await liked.waitFor();
+   await up.goto(href);
+   assert.equal(await up.getByRole('button',{name:'自己的小屋',exact:true}).isDisabled(),true);
+   await vp.goto(base+'/room');await vp.getByRole('button',{name:'逛一逛',exact:true}).click();
+   await directory.getByRole('link',{name:'访问 庭前小屋',exact:true}).waitFor();
+   assert.deepEqual(await directory.locator('tbody tr').first().locator('td').allTextContents(),['作者现用昵称','庭前小屋','1','访问']);
+  }finally{await guest.close();}
  });
  assert.deepEqual(errors,[]);
  const result={pass:true,chrome:browser.version(),os:`${os.type()} ${os.release()} ${os.arch()}`,viewport:[1440,900],isolatedDatabase:true,checks,ms:Date.now()-started};

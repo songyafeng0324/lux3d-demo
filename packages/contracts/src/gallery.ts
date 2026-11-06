@@ -5,7 +5,7 @@ export interface PublicDetails {name:string;description:string;era:string;materi
 export interface GalleryExhibit {candidateId:string;name:string;model:RoomModel}
 export interface GallerySlot {slotNo:number;exhibit:GalleryExhibit|null}
 export interface GalleryView {version:number;slots:GallerySlot[];grant:RoomGrant}
-export interface ExhibitDetail extends PublicDetails {candidateId:string;slotNo:number;model:RoomModel}
+export interface ExhibitDetail extends PublicDetails {candidateId:string;slotNo:number;model:RoomModel;source:'user'|'official'}
 export interface CollectedAsset extends RoomModel {collectionId:string;name:string;authorNickname:string}
 export type ExhibitCollectionStatus = 'available' | 'collected' | 'owned' | 'unavailable';
 export interface CollectionRemoval {previousVersion:number;roomVersion:number;placementsRemoved:number}

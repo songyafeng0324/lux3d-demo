@@ -44,7 +44,7 @@ export function buildRoomWorld(placements: RoomPlacement[], bounds: ReadonlyMap<
       box('house-foundation', -platform.x, platform.x, -platform.z, platform.z, ground, indoor),
       box('porch-step', PORCH_STEP.x0, PORCH_STEP.x1, PORCH_STEP.z0, PORCH_STEP.z1, ground, PORCH_STEP.y),
     ],
-    entry: { x: 0, y: indoor, z: 3.5 },
+    entry: { x: 0, y: PORCH_STEP.y, z: PORCH_STEP.z1 - BODY.radius },
   };
 }
 
@@ -52,7 +52,7 @@ export function roomEntrance(world: WalkingWorld): FirstPerson {
   const entry = { ...world.entry, velocityY: null };
   if (!playerOverlaps(world.colliders, entry)) return entry;
 
-  // A saved layout may put furniture at the old entry. Prefer the path outside, then any free floor.
+  // If a placement blocks the step, use the outdoor path or another free surface.
   const path = { x: 0, y: ground, z: 6, velocityY: null };
   if (!playerOverlaps(world.colliders, path)) return path;
   for (const surface of world.surfaces) {

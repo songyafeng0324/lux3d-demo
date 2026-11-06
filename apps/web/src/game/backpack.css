@@ -46,3 +46,4 @@
 .bag-side-preview .bag-preview-wrap{margin:12px 0 0}
 .bag-side-preview .bag-preview{height:min(54vh,480px)}
 @media(max-width:840px){.bag-side-preview{right:16px;left:16px;width:auto;z-index:1}}
+.bag-generation .bag-image-guidance{color:var(--muted);margin:0 0 14px}

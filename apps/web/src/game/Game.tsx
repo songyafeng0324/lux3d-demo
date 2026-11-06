@@ -8,7 +8,7 @@ import { api, ApiError, type Me } from './backpack-api.js';
 import type { ExhibitCollectionStatus, ExhibitDetail, GalleryExhibit, GalleryView } from '@aholo/contracts';
 
 type Phase = 'loading' | 'failed' | 'intro' | 'play' | 'paused';
-type Overlay = null | 'menu' | 'account' | 'detail' | 'help';
+type Overlay = null | 'menu' | 'account' | 'backpack' | 'detail' | 'help';
 const FLOOR = { ground: '一层 · 中庭', stairs: '楼梯 · 半层', upper: '二层 · 回廊' } as const;
 
 declare global { interface Window { __t10?: { engine: PavilionEngine; ui: () => { phase: Phase; overlay: Overlay; detail: string | null; galleryVersion: number | null; exhibits: number; detailName: string | null } } } }
@@ -133,12 +133,13 @@ export default function Game() {
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      if ((e.target as HTMLElement | null)?.closest?.('input,textarea,select')) return;
-      if (e.repeat) return;
+      if ((e.target as HTMLElement | null)?.closest?.('input,textarea,select,[contenteditable]')) return;
+      if (e.repeat || e.isComposing || e.altKey || e.ctrlKey || e.metaKey) return;
       const { phase: p, overlay: o } = state.current;
       if (p !== 'play' && p !== 'paused') return;
       if (e.code === 'Escape') { if (o) { e.preventDefault(); close(); } return; }
       if (e.code === 'KeyM') { e.preventDefault(); if (o === 'menu') close(); else if (!o) open('menu'); return; }
+      if (e.code === 'KeyB' && !o) { e.preventDefault(); open('backpack'); return; }
       if (e.code === 'KeyE' && p === 'play' && !o) {
         const target = engine.current?.debugState().target;
         if (target) { e.preventDefault(); open('detail', target); }
@@ -163,6 +164,7 @@ export default function Game() {
             <div><strong>藏宝阁</strong><small data-testid="floor">{FLOOR[hud.floor]}</small></div>
           </div>
           <nav className="t10-actions" aria-label="游戏菜单">
+            <button type="button" aria-keyshortcuts="B" onClick={() => open('backpack')}>背包<kbd aria-hidden="true">B</kbd></button>
             <button type="button" onClick={() => open('menu')}>菜单<kbd>M</kbd></button>
           </nav>
         </header>
@@ -199,7 +201,7 @@ export default function Game() {
       </div>}
 
       {phase === 'paused' && !overlay && <div className="t10-paused">
-        <strong>已暂停</strong><span>点击画面继续参观 · M 打开菜单</span>
+        <strong>已暂停</strong><span>点击画面继续参观 · B 打开背包 · M 打开菜单</span>
       </div>}
 
       {overlay === 'menu' && <div className="t10-modal-backdrop" onClick={close}>
@@ -222,6 +224,7 @@ export default function Game() {
             <div><dt>Shift</dt><dd>快走</dd></div>
             <div><dt>鼠标</dt><dd>环顾（点击画面锁定）</dd></div>
             <div><dt>E</dt><dd>对准展台时查看</dd></div>
+            <div><dt>B</dt><dd>打开背包</dd></div>
             <div><dt>M</dt><dd>菜单</dd></div>
             <div><dt>Esc</dt><dd>关闭浮层 / 释放鼠标</dd></div>
           </dl>
@@ -233,6 +236,7 @@ export default function Game() {
       <Backpack kind="account" open={overlay === 'account'} close={closeAccount} onAccountChange={profile => {
         if (profile && returnToExhibit.current) closeAccount();
       }} />
+      <Backpack open={overlay === 'backpack'} close={close} />
 
       {overlay === 'detail' && detail && <div className="t10-modal-backdrop" onClick={close}>
         <section className={`t10-detail${detailExhibit ? ' t10-exhibit' : ''}`} role="dialog" aria-modal="true" aria-label={detailExhibit ? `${detailExhibit.name}详情` : `展位 ${detail.id}`} onClick={e => e.stopPropagation()}>
@@ -257,8 +261,8 @@ function ExhibitInfo({ data, headers, login }: { data: ExhibitDetail; headers?: 
     <ModelPreview fileId={data.model.modelFileId} name={data.name} headers={headers} />
     <div className="t10-exhibit-text">
       <div className="t10-exhibit-title"><h2>{data.name}</h2>{headers && <CollectExhibit key={data.candidateId} candidateId={data.candidateId} headers={headers} login={login} />}</div>
-      <p className="t10-exhibit-source">{data.sourceNickname === '官方馆藏' ? '官方馆藏' : `投稿 · ${data.sourceNickname}`}</p>
-      <p className="t10-exhibit-desc">{data.description}</p>
+      <p className="t10-exhibit-source">{data.source === 'official' ? '官方馆藏' : `作者：${data.sourceNickname}`}</p>
+      <p className="t10-exhibit-desc">简介：{data.description}</p>
       <dl className="t10-exhibit-facts">
         <div><dt>年代</dt><dd>{data.era}</dd></div>
         <div><dt>材质</dt><dd>{data.material}</dd></div>

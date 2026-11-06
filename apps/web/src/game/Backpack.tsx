@@ -461,7 +461,8 @@ export default function Backpack({ open, close, kind = 'backpack', onAccountChan
         {tab === 'tasks' && <section className="bag-generation" aria-label="图片生成">
           <div className="bag-quota"><span>今日可用 <strong>{me.quota.available}</strong> / {me.quota.total}</span><small>{me.quota.day} · 北京时间</small></div>
           {me.activeTask ? <p className="bag-muted">已有任务生成中，可离开等待。完成前不能发起新任务。</p> : <>
-            <label className="bag-file"><span className="bag-file-trigger">选择一张图片</span><input ref={fileInput} aria-label="选择生成图片" type="file" accept="image/png,image/jpeg,image/webp" disabled={locked || me.quota.available === 0} onChange={event => { setFile(event.target.files?.[0] ?? null); inputFile.current = null; setError(''); }} /><span>{file?.name ?? 'PNG / JPEG / WebP · 不超过 10 MiB'}</span></label>
+            <label className="bag-file"><span className="bag-file-trigger">选择一张图片</span><input ref={fileInput} aria-label="选择生成图片" aria-describedby="bag-image-guidance" type="file" accept="image/png,image/jpeg,image/webp" disabled={locked || me.quota.available === 0} onChange={event => { setFile(event.target.files?.[0] ?? null); inputFile.current = null; setError(''); }} /><span>{file?.name ?? 'PNG / JPEG / WebP · 不超过 10 MiB'}</span></label>
+            <p id="bag-image-guidance" className="bag-image-guidance">图片最好不要有背景，将背景处理为白色效果更好。</p>
             <button type="button" className="bag-primary" disabled={locked || !file || me.quota.available === 0} onClick={submitGeneration}>{busy ? '正在提交…' : '生成模型 · 使用 1 次'}</button>
             {me.quota.available === 0 && <p className="bag-muted">今日次数已用完，北京时间 00:00 更新。</p>}
           </>}

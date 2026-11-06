@@ -6,6 +6,11 @@ export interface RoomModel {id:string;modelFileId:string;normalization:{scale:nu
 export interface PersonalRoom {id:string;name:string;version:number;sceneVersion:typeof SCENE_VERSION;placements:RoomPlacement[];shareEnabled:boolean;shareUrl:string|null;assets:RoomModel[]}
 export interface RoomGrant {id:string;token:string;expiresAt:string}
 export interface SharedRoom {name:string;ownerNickname:string;version:number;sceneVersion:typeof SCENE_VERSION;placements:RoomPlacement[];assets:RoomModel[];grant:RoomGrant}
+export interface SharedRoomListing {id:string;ownerNickname:string;name:string;popularity:number;shareUrl:string}
+export interface RoomPopularity {popularity:number}
+export type RoomLikeView = RoomPopularity & (
+  {state:'guest'|'owner'|'liked'} | {state:'available';csrfToken:string}
+);
 export interface RoomSaveReceipt {savedVersion:number;editSequence:number}
 export function roomPlacementBounds(placement: RoomPlacement, bounds: Bounds): Bounds {
  const min: Vec3 = [Infinity, Infinity, Infinity], max: Vec3 = [-Infinity, -Infinity, -Infinity];

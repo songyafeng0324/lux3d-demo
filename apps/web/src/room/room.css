@@ -44,4 +44,25 @@
 .room-app .room-placement-actions button{padding:2px 6px}
 .room-app .selection-card .asset-thumbnail{width:40px;flex-shrink:0}
 .room-app .sidebar-bottom button{width:100%;justify-content:center}
+.room-header-actions kbd,.room-app .sidebar-bottom kbd{margin-left:6px;color:var(--room-gold);font-size:10px}
+.room-directory{width:min(680px,calc(100% - 32px));max-height:min(650px,85dvh);padding:0;overflow:auto;color:var(--room-paper);background:#201710;border:1px solid var(--room-line);border-radius:10px;box-shadow:0 24px 60px #0008}
+.room-directory::backdrop{background:#100b08ae;backdrop-filter:blur(4px)}
+.room-directory .t10-drawer-head{position:sticky;top:0;padding:20px 22px;background:#201710;border-bottom:1px solid var(--room-line)}
+.room-directory h2{font-family:"Songti SC",serif;color:var(--room-paper)}
+.room-directory header p{color:var(--room-muted);font-size:12px;margin-top:5px}
+.room-directory-content{padding:12px 22px 22px;font-size:13px}
+.room-directory table{border-collapse:collapse;width:100%;text-align:left;table-layout:fixed}
+.room-directory th,.room-directory td{padding:12px 8px;border-bottom:1px solid var(--room-line);overflow-wrap:anywhere}
+.room-directory th{font-weight:500;color:var(--room-muted)}
+.room-directory th:nth-child(n+3){width:70px}
+.room-directory td:nth-child(3){font-variant-numeric:tabular-nums;color:var(--room-gold)}
+.room-directory a{display:inline-block;white-space:nowrap;padding:5px 11px;border:1px solid var(--room-line);border-radius:5px;color:var(--room-gold)}
+.room-directory a:hover{background:#d6b06820;border-color:var(--room-gold)}
+.room-like{position:absolute;right:clamp(12px,2vw,26px);top:50%;transform:translateY(-50%);z-index:4;display:flex;flex-direction:column;align-items:center;gap:7px;max-width:140px;text-align:center}
+.room-app .room-like-button{display:grid;justify-items:center;gap:5px;min-width:80px;padding:10px;color:#fff2d4;background:#9a3829;border-color:var(--room-gold);box-shadow:0 3px 14px #0005}
+.room-app .room-like-button:hover:not(:disabled){background:#b44938}
+.room-app .room-like-button:disabled{opacity:1;color:var(--room-muted);background:var(--room-ink);border-color:var(--room-line)}
+.room-app .room-like-button[data-state="liked"]{color:var(--room-gold);border-color:var(--room-gold)}
+.room-like-count,.room-like small{padding:5px 9px;border:1px solid var(--room-line);border-radius:5px;background:var(--room-ink);font-size:11px}
+.room-like-count strong{color:var(--room-gold);font-variant-numeric:tabular-nums}
 @media(max-width:420px){.room-header-actions{gap:4px}.room-app .room-header-actions button{padding:6px 7px;font-size:10px}}

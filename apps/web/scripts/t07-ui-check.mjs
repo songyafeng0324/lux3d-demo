@@ -31,6 +31,7 @@ await context.route('**/api/v1/**', async route => {
   if (path === '/me') return signedIn ? ok({ user, roomId: 'room-1', quota: { day: '2026-11-05', total: 3, used: 0, available: 3 }, activeTask: null, csrfToken: 'csrf-room' }) : fail(401, '请先登录');
   if (path === '/auth/login') { signedIn = true; return ok({ user, csrfToken: 'csrf-room' }); }
   if (path === '/assets') { const offset = Number(url.searchParams.get('cursor') || 0); return ok({ items: models.slice(offset, offset + 30), nextCursor: offset + 30 < models.length ? String(offset + 30) : null }); }
+  if (path === '/collections') return ok({ items: [], nextCursor: null });
   if (path === '/furniture') return ok({ items: [furniture], nextCursor: null });
   if (path === '/rooms/me' && method === 'GET') return loadFailed ? fail(503, '临时读取失败') : ok(ownerRoom());
   if (path.startsWith('/files/')) { modelReads.push(request.headers()); return route.fulfill({ status: 200, contentType: 'model/gltf-binary', body: glb }); }
@@ -49,6 +50,7 @@ await context.route('**/api/v1/**', async route => {
   }
   if (path === '/rooms/me/share') { shareEnabled = request.postDataJSON().enabled; return ok({ enabled: shareEnabled, shareUrl: '/shared/stable-token' }); }
   if (path === '/shared-rooms/stable-token') { sharedReadCount++; return ok({ name: roomName, ownerNickname: '藏家', version: roomVersion, sceneVersion: 'courtyard-v1', placements, assets: roomModels(), grant: { id: 'grant-1', token: 'grant-token', expiresAt: new Date(Date.now() + 60_000).toISOString() } }); }
+  if (path === '/snapshots/grant-1/room-like') return ok({ popularity: 0, state: 'guest' });
   if (path === '/snapshots/grant-1/renew') { renewals.push(request.headers()); if (renewals.length === 1) return route.abort('connectionreset'); return ok({ grant: { id: 'grant-1', token: 'grant-token', expiresAt: new Date(Date.now() + 86_400_000).toISOString() } }); }
   return fail(404, path);
 });
@@ -161,7 +163,7 @@ try {
   assert.equal((await page.evaluate(() => window.__room.engine.debug().camera))[1], 1.65, 'porch step allows walking back indoors');
   await page.keyboard.press('Escape'); await page.waitForFunction(() => document.pointerLockElement === null);
   await page.getByRole('button', { name: '回到入口', exact: false }).click();
-  assert.deepEqual(await page.evaluate(() => window.__room.engine.debug().camera), [0, 1.65, 3.5]);
+  assert.deepEqual(await page.evaluate(() => window.__room.engine.debug().camera.map(n => Number(n.toFixed(3)))), [0, 1.425, 5.1]);
   await page.getByRole('button', { name: '布置小屋', exact: true }).click();
   assert.equal(await page.evaluate(() => window.__room.engine.debug().orbitEnabled), true);
   await shot(page, 'owner-room.png');

@@ -88,7 +88,7 @@
 ## 沉浸式体验与建模方向
 - 最新产品增量见 `docs/product/2026-11-04-沉浸场景与建模确认.md`，总体执行依据见 `docs/architecture/沉浸式MVP实施计划.md`：前台全视口游戏式3D、Agent用Blender MCP制作可上下楼二层古阁；先框架/完整功能，细节后补。
 - 2026-11-05用户已明确启动T10；T10（A设计、B建筑框架、C全视口前台）已全部完成并经Mac真机验证；T06/T07/T08正式业务也已完成，T09 已完成 Mac 本地功能验收与独立复核。Blender/MCP实际状态和只读探针见环境记录，不把连接检查当成模型交付。
-- 首页 `/` 为全屏藏宝阁，背包入口在 `/room`，两处菜单均有账号设置。健康诊断入口为 `/api/v1/health/ready`。行走碰撞以`apps/web/src/game/navigation.ts`为合同（按build_t10.py几何抄录），改建筑几何必须同步此文件并跑`npm test`与`npm run test:t10`（含GLB射线对照）；不要改用渲染网格做碰撞。
+- 首页 `/` 为全屏藏宝阁，与 `/room` 共用背包及 `B` 快捷键，两处菜单均有账号设置。健康诊断入口为 `/api/v1/health/ready`。行走碰撞以`apps/web/src/game/navigation.ts`为合同（按build_t10.py几何抄录），改建筑几何必须同步此文件并跑`npm test`与`npm run test:t10`（含GLB射线对照）；不要改用渲染网格做碰撞。
 - 云端容器只有软件WebGL（约1帧/秒），性能与实走结论以用户M5/Chrome为准。
 
 ## T09 本地验收
@@ -105,6 +105,7 @@
 - 全视口3D与墨底金线HUD不变，物品库/列表是按需覆盖抽屉，不能用旧T04常驻侧栏挤压画布。
 - 布局保存必须CAS/immutable版本/同键回执原子提交，锁序user→排序旧新assets→room。丢响应保留原key/body，旧ACK不得回弹当前拖动或误认后续草稿已保存。会话过期暂停写入，同账号重新登录后可继续确认原请求。
 - 分享稳定token加密、grant256bit摘要/原版/epoch隔离，文件有grant头就不能回退cookie扩大权限；关闭/重开不复活旧grant。源删除后的完整布局/展陈清理由T08负责。
+- T14 目录纳入全部开启分享的小屋，登录后可浏览。点赞按房间和访客账号唯一且不可撤销，使用会话及当前分享凭证，关分享后下榜并拒绝旧凭证写入。契约见数据契约第 13 节。
 - 基础家具源与manifest在assets/furniture，构建/幂等导入用scripts/build-furniture.mjs和seed-furniture.mjs；系统来源记录不能登录，不替代正常管理员种子。
 
 ## T08 投稿、后台与展陈

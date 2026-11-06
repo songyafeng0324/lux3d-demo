@@ -1,10 +1,10 @@
 import {randomBytes,randomUUID,createCipheriv,createDecipheriv} from 'node:crypto';
 import type pg from 'pg';
 import type {FastifyInstance,FastifyRequest} from 'fastify';
-import {BusinessError,inputObject,exactFields,requestWrite,transaction,tokenHash} from '@aholo/domain';
+import {BusinessError,csrfFor,inputObject,exactFields,requestWrite,transaction,tokenHash} from '@aholo/domain';
 import type {Config} from '@aholo/domain';
 import {validGalleryGrant,galleryFile} from './curation.js';
-import {validateRoomLayout,type Bounds,type RoomPlacement,type RoomModel} from '@aholo/contracts';
+import {validateRoomLayout,type Bounds,type RoomPlacement,type RoomModel,type RoomLikeView,type SharedRoomListing} from '@aholo/contracts';
 interface Session {user:Record<string,any>;token:string;hash:string}
 interface RoomContext {pool:pg.Pool;config:Config;session:(r:FastifyRequest,write?:boolean)=>Promise<Session>;reauthorize:(c:pg.PoolClient,s:Session)=>Promise<void>}
 class RetryRoomLock extends Error {}
@@ -43,7 +43,7 @@ export function grantCredentials(request:FastifyRequest,id?:string){
  const grantId=id??headerId;if(!validId(grantId)||(headerId!==undefined&&headerId!==grantId))fail(403,'SNAPSHOT_FORBIDDEN','参观凭证无效，请重新进入分享链接');return {id:grantId as string,token:authorization!.slice(7)};
 }
 async function validGrant(c:pg.Pool|pg.PoolClient,id:string,token:string,lock=false){
- const r=(await c.query(`SELECT g.*,r.share_epoch AS current_epoch,r.share_enabled FROM snapshot_grants g JOIN rooms r ON r.id=g.scope_id JOIN room_versions v ON v.room_id=g.scope_id AND v.version=g.version WHERE g.id=$1 AND g.token_hash=$2 AND g.kind='room' AND g.expires_at>now() AND r.share_enabled AND r.share_epoch=g.share_epoch AND NOT EXISTS(SELECT 1 FROM jsonb_array_elements(v.placements_json) p LEFT JOIN assets a ON a.id::text=p->>'assetId' WHERE a.id IS NULL OR a.state<>'ready' OR NOT ${roomAssetAllowed}) ${lock?'FOR SHARE OF r':''}`,[id,tokenHash(token)])).rows[0];
+ const r=(await c.query(`SELECT g.*,r.owner_id FROM snapshot_grants g JOIN rooms r ON r.id=g.scope_id JOIN room_versions v ON v.room_id=g.scope_id AND v.version=g.version WHERE g.id=$1 AND g.token_hash=$2 AND g.kind='room' AND g.expires_at>now() AND r.share_enabled AND r.share_epoch=g.share_epoch AND NOT EXISTS(SELECT 1 FROM jsonb_array_elements(v.placements_json) p LEFT JOIN assets a ON a.id::text=p->>'assetId' WHERE a.id IS NULL OR a.state<>'ready' OR NOT ${roomAssetAllowed}) ${lock?'FOR SHARE OF r':''}`,[id,tokenHash(token)])).rows[0];
  if(!r)fail(404,'SNAPSHOT_UNAVAILABLE','分享已关闭或参观凭证过期，请重新进入分享链接');return r;
 }
 export function hasSnapshotAuthorization(request:FastifyRequest){return request.headers.authorization!==undefined||request.headers['x-snapshot-grant']!==undefined;}
@@ -56,9 +56,22 @@ export async function snapshotFile(pool:pg.Pool,request:FastifyRequest,fileId:st
 export async function registerRoomRoutes(app:FastifyInstance,ctx:RoomContext){
  const {pool,config,session,reauthorize}=ctx;
  const envelope=(r:FastifyRequest,data:unknown)=>({data,requestId:r.id});
- const shareUrl=(r:Record<string,any>)=>r.share_token_ciphertext?`${new URL(config.publicOrigin).origin}/shared/${decipherToken(r.share_token_ciphertext,r.id,config.appDataKey)}`:null;
+ const sharePath=(id:string,ciphertext:string)=>'/shared/'+decipherToken(ciphertext,id,config.appDataKey);
+ const shareUrl=(r:Record<string,any>)=>r.share_token_ciphertext?new URL(sharePath(r.id,r.share_token_ciphertext),config.publicOrigin).href:null;
  async function ownerRoom(c:pg.Pool|pg.PoolClient,owner:string,lock=false){const r=(await c.query(`SELECT * FROM rooms WHERE owner_id=$1 ${lock?'FOR UPDATE':''}`,[owner])).rows[0];if(!r)fail(404,'NOT_FOUND','未找到个人小屋');return r;}
  app.get('/api/v1/rooms/me',async request=>{const s=await session(request);const room=await ownerRoom(pool,s.user.id);const view=await roomView(pool,room.id);return envelope(request,{id:view.id,...visibleLayout(view),shareEnabled:view.share_enabled,shareUrl:shareUrl(view)});});
+ app.get('/api/v1/rooms/discover',async(request,reply)=>{
+  await session(request);
+  const rows=(await pool.query(`SELECT r.id,r.name,r.share_token_ciphertext,u.nickname,
+    (SELECT count(*)::int FROM room_likes l WHERE l.room_id=r.id) AS popularity
+    FROM rooms r JOIN users u ON u.id=r.owner_id
+    WHERE r.share_enabled ORDER BY popularity DESC,u.created_at,r.id`)).rows;
+  const items:SharedRoomListing[]=rows.map(r=>({
+    id:r.id,name:r.name,ownerNickname:r.nickname,popularity:r.popularity,shareUrl:sharePath(r.id,r.share_token_ciphertext),
+  }));
+  reply.header('Cache-Control','private, no-store');
+  return envelope(request,{items});
+ });
  app.put('/api/v1/rooms/me/layout',{bodyLimit:64*1024*1024},async(request,reply)=>{
   const s=await session(request,true),body=inputObject(request.body);exactFields(body,['baseVersion','editSequence','name','placements']);
   if(!Number.isSafeInteger(body.baseVersion)||(body.baseVersion as number)<0||!Number.isSafeInteger(body.editSequence)||(body.editSequence as number)<0)fail(422,'INVALID_LAYOUT','布局版本或编辑序号无效');
@@ -97,6 +110,46 @@ export async function registerRoomRoutes(app:FastifyInstance,ctx:RoomContext){
  app.get('/api/v1/shared-rooms/:token',async(request,reply)=>{
   const token=(request.params as {token:string}).token;if(!/^[a-f0-9]{64}$/.test(token))fail(404,'SHARE_UNAVAILABLE','分享链接不可用');
   const data=await transaction(pool,async c=>{const r=(await c.query('SELECT id,layout_version,share_epoch FROM rooms WHERE share_token_hash=$1 AND share_enabled FOR SHARE',[tokenHash(token)])).rows[0];if(!r)fail(404,'SHARE_UNAVAILABLE','分享已关闭或链接不存在');const view=await roomView(c,r.id,r.layout_version);const grantToken=randomBytes(32).toString('hex'),grantId=randomUUID();const grant=(await c.query("INSERT INTO snapshot_grants(id,token_hash,kind,scope_id,version,share_epoch,expires_at) VALUES($1,$2,'room',$3,$4,$5,now()+interval '24 hours') RETURNING expires_at",[grantId,tokenHash(grantToken),r.id,r.layout_version,r.share_epoch])).rows[0];return {...visibleLayout(view),version:Number(r.layout_version),ownerNickname:view.owner_nickname,grant:{id:grantId,token:grantToken,expiresAt:new Date(grant.expires_at).toISOString()}};});reply.header('Cache-Control','private, no-store');return envelope(request,data);
+ });
+ app.get('/api/v1/snapshots/:grant/room-like',async(request,reply)=>{
+  const credentials=grantCredentials(request,(request.params as {grant:string}).grant);
+  const viewer=await session(request).catch(error=>{
+    if(error instanceof BusinessError && error.status===401)return null;
+    throw error;
+  });
+  const grant=await validGrant(pool,credentials.id,credentials.token);
+  const {popularity,liked}=(await pool.query(`SELECT count(*)::int AS popularity,
+    coalesce(bool_or(voter_id=$2),false) AS liked FROM room_likes WHERE room_id=$1`,
+    [grant.scope_id,viewer?.user.id??null])).rows[0];
+  const view:RoomLikeView=!viewer?{popularity,state:'guest'}
+    :viewer.user.id===grant.owner_id?{popularity,state:'owner'}
+    :liked?{popularity,state:'liked'}
+    :{popularity,state:'available',csrfToken:csrfFor(viewer.token,config.appDataKey)};
+  reply.header('Cache-Control','private, no-store');
+  return envelope(request,view);
+ });
+ app.put('/api/v1/snapshots/:grant/room-like',async(request,reply)=>{
+  const voter=await session(request,true);
+  const credentials=grantCredentials(request,(request.params as {grant:string}).grant);
+  if(request.body!==undefined)exactFields(inputObject(request.body),[]);
+  let roomId:string;
+  const result=await requestWrite(pool,{
+    actor:voter.user.id,method:'PUT',path:`/api/v1/snapshots/${credentials.id}/room-like`,
+    key:request.headers['idempotency-key'],body:{},secret:config.appDataKey,
+    authorize:async c=>{
+      await reauthorize(c,voter);
+      // The room lock orders a like against closing or reopening the share.
+      const grant=await validGrant(c,credentials.id,credentials.token,true);
+      if(grant.owner_id===voter.user.id)fail(403,'ROOM_SELF_LIKE','不能给自己的小屋点赞');
+      roomId=grant.scope_id;
+    },
+  },async c=>{
+    await c.query('INSERT INTO room_likes(room_id,voter_id) VALUES($1,$2) ON CONFLICT DO NOTHING',[roomId,voter.user.id]);
+    return {status:200,data:{roomId}};
+  });
+  const {popularity}=(await pool.query('SELECT count(*)::int AS popularity FROM room_likes WHERE room_id=$1',[result.data.roomId])).rows[0];
+  reply.header('Cache-Control','private, no-store');
+  return envelope(request,{popularity});
  });
  app.post('/api/v1/snapshots/:grant/renew',async(request,reply)=>{
   const credentials=grantCredentials(request,(request.params as {grant:string}).grant);

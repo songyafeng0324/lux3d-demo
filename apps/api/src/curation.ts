@@ -177,8 +177,9 @@ export async function registerCurationRoutes(app:FastifyInstance,{pool,config,se
   const params=request.params as {grant:string;candidateId:string};const credentials=grantCredentials(request,params.grant);const candidateId=uuid(params.candidateId);
   const g=await validGalleryGrant(pool,credentials.id,credentials.token,false);const d=g.details_json[candidateId];const slot=(g.slots_json as Array<{slotNo:number;candidateId:string|null}>).find(x=>x.candidateId===candidateId);
   if(!d||!slot)fail(404,'NOT_FOUND','该展位没有此藏品');
-  if(!(await pool.query("SELECT 1 FROM assets a JOIN files f ON f.id=a.model_file_id AND f.state='committed' WHERE a.id=$1 AND a.state='ready'",[d.assetId])).rowCount)fail(404,'NOT_FOUND','该藏品已不可查看');
-  const detail:ExhibitDetail={...(d.snapshot as PublicDetails),candidateId,slotNo:slot!.slotNo,model:d.model};reply.header('Cache-Control','private, no-store');return ok(request,detail);
+  const asset=(await pool.query("SELECT a.source_type FROM assets a JOIN files f ON f.id=a.model_file_id AND f.state='committed' WHERE a.id=$1 AND a.state='ready'",[d.assetId])).rows[0];
+  if(!asset)fail(404,'NOT_FOUND','该藏品已不可查看');
+  const detail:ExhibitDetail={...(d.snapshot as PublicDetails),candidateId,slotNo:slot!.slotNo,model:d.model,source:asset.source_type==='official_candidate'?'official':'user'};reply.header('Cache-Control','private, no-store');return ok(request,detail);
  });
 
  app.get('/api/v1/collections',async(request,reply)=>{

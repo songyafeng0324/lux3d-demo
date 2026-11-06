@@ -155,7 +155,7 @@ function ReviewTab({ write, locked, revision, refresh, setMessage }: TabProps) {
           {item.model ? <ModelPreview fileId={item.model.modelFileId} name={item.publicSnapshot.name} /> : <p className="adm-muted">模型已删除。</p>}
           {item.originalImageId && <figure><img src={fileUrl(item.originalImageId)} alt="生成所用原图" /><figcaption>生成所用原图</figcaption></figure>}
         </div>
-        <p className="adm-desc">{item.publicSnapshot.description}</p>
+        <p className="adm-desc">简介：{item.publicSnapshot.description}</p>
         <Facts s={item.publicSnapshot} />
         {item.status === 'rejected' && <p className="adm-muted">驳回原因：{item.rejectionReason}</p>}
         {item.status === 'pending' && <div className="adm-actions">
@@ -264,7 +264,7 @@ function AssetsTab({ write, locked, revision, refresh, setMessage }: TabProps) {
         <div className="adm-detail-head"><div><h2>{asset.name}</h2><p className="adm-muted">{SOURCE[asset.sourceType]}{asset.owner ? ` · 归属 ${asset.owner.username}（${asset.owner.nickname}）` : ''} · {time(asset.createdAt)}</p></div></div>
         <ModelPreview fileId={asset.modelFileId} name={asset.name} />
         {mode === 'view' && <>
-          <p className="adm-desc">{asset.description || '（无简介）'}</p>
+          <p className="adm-desc">简介：{asset.description || '（无简介）'}</p>
           {asset.publicSnapshot && <Facts s={asset.publicSnapshot} />}
           <div className="adm-actions-inline">
             {asset.editable ? <button type="button" disabled={locked} onClick={() => setMode('edit')}>编辑文字资料</button> : <small className="adm-muted">用户个人资产的名称、简介由本人维护，后台不代改。</small>}
