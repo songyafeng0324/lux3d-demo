@@ -68,3 +68,15 @@ kbd{display:inline-grid;place-items:center;min-width:20px;height:20px;padding:0 
   .t10-exhibit-body .bag-preview-wrap{height:clamp(200px,42dvh,350px)}
   .t10-exhibit-text{overflow:visible;padding-right:0}
 }
+/* T15 character picker: same dialog in the pavilion and the room; fallbacks keep it themed outside .t10-game */
+.character-layer{z-index:30}
+.character-picker{width:min(560px,100%);max-height:calc(100dvh - 32px);overflow:auto;display:flex;flex-direction:column;gap:14px;padding:22px 24px;border:1px solid var(--line,rgba(214,176,104,.32));border-radius:10px;background:rgba(20,15,12,.94);color:var(--paper,#efe5d2);backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);box-shadow:0 24px 60px rgba(0,0,0,.45);user-select:none}
+.character-picker-head{display:flex;align-items:baseline;justify-content:space-between;gap:12px}.character-picker h2{margin:0;font-family:"Songti SC","Noto Serif SC","STSong",serif;font-size:20px;font-weight:600;letter-spacing:.18em}
+.character-picker small{font-size:12px;color:var(--muted,#b9ab92)}
+.character-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px}
+.character-picker .character-card{appearance:none;display:flex;flex-direction:column;align-items:center;gap:6px;margin:0;padding:8px 6px 10px;border:1px solid var(--line,rgba(214,176,104,.32));border-radius:8px;background:radial-gradient(circle at 50% 42%,rgba(214,176,104,.16),rgba(0,0,0,.28) 70%);color:var(--paper,#efe5d2);font:inherit;font-size:13px;letter-spacing:.08em;line-height:1.4;cursor:pointer;transition:border-color .15s,background-color .15s,transform .15s}
+.character-picker .character-card img{display:block;width:100%;max-width:150px;height:auto;aspect-ratio:1;object-fit:contain;pointer-events:none}
+.character-picker .character-card:hover{border-color:var(--gold,#d6b068);transform:translateY(-2px)}
+.character-picker .character-card[aria-pressed=true]{border-color:var(--gold,#d6b068);background-color:rgba(142,44,34,.55);box-shadow:inset 0 0 0 1px var(--gold,#d6b068)}
+.character-picker .character-card:focus-visible{outline:2px solid var(--gold,#d6b068);outline-offset:2px}
+@media (max-width:480px){.character-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.character-picker{padding:18px 16px}.character-picker-head{flex-direction:column;gap:4px}}

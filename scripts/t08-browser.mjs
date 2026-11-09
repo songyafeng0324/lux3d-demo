@@ -231,7 +231,7 @@ try{
    assert.equal(await up.getByRole('dialog',{name:'背包',exact:true}).count(),0);
    await roomName.fill('庭前小屋');
    await up.waitForFunction(()=>window.__room?.save?.state.status==='saved');
-   await up.getByRole('button',{name:'第一人称参观',exact:true}).click();
+   await up.getByRole('button',{name:'漫游参观',exact:true}).click();
    assert.deepEqual(await entrance(up),[0,1.425,5.1]);
    await up.locator('.scene-canvas canvas').click();
    await up.waitForFunction(()=>Boolean(document.pointerLockElement));

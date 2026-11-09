@@ -34,7 +34,9 @@
     "test:t08": "node scripts/t08-browser.mjs",
     "demo:t08": "node scripts/t08-main-demo.mjs",
     "seed:furniture": "node scripts/seed-furniture.mjs",
-    "build:furniture": "node scripts/build-furniture.mjs"
+    "build:furniture": "node scripts/build-furniture.mjs",
+    "build:characters": "node scripts/build-characters.mjs && node scripts/render-character-thumbs.mjs",
+    "test:t15": "node scripts/t15-third-person-browser.mjs"
   },
   "devDependencies": {
     "@playwright/test": "1.64.1",

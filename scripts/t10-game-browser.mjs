@@ -101,11 +101,16 @@ try {
   // Input exclusion: drawers/menus stop walking; closing leaves a click-to-resume pause.
   const start = (await st(page)).player;
   const holdW = async () => { await page.keyboard.down('KeyW'); await page.waitForTimeout(Math.max(600, frameMs * 4)); await page.keyboard.up('KeyW'); return (await st(page)).player; };
-  assert.equal(await page.locator('.t10-actions button').count(), 2);
+  assert.equal(await page.locator('.t10-actions button').count(), 3); // T15: 角色 C · 背包 B · 菜单 M
   assert.equal(await page.getByRole('button', { name: '背包', exact: true }).getAttribute('aria-keyshortcuts'), 'B');
   await page.keyboard.press('KeyB');
   await page.getByRole('dialog', { name: '背包', exact: true }).getByLabel('用户名').waitFor();
   assert.deepEqual(await holdW(), start, 'walked with the backpack open');
+  await page.keyboard.press('Escape');
+  assert.equal((await st(page)).ui.overlay, null);
+  await page.keyboard.press('KeyC');
+  await page.getByRole('dialog', { name: '选择角色' }).waitFor();
+  assert.deepEqual(await holdW(), start, 'walked with the character picker open');
   await page.keyboard.press('Escape');
   assert.equal((await st(page)).ui.overlay, null);
   await page.keyboard.press('KeyM');

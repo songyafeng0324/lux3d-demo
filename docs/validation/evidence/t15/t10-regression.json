@@ -1,0 +1,424 @@
+{
+  "scope": "T10-C game front: walking/collision/HUD on the T10-B frame; no business features",
+  "base": "http://localhost:5173",
+  "browser": "157.0.8103.38",
+  "viewport": {
+    "width": 1440,
+    "height": 900
+  },
+  "dpr": 1,
+  "started": "2026-11-09T09:25:59.268Z",
+  "layout": {
+    "canvas": [
+      0,
+      0,
+      1440,
+      900
+    ],
+    "viewport": [
+      1440,
+      900
+    ],
+    "scroll": [
+      1440,
+      900
+    ]
+  },
+  "measuredFrameMs": 17,
+  "pointerLockAfterEnter": true,
+  "meshesAfterMerge": 9,
+  "surfaceProbe": {
+    "checked": 2774,
+    "mismatches": []
+  },
+  "inputExclusion": "backpack, account settings, paused, menu and focused input all blocked movement",
+  "walk": {
+    "seconds": 55,
+    "samples": 1818,
+    "maxY": 4.8,
+    "legs": [
+      {
+        "to": [
+          0,
+          0,
+          9
+        ],
+        "at": [
+          0,
+          0,
+          9.26
+        ],
+        "floor": "ground"
+      },
+      {
+        "to": [
+          8,
+          0,
+          9
+        ],
+        "at": [
+          7.75,
+          0,
+          9.01
+        ],
+        "floor": "ground"
+      },
+      {
+        "to": [
+          8,
+          0,
+          -5.9
+        ],
+        "at": [
+          8,
+          0,
+          -5.64
+        ],
+        "floor": "ground"
+      },
+      {
+        "to": [
+          1.5,
+          0,
+          -5.9
+        ],
+        "at": [
+          1.75,
+          0,
+          -5.89
+        ],
+        "floor": "ground"
+      },
+      {
+        "to": [
+          1.5,
+          0,
+          -6.7
+        ],
+        "at": [
+          1.59,
+          0,
+          -6.42
+        ],
+        "floor": "ground"
+      },
+      {
+        "to": [
+          1.5,
+          2.4,
+          -11.5
+        ],
+        "at": [
+          1.5,
+          2.26,
+          -11.22
+        ],
+        "floor": "stairs"
+      },
+      {
+        "to": [
+          1.5,
+          2.4,
+          -12.25
+        ],
+        "at": [
+          1.5,
+          2.4,
+          -11.96
+        ],
+        "floor": "stairs"
+      },
+      {
+        "to": [
+          -1.5,
+          2.4,
+          -12.25
+        ],
+        "at": [
+          -1.29,
+          2.4,
+          -12.23
+        ],
+        "floor": "stairs"
+      },
+      {
+        "to": [
+          -1.5,
+          2.4,
+          -11.5
+        ],
+        "at": [
+          -1.43,
+          2.4,
+          -11.75
+        ],
+        "floor": "stairs"
+      },
+      {
+        "to": [
+          -1.5,
+          4.8,
+          -6.7
+        ],
+        "at": [
+          -1.5,
+          4.65,
+          -7
+        ],
+        "floor": "upper"
+      },
+      {
+        "to": [
+          -1.5,
+          4.8,
+          -5.9
+        ],
+        "at": [
+          -1.5,
+          4.8,
+          -6.2
+        ],
+        "floor": "upper"
+      },
+      {
+        "to": [
+          -8,
+          4.8,
+          -5.9
+        ],
+        "at": [
+          -7.8,
+          4.8,
+          -5.91
+        ],
+        "floor": "upper"
+      },
+      {
+        "to": [
+          -8,
+          4.8,
+          10
+        ],
+        "at": [
+          -8,
+          4.8,
+          9.74
+        ],
+        "floor": "upper"
+      },
+      {
+        "to": [
+          8,
+          4.8,
+          10
+        ],
+        "at": [
+          7.75,
+          4.8,
+          10
+        ],
+        "floor": "upper"
+      },
+      {
+        "to": [
+          8,
+          4.8,
+          -5.9
+        ],
+        "at": [
+          8,
+          4.8,
+          -5.7
+        ],
+        "floor": "upper"
+      },
+      {
+        "to": [
+          -1.5,
+          4.8,
+          -5.9
+        ],
+        "at": [
+          -1.24,
+          4.8,
+          -5.89
+        ],
+        "floor": "upper"
+      },
+      {
+        "to": [
+          -1.5,
+          4.8,
+          -6.7
+        ],
+        "at": [
+          -1.43,
+          4.8,
+          -6.47
+        ],
+        "floor": "upper"
+      },
+      {
+        "to": [
+          -1.5,
+          2.4,
+          -11.5
+        ],
+        "at": [
+          -1.5,
+          2.54,
+          -11.22
+        ],
+        "floor": "stairs"
+      },
+      {
+        "to": [
+          -1.5,
+          2.4,
+          -12.25
+        ],
+        "at": [
+          -1.5,
+          2.4,
+          -11.97
+        ],
+        "floor": "stairs"
+      },
+      {
+        "to": [
+          1.5,
+          2.4,
+          -12.25
+        ],
+        "at": [
+          1.23,
+          2.4,
+          -12.22
+        ],
+        "floor": "stairs"
+      },
+      {
+        "to": [
+          1.5,
+          2.4,
+          -11.5
+        ],
+        "at": [
+          1.4,
+          2.4,
+          -11.77
+        ],
+        "floor": "stairs"
+      },
+      {
+        "to": [
+          1.5,
+          0,
+          -6.7
+        ],
+        "at": [
+          1.49,
+          0.13,
+          -6.97
+        ],
+        "floor": "ground"
+      },
+      {
+        "to": [
+          1.5,
+          0,
+          -5.9
+        ],
+        "at": [
+          1.5,
+          0,
+          -6.17
+        ],
+        "floor": "ground"
+      },
+      {
+        "to": [
+          8,
+          0,
+          -5.9
+        ],
+        "at": [
+          7.74,
+          0,
+          -5.91
+        ],
+        "floor": "ground"
+      },
+      {
+        "to": [
+          8,
+          0,
+          9
+        ],
+        "at": [
+          8,
+          0,
+          8.74
+        ],
+        "floor": "ground"
+      },
+      {
+        "to": [
+          0,
+          0,
+          9
+        ],
+        "at": [
+          0.25,
+          0,
+          8.99
+        ],
+        "floor": "ground"
+      },
+      {
+        "to": [
+          0,
+          0,
+          12.2
+        ],
+        "at": [
+          0.02,
+          0,
+          11.93
+        ],
+        "floor": "ground"
+      }
+    ]
+  },
+  "atriumJump": {
+    "landed": {
+      "x": 0,
+      "y": 0,
+      "z": 4.233499999996279
+    }
+  },
+  "lockLossPauses": true,
+  "performance": {
+    "entry": {
+      "medianMs": 16.7,
+      "p95Ms": 16.7,
+      "calls": 15,
+      "triangles": 247160,
+      "pixelRatio": 1
+    },
+    "upper": {
+      "medianMs": 16.7,
+      "p95Ms": 16.7,
+      "calls": 13
+    }
+  },
+  "errors": [],
+  "narrow": {
+    "overflow": false,
+    "canvas": 390
+  },
+  "failedAssetShowsError": true,
+  "legacyBackpackOpensRoom": true,
+  "pass": true,
+  "finished": "2026-11-09T09:27:16.035Z"
+}

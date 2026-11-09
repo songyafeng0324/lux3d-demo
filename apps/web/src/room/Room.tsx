@@ -6,6 +6,8 @@ import AssetThumbnail, { type ThumbnailCache } from '../game/AssetThumbnail.js';
 import '../game/game.css';
 import { RoomEngine, type RoomMode, type RoomTool } from './engine.js';
 import RoomDirectory from './RoomDirectory.js';
+import CharacterPicker, { CharacterButton, CHARACTER_KEY, useAvatarPrefs, VIEW_LABEL, WALK_HINT } from '../game/CharacterPicker.js';
+import type { AvatarPrefs, CharacterId } from '../game/avatar-prefs.js';
 import RoomLike from './RoomLike.js';
 import { PersonalRoomSave, type RoomSaveState } from './save.js';
 import '../scene/scene.css';
@@ -38,13 +40,17 @@ export default function Room({ shareToken }: { shareToken?: string }) {
   const [tool, setTool] = useState<RoomTool>('translate'), [selected, setSelected] = useState<string | null>(null);
   const [tab, setTab] = useState<'catalog' | 'objects'>('catalog');
   const [drawerOpen, setDrawerOpen] = useState(false);
-  const [overlay, setOverlay] = useState<'menu' | 'account' | 'backpack' | 'discover' | null>(() =>
+  const [overlay, setOverlay] = useState<'menu' | 'account' | 'backpack' | 'discover' | 'character' | null>(() =>
     !shareToken && new URLSearchParams(location.search).get('backpack') === '1' ? 'backpack' : null);
   const menuButton = useRef<HTMLButtonElement>(null);
   const [notice, setNotice] = useState(''), [loadError, setLoadError] = useState(''), [loginRequired, setLoginRequired] = useState(false);
   const [loadingModel, setLoadingModel] = useState(false), [shareBusy, setShareBusy] = useState(false), [reloadKey, setReloadKey] = useState(0);
   const sharePending = useRef<{ key: string; enabled: boolean } | null>(null);
   const [hasSharePending, setHasSharePending] = useState(false), [shareNote, setShareNote] = useState('');
+  const [avatar, setAvatar, avatarFellBack] = useAvatarPrefs();
+  const avatarRef = useRef(avatar); avatarRef.current = avatar;
+  const avatarFailed = useCallback((message: string) => { avatarFellBack(); setNotice(`${message}，已切换为第一人称。`); }, [avatarFellBack]);
+  const changeAvatar = useCallback((next: AvatarPrefs) => { setAvatar(next); engine.current?.setAvatar(next, avatarFailed); }, [setAvatar, avatarFailed]);
   const refreshCatalog = useCallback(async (instance: RoomEngine) => {
     const sequence = ++catalogSequence.current;
     const groups: [CatalogGroup, string][] = [['personal', '/assets'], ['collected', '/collections'], ['furniture', '/furniture']];
@@ -106,6 +112,12 @@ export default function Room({ shareToken }: { shareToken?: string }) {
     }
     if (overlay === 'menu' || overlay === 'account') menuButton.current?.focus();
   }, [overlay, refreshCatalog]);
+  /** One click in the picker: show that character (third person), close, and resume walking. */
+  const pickCharacter = useCallback((character: CharacterId) => {
+    changeAvatar({ character, view: 'third' });
+    setOverlay(null);
+    engine.current?.lock();
+  }, [changeAvatar]);
   function collectionRemoved(item: CollectedAsset, result: CollectionRemoval) {
     const currentCollection = catalogById.get(item.id)?.collectionId;
     if (currentCollection && currentCollection !== item.collectionId) return;
@@ -157,6 +169,7 @@ export default function Room({ shareToken }: { shareToken?: string }) {
       instance = new RoomEngine(host.current, { select: setSelected, edit: placement => { const value = current.current; if (value) latest.current.edit(value.name, value.placements.map(p => p.id === placement.id ? placement : p)); }, notice: setNotice }, (): Record<string, string> => { const grant = snapshot.current?.grant; return visitor && grant ? { Authorization: 'Bearer ' + grant.token, 'X-Snapshot-Grant': grant.id } : {}; }, visitor);
     } catch { setLoadError('浏览器暂时无法创建小屋场景，请使用最新版 Chrome。'); return; }
     engine.current = instance;
+    instance.setAvatar(avatarRef.current, avatarFailed);
     const prepare = async (value: PersonalRoom) => {
       instance.setCatalog(value.assets);
       const used = new Set(value.placements.map(p => p.assetId));
@@ -239,6 +252,21 @@ export default function Room({ shareToken }: { shareToken?: string }) {
     return () => window.removeEventListener('keydown', backpack);
   }, [visitor, overlay, openOverlay]);
 
+  const sceneBlocked = loginRequired || Boolean(loadError) || save.status === 'loadFailed' || save.status === 'loading';
+  useEffect(() => {
+    if (mode === 'edit' || overlay || sceneBlocked) return;
+    const walkKeys = (event: KeyboardEvent) => {
+      // Shift is held for quick walking: V/C with Shift do nothing, as in the pavilion.
+      if ((event.code !== 'KeyV' && event.code !== CHARACTER_KEY) || event.defaultPrevented || event.repeat || event.isComposing || event.shiftKey || event.altKey || event.ctrlKey || event.metaKey) return;
+      if ((event.target as HTMLElement | null)?.closest?.('input,textarea,select,[contenteditable]')) return;
+      event.preventDefault();
+      if (event.code === CHARACTER_KEY) { openOverlay('character'); return; }
+      const a = avatarRef.current; changeAvatar({ ...a, view: a.view === 'third' ? 'first' : 'third' });
+    };
+    window.addEventListener('keydown', walkKeys);
+    return () => window.removeEventListener('keydown', walkKeys);
+  }, [mode, overlay, sceneBlocked, changeAvatar, openOverlay]);
+
   useEffect(() => {
     if (!drawerOpen || visitor || mode !== 'edit') return;
     const escape = (event: KeyboardEvent) => { if (event.key === 'Escape') { event.preventDefault(); setDrawerOpen(false); } };
@@ -265,7 +293,11 @@ export default function Room({ shareToken }: { shareToken?: string }) {
     } catch (error) { if (error instanceof ApiError && error.status >= 400 && error.status < 500) { sharePending.current = null; setHasSharePending(false); } setShareNote(error instanceof Error ? error.message : '分享操作未确认，请重试原请求。'); }
     finally { setShareBusy(false); }
   }
-  function changeMode(next: RoomMode) { if (engine.current?.debug().moving) return; setMode(next); engine.current?.setMode(next); }
+  function changeMode(next: RoomMode) {
+    if (engine.current?.debug().moving) return;
+    if (next === 'edit') setOverlay(o => o === 'character' ? null : o); // the picker only exists while walking
+    setMode(next); engine.current?.setMode(next);
+  }
   const active = room?.placements.find(p => p.id === selected);
   const nameOf = (id: string) => catalogById.get(id)?.name ?? '个人藏品';
   const ownerRoom = !visitor ? room as PersonalRoom | null : null;
@@ -274,14 +306,15 @@ export default function Room({ shareToken }: { shareToken?: string }) {
     <header className="scene-header">
       <a className="brand" href="/"><span className="seal">藏</span><span>个人小屋<small>MY LITTLE COLLECTION</small></span></a>
       <span className="room-identity">{visitor ? '只读参观' : owner?.user.nickname ?? '我的空间'}</span>
-      {visitor ? <a className="service-link" href="/">返回藏宝阁</a> : <nav className="room-header-actions" aria-label="小屋菜单">
+      {visitor ? <nav className="room-header-actions" aria-label="参观菜单">{!sceneBlocked && <CharacterButton onClick={() => openOverlay('character')} />}<a className="service-link" href="/">返回藏宝阁</a></nav> : <nav className="room-header-actions" aria-label="小屋菜单">
+        {mode !== 'edit' && !sceneBlocked && <CharacterButton onClick={() => openOverlay('character')} />}
         {mode === 'edit' && !drawerOpen && <button type="button" onClick={openCatalog}>打开物品库</button>}
         <button type="button" disabled={!owner} onClick={() => openOverlay('discover')}>逛一逛</button>
         <button type="button" aria-keyshortcuts="B" onClick={() => openOverlay('backpack')}>背包<kbd aria-hidden="true">B</kbd></button>
         <button type="button" ref={menuButton} onClick={() => openOverlay('menu')}>菜单</button>
       </nav>}
     </header>
-    <div className="scene-navigation"><div className="room-heading"><p>{visitor ? (room as SharedRoom | null)?.ownerNickname ?? '分享的小屋' : '布置你的小世界'}</p>{visitor || mode !== 'edit' ? <h1>{room?.name ?? '个人小屋'}</h1> : <input aria-label="房间名称" value={room?.name ?? ''} disabled={!canEdit} maxLength={80} onChange={event => edit(event.target.value, room?.placements ?? [])} />}</div>{!visitor && <nav aria-label="小屋模式"><button className={mode === 'edit' ? 'active' : ''} onClick={() => changeMode('edit')}>布置小屋</button><button className={mode === 'visit' ? 'active' : ''} onClick={() => changeMode('visit')}>第一人称参观</button></nav>}<div className={'save-state ' + save.status} role="status">{visitor ? '只读快照 · 版本 ' + (room?.version ?? '—') : labels[save.status]}{!visitor && <small>v{save.version}</small>}</div></div>
+    <div className="scene-navigation"><div className="room-heading"><p>{visitor ? (room as SharedRoom | null)?.ownerNickname ?? '分享的小屋' : '布置你的小世界'}</p>{visitor || mode !== 'edit' ? <h1>{room?.name ?? '个人小屋'}</h1> : <input aria-label="房间名称" value={room?.name ?? ''} disabled={!canEdit} maxLength={80} onChange={event => edit(event.target.value, room?.placements ?? [])} />}</div>{!visitor && <nav aria-label="小屋模式"><button className={mode === 'edit' ? 'active' : ''} onClick={() => changeMode('edit')}>布置小屋</button><button className={mode === 'visit' ? 'active' : ''} onClick={() => changeMode('visit')}>漫游参观</button></nav>}<div className={'save-state ' + save.status} role="status">{visitor ? '只读快照 · 版本 ' + (room?.version ?? '—') : labels[save.status]}{!visitor && <small>v{save.version}</small>}</div></div>
     <main className="scene-workspace">
       {!visitor && mode === 'edit' && drawerOpen && <aside className="scene-sidebar" aria-label="物品抽屉">
         <div className="room-drawer-head"><strong>物品与摆放</strong><button type="button" aria-label="关闭物品抽屉" onClick={() => setDrawerOpen(false)}>×</button></div>
@@ -320,19 +353,20 @@ export default function Room({ shareToken }: { shareToken?: string }) {
       </aside>}
       <section className="scene-stage" aria-label="个人小屋三维空间"><div className="scene-canvas" ref={host} />
         {(loginRequired || loadError || save.status === 'loadFailed' || save.status === 'loading') && <div className="scene-blocked"><div><p>{loadError || save.message || (loginRequired ? '请登录后继续使用小屋。' : '正在读取小屋与模型…')}</p>{loginRequired ? <button type="button" onClick={() => openOverlay('account')}>登录后进入自己的小屋 →</button> : save.status !== 'loading' || loadError ? <button type="button" onClick={() => { if (saver.current && !loadError) void saver.current.load(); else setReloadKey(key => key + 1); }}>重试读取</button> : null}</div></div>}
-        <div className="stage-label"><span className="stage-live" />{mode === 'edit' ? '斜俯视布置' : '第一人称参观'}<small>{visitor ? '仅展示主人已摆放并确认的物品' : '固定建筑与摆放物品分离'}</small><small className="desktop-input-hint">请使用配有键盘和鼠标的电脑操作 3D 场景。</small></div>
+        <div className="stage-label"><span className="stage-live" />{mode === 'edit' ? '斜俯视布置' : VIEW_LABEL[avatar.view] + '参观'}<small>{visitor ? '仅展示主人已摆放并确认的物品' : '固定建筑与摆放物品分离'}</small><small className="desktop-input-hint">请使用配有键盘和鼠标的电脑操作 3D 场景。</small></div>
         {mode === 'edit' && <div className="scene-tools" role="toolbar" aria-label="变换工具">{([['translate', '↔', '移动'], ['rotate', '⟳', '旋转'], ['scale', '⤢', '等比缩放']] as const).map(([value, icon, label]) => <button type="button" key={value} disabled={!canEdit} aria-label={label} aria-pressed={tool === value} className={tool === value ? 'active' : ''} onClick={() => { setTool(value); engine.current?.setTool(value); }}><span>{icon}</span>{label}</button>)}<span className="tool-divider" /><button type="button" onClick={() => engine.current?.home()}>⌂ 全景</button></div>}
-        {mode !== 'edit' && <><div className="visit-actions"><button type="button" onClick={() => engine.current?.home()}>↶ 回到入口</button><span>点击场景锁定鼠标 · WASD / 方向键行走 · 空格跳跃 · Esc 释放</span></div><span className="crosshair" aria-hidden="true">＋</span></>}
+        {mode !== 'edit' && <><div className="visit-actions"><button type="button" onClick={() => engine.current?.home()}>↶ 回到入口</button><span>{WALK_HINT}</span></div><span className="crosshair" aria-hidden="true">＋</span></>}
         {visitor && room && <RoomLike room={room as SharedRoom} />}
         {mode === 'edit' && active && <div className="selection-card"><AssetThumbnail asset={catalogById.get(active.assetId)} cache={thumbnailCache} /><div><strong>{nameOf(active.assetId)}</strong><small>移动、旋转或等比缩放</small></div><button type="button" onClick={() => engine.current?.focus(active.id)}>定位</button><button type="button" aria-label="移除选中摆放" disabled={!canEdit} onClick={() => edit(room!.name, room!.placements.filter(p => p.id !== active.id))}>移除</button></div>}
         {mode === 'edit' && !active && room?.placements.length === 0 && <div className="empty-room"><span>从一件物品开始</span><p>从左侧添加模型或家具<br />通过三轴控件布置小屋</p></div>}
         {notice && <div className="scene-notice" role="alert">{notice}<button type="button" aria-label="收起提示" onClick={() => setNotice('')}>×</button></div>}
-        <div className="stage-footer"><span>{mode === 'edit' ? '拖动三轴控件 · 滚轮缩放视角 · 鼠标拖动环绕' : '点击锁定鼠标后行走 · 参观不改变布局'}</span><span>共 {room?.placements.length ?? 0} 件摆放</span></div>
+        <div className="stage-footer"><span>{mode === 'edit' ? '拖动三轴控件 · 滚轮缩放视角 · 鼠标拖动环绕' : '参观不改变布局'}</span><span>共 {room?.placements.length ?? 0} 件摆放</span></div>
       </section>
     </main>
     {!visitor && <footer className="lab-bottom room-bottom"><p>{save.message || '完整布局在服务端确认后才标为已保存。'}{saver.current?.unsaved && <strong> 本页有未保存修改，分享页只展示服务端已确认布局。</strong>}</p><div>{owner && save.status === 'failed' && <button type="button" onClick={() => void saver.current?.flush()}>重试保存</button>}{owner && save.status === 'conflict' && <button type="button" onClick={() => { if (confirm('载入将放弃本页未保存修改，使用服务端已确认布局。')) void saver.current?.load(); }}>载入已确认版本</button>}<button type="button" disabled={!owner || !ownerRoom || shareBusy || save.status === 'loadFailed' || save.status === 'loading'} onClick={() => void toggleShare()}>{shareBusy ? '正在处理…' : hasSharePending ? '确认上次分享操作' : ownerRoom?.shareEnabled ? '关闭分享' : '开启分享'}</button></div></footer>}
     {!visitor && owner && ownerRoom?.shareUrl && <div className="room-share-panel"><span>{ownerRoom.shareEnabled ? '分享已开启' : '分享已关闭，重新开启沿用此链接'} · 服务端已确认布局</span><a href={ownerRoom.shareUrl} target="_blank" rel="noreferrer">{ownerRoom.shareUrl}</a><button type="button" onClick={() => void navigator.clipboard.writeText(new URL(ownerRoom.shareUrl!, location.origin).href).then(() => setShareNote('分享链接已复制。')).catch(() => setShareNote('复制未完成，可直接选中链接复制。'))}>复制链接</button>{shareNote && <small role="status">{shareNote}</small>}</div>}
     {!visitor && !ownerRoom?.shareUrl && shareNote && <p className="room-share-note" role="status">{shareNote}</p>}
+    {overlay === 'character' && mode !== 'edit' && <CharacterPicker prefs={avatar} pick={pickCharacter} close={closeOverlay} />}
     {!visitor && <>
       {overlay === 'menu' && <div className="t10-modal-backdrop room-menu-layer" onClick={closeOverlay}>
         <section className="t10-menu" role="dialog" aria-modal="true" aria-label="菜单" onClick={event => event.stopPropagation()}>

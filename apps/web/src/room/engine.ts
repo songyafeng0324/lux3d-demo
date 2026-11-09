@@ -3,11 +3,14 @@ import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { TransformControls } from 'three/addons/controls/TransformControls.js';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
-import { roomPlacementBounds, roomPlacementFloor, validateRoomLayout, type Bounds, type RoomModel, type RoomPlacement } from '@aholo/contracts';
-import { MOVE_KEYS, playerOverlaps, stepFirstPerson, type FirstPerson } from '../game/navigation.js';
+import { ROOM_COURTYARD_BOUNDS, roomPlacementBounds, roomPlacementFloor, validateRoomLayout, type Bounds, type RoomModel, type RoomPlacement } from '@aholo/contracts';
+import { MOVE_KEYS, playerOverlaps, stepFirstPerson, supportAt, type FirstPerson } from '../game/navigation.js';
+import { AvatarRig } from '../game/avatar.js';
+import type { AvatarPrefs, ViewMode } from '../game/avatar-prefs.js';
+import { boomLength, clampFollowPitch, easeBoom, FOLLOW, viewDirection, type Vec3 } from '../game/follow-camera.js';
 import { architecture, disposeResources, enableMeshShadows } from '../scene/assets.js';
 import { courtyardGround, courtyardPlants, courtyardSky, horizonColor } from './courtyard.js';
-import { buildRoomWorld, ROOM_EYE_HEIGHT, roomEntrance } from './navigation.js';
+import { buildRoomWorld, ROOM_CAMERA_BLOCKERS, ROOM_EYE_HEIGHT, roomEntrance } from './navigation.js';
 export type RoomMode = 'edit' | 'visit' | 'share';
 export type RoomTool = 'translate' | 'rotate' | 'scale';
 interface Hooks { select: (id: string | null) => void; edit: (placement: RoomPlacement) => void; notice: (message: string) => void }
@@ -41,11 +44,15 @@ export class RoomEngine {
   private keys = new Set<string>();
   private jumpQueued = false;
   private yaw = 0;
-  private pitch = 0;
+  private pitch: number = FOLLOW.entryPitch;
   private looking = false;
   private stopped = false;
   private lastTime = 0;
   private raycaster = new T.Raycaster();
+  private view: ViewMode = 'third';
+  private avatar: AvatarRig;
+  private boom: number = FOLLOW.distance;
+  private velocity: [number, number] = [0, 0];
   constructor(readonly host: HTMLElement, private hooks: Hooks, private headers: () => Record<string, string>, readonly readOnly = false) {
     this.mode = readOnly ? 'share' : 'edit';
     this.renderer = new T.WebGLRenderer({ antialias: true });
@@ -83,6 +90,7 @@ export class RoomEngine {
     enableMeshShadows(shell.group);
     this.roof = shell.roof;
     this.scene.add(shell.group, courtyardGround(), this.sky, courtyardPlants());
+    this.avatar = new AvatarRig(this.scene);
     this.orbit = new OrbitControls(this.camera, this.renderer.domElement);
     this.orbit.enableDamping = true; this.orbit.maxPolarAngle = Math.PI * .46; this.orbit.minDistance = 2; this.orbit.maxDistance = 35;
     this.transform = new TransformControls(this.camera, this.renderer.domElement);
@@ -180,20 +188,49 @@ export class RoomEngine {
   select(id: string | null) { this.selected = id; const object = id ? this.instances.get(id) : undefined; if (object && this.mode === 'edit') { this.transform.attach(object); this.outline.visible = true; this.refreshOutline(); } else { this.transform.detach(); this.outline.visible = false; } this.hooks.select(id); }
   focus(id: string) { this.select(id); const object = this.instances.get(id); if (object && this.mode === 'edit') { const center = new T.Box3().setFromObject(object).getCenter(new T.Vector3()); this.orbit.target.copy(center); this.camera.position.copy(center).add(new T.Vector3(4, 4, 5)); this.orbit.update(); } }
   setTool(tool: RoomTool) { this.transform.setMode(tool); this.transform.setSpace(tool === 'scale' ? 'local' : 'world'); }
+  /** Walking modes: lock the mouse again (call from a click, e.g. right after picking a character). */
+  lock() { if (this.mode === 'edit' || this.stopped) return; this.renderer.domElement.focus(); void this.renderer.domElement.requestPointerLock?.()?.catch?.(() => {}); }
   home() {
-    this.blur(); this.yaw = 0; this.pitch = 0;
+    this.blur(); this.yaw = 0; this.pitch = this.view === 'third' ? FOLLOW.entryPitch : 0;
     if (this.mode === 'edit') {
       this.camera.position.set(14, 8, 19); this.orbit.target.set(0, 1.15, 0); this.orbit.update();
     } else {
       this.player = roomEntrance(this.world);
-      this.placeVisitCamera();
-      this.camera.rotation.set(0, 0, 0, 'YXZ');
+      this.avatar.face(Math.PI);
+      this.boom = FOLLOW.distance;
+      this.placeVisitCamera(0);
     }
   }
-  private placeVisitCamera() {
-    this.camera.position.set(this.player.x, this.player.y + ROOM_EYE_HEIGHT, this.player.z);
+  /** Per-browser character and view (T15); only visit/share modes show the avatar. */
+  setAvatar(prefs: AvatarPrefs, failed?: (message: string) => void) {
+    this.setView(prefs.view);
+    this.avatar.setCharacter(prefs.character).catch(error => {
+      if (this.stopped) return;
+      this.setView('first');
+      failed?.(error instanceof Error ? error.message : '角色模型读取失败');
+    });
   }
-  setMode(mode: RoomMode) { if (this.moving || (this.readOnly && mode === 'edit')) return; this.mode = mode; this.keys.clear(); this.looking = false; if (document.pointerLockElement === this.renderer.domElement) document.exitPointerLock(); this.roof.visible = mode !== 'edit'; this.renderer.shadowMap.needsUpdate = true; this.orbit.enabled = mode === 'edit'; this.transform.enabled = mode === 'edit'; this.select(mode === 'edit' ? this.selected : null); this.home(); }
+  setView(view: ViewMode) {
+    const entry = this.pitch === (this.view === 'third' ? FOLLOW.entryPitch : 0);
+    this.view = view; this.boom = FOLLOW.distance;
+    this.pitch = entry ? (view === 'third' ? FOLLOW.entryPitch : 0) : view === 'third' ? clampFollowPitch(this.pitch) : this.pitch;
+    if (this.mode !== 'edit') this.placeVisitCamera(0);
+  }
+  /** Edit mode and first person keep the original 45° lens; following the avatar needs a wider one. */
+  private fitLens() {
+    const fov = this.mode !== 'edit' && this.view === 'third' ? 60 : 45;
+    if (this.camera.fov !== fov) { this.camera.fov = fov; this.camera.updateProjectionMatrix(); }
+  }
+  private placeVisitCamera(dt: number) {
+    this.fitLens();
+    this.camera.rotation.set(this.pitch, this.yaw, 0, 'YXZ');
+    if (this.view === 'first') { this.camera.position.set(this.player.x, this.player.y + ROOM_EYE_HEIGHT, this.player.z); return; }
+    const pivot: Vec3 = [this.player.x, this.player.y + FOLLOW.pivot, this.player.z], [dx, dy, dz] = viewDirection(this.yaw, this.pitch), back: Vec3 = [-dx, -dy, -dz];
+    const target = boomLength({ colliders: this.world.colliders, surfaces: this.world.surfaces, floorY: ROOM_COURTYARD_BOUNDS.min[1] }, pivot, back, FOLLOW.distance, ROOM_CAMERA_BLOCKERS);
+    this.boom = dt ? easeBoom(this.boom, target, dt) : target;
+    this.camera.position.set(pivot[0] + back[0] * this.boom, pivot[1] + back[1] * this.boom, pivot[2] + back[2] * this.boom);
+  }
+  setMode(mode: RoomMode) { if (this.moving || (this.readOnly && mode === 'edit')) return; this.mode = mode; this.keys.clear(); this.looking = false; if (document.pointerLockElement === this.renderer.domElement) document.exitPointerLock(); this.roof.visible = mode !== 'edit'; this.renderer.shadowMap.needsUpdate = true; this.orbit.enabled = mode === 'edit'; this.transform.enabled = mode === 'edit'; this.fitLens(); this.select(mode === 'edit' ? this.selected : null); this.home(); }
   private pointerDown = (event: PointerEvent) => { this.down = [event.clientX, event.clientY]; if (this.mode !== 'edit' && event.button === 0) { this.looking = true; this.renderer.domElement.focus(); void this.renderer.domElement.requestPointerLock?.().catch(() => {}); } };
   private pointerUp = (event: PointerEvent) => {
     this.looking = false;
@@ -202,7 +239,7 @@ export class RoomEngine {
     let object: T.Object3D | null = this.raycaster.intersectObjects([...this.instances.values()], true)[0]?.object ?? null;
     while (object && !object.userData.placementId) object = object.parent; this.select(object?.userData.placementId ?? null);
   };
-  private pointerMove = (event: PointerEvent) => { if (this.mode === 'edit' || (!this.looking && document.pointerLockElement !== this.renderer.domElement)) return; this.yaw -= event.movementX * .002; this.pitch = T.MathUtils.clamp(this.pitch - event.movementY * .002, -1.3, 1.3); this.camera.rotation.set(this.pitch, this.yaw, 0, 'YXZ'); };
+  private pointerMove = (event: PointerEvent) => { if (this.mode === 'edit' || (!this.looking && document.pointerLockElement !== this.renderer.domElement)) return; this.yaw -= event.movementX * .002; const pitch = this.pitch - event.movementY * .002; this.pitch = this.view === 'third' ? clampFollowPitch(pitch) : T.MathUtils.clamp(pitch, -1.3, 1.3); };
   private contextMenu = (event: Event) => event.preventDefault();
   private keyDown = (event: KeyboardEvent) => {
     if ((event.target as HTMLElement)?.closest('input,textarea,button,select,[role="dialog"]')) return;
@@ -211,7 +248,7 @@ export class RoomEngine {
     if (event.code === 'Space') {
       event.preventDefault();
       if (!event.repeat) this.jumpQueued = true;
-    } else if (event.code in MOVE_KEYS) {
+    } else if (event.code in MOVE_KEYS || event.code === 'ShiftLeft' || event.code === 'ShiftRight') {
       event.preventDefault(); this.keys.add(event.code);
     }
   };
@@ -220,14 +257,26 @@ export class RoomEngine {
   private lockChange = () => { if (document.pointerLockElement !== this.renderer.domElement) this.blur(); };
   private frame = (now: number) => {
     if (this.stopped) return; const dt = this.lastTime ? Math.min((now - this.lastTime) / 1000, .25) : 0; this.lastTime = now;
+    this.velocity = [0, 0];
     if (this.mode === 'edit') this.orbit.update();
-    else if (this.keys.size || this.jumpQueued || this.player.velocityY !== null) {
-      let forward = 0, right = 0;
-      for (const key of this.keys) { forward += MOVE_KEYS[key][0]; right += MOVE_KEYS[key][1]; }
-      this.player = stepFirstPerson(this.world, this.player, { forward, right, run: false }, this.yaw, dt, this.jumpQueued);
-      this.jumpQueued = false;
-      this.placeVisitCamera();
+    else {
+      if (this.keys.size || this.jumpQueued || this.player.velocityY !== null) {
+        let forward = 0, right = 0;
+        for (const key of this.keys) { const v = MOVE_KEYS[key]; if (v) { forward += v[0]; right += v[1]; } }
+        // Shift = quick walk, same speed as the pavilion (BODY.run).
+        const run = this.keys.has('ShiftLeft') || this.keys.has('ShiftRight');
+        const before = this.player;
+        this.player = stepFirstPerson(this.world, this.player, { forward, right, run }, this.yaw, dt, this.jumpQueued);
+        this.jumpQueued = false;
+        if (dt) this.velocity = [(this.player.x - before.x) / dt, (this.player.z - before.z) / dt];
+      }
+      this.placeVisitCamera(dt);
     }
+    this.avatar.update(dt, {
+      feet: this.player, velocity: this.velocity,
+      ground: supportAt(this.world, this.player.x, this.player.z, this.player.y + .01),
+      visible: this.mode !== 'edit' && this.view === 'third' && this.boom >= FOLLOW.hideBelow,
+    });
     this.sky.position.copy(this.camera.position);
     this.renderer.render(this.scene, this.camera);
   };
@@ -236,7 +285,7 @@ export class RoomEngine {
     const rect = this.renderer.domElement.getBoundingClientRect();
     const project = (value: T.Vector3) => { value.project(this.camera); return { x: rect.left + (value.x + 1) * rect.width / 2, y: rect.top + (1 - value.y) * rect.height / 2 }; };
     const object = this.selected ? this.instances.get(this.selected) : null;
-    return { mode: this.mode, placements: structuredClone(this.placements), selected: this.selected, moving: this.moving, camera: this.camera.position.toArray(), airborne: this.player.velocityY !== null, keys: [...this.keys], models: this.templates.size, instances: this.instances.size, axis: this.transform.axis, orbitEnabled: this.orbit.enabled,
+    return { view: this.view, boom: this.boom, player: { x: this.player.x, y: this.player.y, z: this.player.z }, yaw: this.yaw, pitch: this.pitch, avatar: this.avatar.debug(), mode: this.mode, placements: structuredClone(this.placements), selected: this.selected, moving: this.moving, camera: this.camera.position.toArray(), airborne: this.player.velocityY !== null, keys: [...this.keys], models: this.templates.size, instances: this.instances.size, axis: this.transform.axis, orbitEnabled: this.orbit.enabled,
       point: object ? project(object.position.clone()) : null,
       axes: object ? [new T.Vector3(1, 0, 0), new T.Vector3(0, 1, 0), new T.Vector3(0, 0, 1)].map(axis => project(axis.add(object.position))) : [],
       assetBounds: Object.fromEntries([...this.templates].map(([id, template]) => { const bounds = new T.Box3().setFromObject(template); return [id, { min: bounds.min.toArray(), max: bounds.max.toArray() }]; })) };
@@ -245,6 +294,6 @@ export class RoomEngine {
     if (this.stopped) return; this.stopped = true; this.abort.abort(); this.renderer.setAnimationLoop(null); this.observer.disconnect(); this.blur(); if (document.pointerLockElement === this.renderer.domElement) document.exitPointerLock();
     this.host.removeEventListener('pointerdown', this.pointerDown); this.host.removeEventListener('pointerup', this.pointerUp); this.host.removeEventListener('pointermove', this.pointerMove); this.host.removeEventListener('contextmenu', this.contextMenu);
     window.removeEventListener('keydown', this.keyDown); window.removeEventListener('keyup', this.keyUp); window.removeEventListener('blur', this.blur); document.removeEventListener('pointerlockchange', this.lockChange);
-    this.transform.detach(); this.transform.dispose(); this.orbit.dispose(); disposeResources([this.scene, ...this.templates.values()]); this.environment.dispose(); this.sun.shadow.dispose(); this.renderer.renderLists.dispose(); this.renderer.dispose(); this.renderer.forceContextLoss(); this.renderer.domElement.remove(); this.templates.clear(); this.instances.clear();
+    this.avatar.dispose(); this.transform.detach(); this.transform.dispose(); this.orbit.dispose(); disposeResources([this.scene, ...this.templates.values()]); this.environment.dispose(); this.sun.shadow.dispose(); this.renderer.renderLists.dispose(); this.renderer.dispose(); this.renderer.forceContextLoss(); this.renderer.domElement.remove(); this.templates.clear(); this.instances.clear();
   }
 }

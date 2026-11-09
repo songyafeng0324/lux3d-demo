@@ -1,0 +1,86 @@
+{
+  "base": "http://localhost:5173",
+  "browser": "157.0.8103.38",
+  "started": "2026-11-09T09:25:24.988Z",
+  "cameraProbe": {
+    "views": 7680,
+    "shortened": 4168,
+    "hits": []
+  },
+  "exhibitDetail": {
+    "slot": "T03",
+    "opened": true
+  },
+  "characters": [
+    {
+      "label": "白衣男孩",
+      "id": "white-shirt-boy",
+      "height": 1.5
+    },
+    {
+      "label": "粉裤女孩",
+      "id": "pink-shorts-girl",
+      "height": 1.5
+    },
+    {
+      "label": "黄衣牛角人",
+      "id": "bull-tpose",
+      "height": 1.5
+    },
+    {
+      "label": "红衣小丸子",
+      "id": "maruko-tpose",
+      "height": 1.5
+    },
+    {
+      "label": "蜡笔小新",
+      "id": "shin-chan",
+      "height": 1.5
+    },
+    {
+      "label": "拟人橘猫",
+      "id": "humanoid-tabby",
+      "height": 1.5
+    }
+  ],
+  "hints": {
+    "pavilion": "点击画面锁定鼠标 · WASD 行走 · Shift 快走 · 空格跳跃 · V 切换视角 · C 选择角色 · Esc 释放鼠标",
+    "room": "点击画面锁定鼠标 · WASD 行走 · Shift 快走 · 空格跳跃 · V 切换视角 · C 选择角色 · Esc 释放鼠标",
+    "shared": "点击画面锁定鼠标 · WASD 行走 · Shift 快走 · 空格跳跃 · V 切换视角 · C 选择角色 · Esc 释放鼠标"
+  },
+  "picker": {
+    "cards": [
+      "拟人橘猫",
+      "白衣男孩",
+      "粉裤女孩",
+      "黄衣牛角人",
+      "红衣小丸子",
+      "蜡笔小新"
+    ]
+  },
+  "fps": {
+    "first": 60,
+    "third": 60.3,
+    "note": "headless Chrome; M5 real-device numbers are the acceptance basis"
+  },
+  "renderInfo": {
+    "calls": 15,
+    "triangles": 247160
+  },
+  "roomSpeed": {
+    "walk": 2.55,
+    "shift": 5.1
+  },
+  "room": {
+    "indoorCamera": [
+      0,
+      2.410741858544196,
+      4.033053049091967
+    ],
+    "indoorBoom": 3.2,
+    "sharedCharacter": "pink-shorts-girl",
+    "sharedBoom": 3.2
+  },
+  "passed": true,
+  "errors": []
+}

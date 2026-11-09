@@ -66,3 +66,4 @@
 .room-like-count,.room-like small{padding:5px 9px;border:1px solid var(--room-line);border-radius:5px;background:var(--room-ink);font-size:11px}
 .room-like-count strong{color:var(--room-gold);font-variant-numeric:tabular-nums}
 @media(max-width:420px){.room-header-actions{gap:4px}.room-app .room-header-actions button{padding:6px 7px;font-size:10px}}
+.room-header-actions .service-link{display:inline-flex;align-items:center;margin-left:0}

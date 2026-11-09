@@ -88,7 +88,8 @@
 ## 沉浸式体验与建模方向
 - 最新产品增量见 `docs/product/2026-11-04-沉浸场景与建模确认.md`，总体执行依据见 `docs/architecture/沉浸式MVP实施计划.md`：前台全视口游戏式3D、Agent用Blender MCP制作可上下楼二层古阁；先框架/完整功能，细节后补。
 - 2026-11-05用户已明确启动T10；T10（A设计、B建筑框架、C全视口前台）已全部完成并经Mac真机验证；T06/T07/T08正式业务也已完成，T09 已完成 Mac 本地功能验收与独立复核。Blender/MCP实际状态和只读探针见环境记录，不把连接检查当成模型交付。
-- 首页 `/` 为全屏藏宝阁，与 `/room` 共用背包及 `B` 快捷键，两处菜单均有账号设置。健康诊断入口为 `/api/v1/health/ready`。行走碰撞以`apps/web/src/game/navigation.ts`为合同（按build_t10.py几何抄录），改建筑几何必须同步此文件并跑`npm test`与`npm run test:t10`（含GLB射线对照）；不要改用渲染网格做碰撞。
+- 首页 `/` 为全屏藏宝阁，与 `/room` 共用背包及 `B` 快捷键，两处菜单均有账号设置。健康诊断入口为 `/api/v1/health/ready`。行走碰撞以`apps/web/src/game/navigation.ts`为合同（按build_t10.py几何抄录），改建筑几何必须同步此文件（含第三人称镜头遮挡 `pavilionCamera()`）并跑`npm test`、`npm run test:t10`与`npm run test:t15`（含GLB射线对照）；不要改用渲染网格做碰撞或镜头遮挡。
+- T15 第三人称：默认第三人称，`V` 切回第一人称；三个可行走场景右上角都有「角色」按钮，`C` 打开共用选角框（`game/CharacterPicker.tsx`），操作提示统一用 `WALK_HINT`；角色和视角只存本机浏览器；规则见 `docs/product/2026-11-09-第三人称角色接入.md`，验证见 `docs/validation/T15第三人称验证.md`。运行版角色 GLB 和选角缩略图由 `npm run build:characters` 从 `assets/characters/<id>/` 生成。
 - 云端容器只有软件WebGL（约1帧/秒），性能与实走结论以用户M5/Chrome为准。
 
 ## T09 本地验收

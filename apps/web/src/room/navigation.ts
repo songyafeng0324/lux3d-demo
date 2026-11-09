@@ -1,5 +1,5 @@
 import { ROOM_BOUNDS, ROOM_COURTYARD_BOUNDS, ROOM_PLATFORM_HALF, roomPlacementBounds, type Bounds, type RoomPlacement } from '@aholo/contracts';
-import { BODY, playerOverlaps, supportAt, type BoxCollider, type CircleCollider, type FirstPerson, type WalkingWorld } from '../game/navigation.js';
+import { BODY, playerOverlaps, supportAt, type BoxCollider, type CircleCollider, type Collider, type FirstPerson, type WalkingWorld } from '../game/navigation.js';
 
 const ground = ROOM_COURTYARD_BOUNDS.min[1];
 const indoor = .025; // Top of the indoor tiles.
@@ -68,3 +68,10 @@ export function roomEntrance(world: WalkingWorld): FirstPerson {
   // Even if the whole ground is covered, start above the outdoor path and land on the first surface.
   return { ...path, y: ROOM_COURTYARD_BOUNDS.max[1], velocityY: 0 };
 }
+
+/** Camera-only blockers for the third-person boom: the roof with its eaves and the side friezes (scene/assets.ts architecture()). */
+const ROOF_TOP = ROOM_BOUNDS.max[1];
+export const ROOM_CAMERA_BLOCKERS: Collider[] = [
+  { id: 'roof', kind: 'box', x0: -ROOM_BOUNDS.max[0] - 1.1, x1: ROOM_BOUNDS.max[0] + 1.1, z0: -ROOM_BOUNDS.max[2] - .95, z1: ROOM_BOUNDS.max[2] + .95, y0: ROOF_TOP - .3, y1: ROOF_TOP + 2.2 },
+  ...[-1, 1].map((side): Collider => ({ id: `side-frieze-${side}`, kind: 'box', x0: side * ROOM_BOUNDS.max[0] - .08, x1: side * ROOM_BOUNDS.max[0] + .08, z0: ROOM_BOUNDS.min[2], z1: ROOM_BOUNDS.max[2], y0: 3.5, y1: ROOF_TOP })),
+];

@@ -4,14 +4,16 @@ import type { ExhibitSlot } from './navigation.js';
 import './game.css';
 import Backpack from './Backpack.js';
 import ModelPreview from './ModelPreview.js';
+import CharacterPicker, { CharacterButton, CHARACTER_KEY, useAvatarPrefs, WALK_HINT } from './CharacterPicker.js';
 import { api, ApiError, type Me } from './backpack-api.js';
+import type { AvatarPrefs, CharacterId } from './avatar-prefs.js';
 import type { ExhibitCollectionStatus, ExhibitDetail, GalleryExhibit, GalleryView } from '@aholo/contracts';
 
 type Phase = 'loading' | 'failed' | 'intro' | 'play' | 'paused';
-type Overlay = null | 'menu' | 'account' | 'backpack' | 'detail' | 'help';
+type Overlay = null | 'menu' | 'account' | 'backpack' | 'detail' | 'help' | 'character';
 const FLOOR = { ground: '一层 · 中庭', stairs: '楼梯 · 半层', upper: '二层 · 回廊' } as const;
 
-declare global { interface Window { __t10?: { engine: PavilionEngine; ui: () => { phase: Phase; overlay: Overlay; detail: string | null; galleryVersion: number | null; exhibits: number; detailName: string | null } } } }
+declare global { interface Window { __t10?: { engine: PavilionEngine; ui: () => { avatar: AvatarPrefs; phase: Phase; overlay: Overlay; detail: string | null; galleryVersion: number | null; exhibits: number; detailName: string | null } } } }
 type DetailState = { status: 'loading' } | { status: 'failed'; message: string } | { status: 'ready'; data: ExhibitDetail };
 const OWNERSHIP = { museum: '博物馆', personal_collection: '个人收藏' } as const;
 const slotNoOf = (s: ExhibitSlot) => Number(s.id.slice(1));
@@ -33,6 +35,10 @@ export default function Game() {
   const [gallery, setGallery] = useState<GalleryView | null>(null);
   const [galleryNotice, setGalleryNotice] = useState('');
   const [detailState, setDetailState] = useState<DetailState | null>(null);
+  const [avatar, setAvatar, avatarFellBack] = useAvatarPrefs();
+  const [avatarNotice, setAvatarNotice] = useState('');
+  const avatarRef = useRef(avatar);
+  avatarRef.current = avatar;
   const grant = useRef<GalleryView['grant'] | null>(null);
   const returnToExhibit = useRef(false);
   const state = useRef({ phase, overlay, detail, gallery, detailState });
@@ -50,14 +56,16 @@ export default function Game() {
         hud: setHud,
         // Esc while walking: the browser releases the mouse; we pause until the visitor clicks back in.
         lockLost: () => { if (state.current.phase === 'play' && !state.current.overlay) { engine.current?.setEnabled(false); setPhase('paused'); } },
+        avatarFailed: message => { avatarFellBack(); setAvatarNotice(`${message}，已切换为第一人称。`); },
       });
+      instance.setAvatar(avatarRef.current);
     } catch (e) {
       setError(e instanceof Error && /WebGL/i.test(e.message) ? '此浏览器无法创建 WebGL 画布，请使用最新版 Chrome。' : String(e));
       setPhase('failed');
       return;
     }
     engine.current = instance;
-    window.__t10 = { engine: instance, ui: () => ({ phase: state.current.phase, overlay: state.current.overlay, detail: state.current.detail?.id ?? null, galleryVersion: state.current.gallery?.version ?? null, exhibits: instance.exhibitCount(), detailName: state.current.detailState?.status === 'ready' ? state.current.detailState.data.name : null }) };
+    window.__t10 = { engine: instance, ui: () => ({ avatar: avatarRef.current, phase: state.current.phase, overlay: state.current.overlay, detail: state.current.detail?.id ?? null, galleryVersion: state.current.gallery?.version ?? null, exhibits: instance.exhibitCount(), detailName: state.current.detailState?.status === 'ready' ? state.current.detailState.data.name : null }) };
     let renewal: ReturnType<typeof setTimeout> | undefined, stopped = false, renewKey: string | null = null;
     /** Each entry or refresh reads the latest published version; an open page keeps its version (AC42). */
     async function loadGallery(target: PavilionEngine) {
@@ -88,6 +96,12 @@ export default function Game() {
     return () => { stopped = true; clearTimeout(renewal); instance.dispose(); engine.current = null; delete window.__t10; };
   }, []);
 
+  /** Preference changes apply live; a failed load keeps the saved choice for the next visit. */
+  const changeAvatar = useCallback((next: AvatarPrefs) => {
+    setAvatar(next); setAvatarNotice('');
+    engine.current?.setAvatar(next);
+  }, [setAvatar]);
+
   const play = useCallback(() => {
     (document.activeElement as HTMLElement | null)?.blur?.();
     setOverlay(null);
@@ -96,6 +110,11 @@ export default function Game() {
     engine.current?.setEnabled(true);
     engine.current?.requestLock();
   }, []);
+  /** One click in the picker: show that character (third person) and go straight back to walking. */
+  const pickCharacter = useCallback((character: CharacterId) => {
+    changeAvatar({ character, view: 'third' });
+    play();
+  }, [changeAvatar, play]);
 
   /** Any menu, drawer or detail takes input: stop walking and free the mouse. */
   const open = useCallback((next: Exclude<Overlay, null>, slot?: ExhibitSlot) => {
@@ -140,6 +159,8 @@ export default function Game() {
       if (e.code === 'Escape') { if (o) { e.preventDefault(); close(); } return; }
       if (e.code === 'KeyM') { e.preventDefault(); if (o === 'menu') close(); else if (!o) open('menu'); return; }
       if (e.code === 'KeyB' && !o) { e.preventDefault(); open('backpack'); return; }
+      if (e.code === CHARACTER_KEY && !o && !e.shiftKey) { e.preventDefault(); open('character'); return; }
+      if (e.code === 'KeyV' && !o && !e.shiftKey) { e.preventDefault(); const a = avatarRef.current; changeAvatar({ ...a, view: a.view === 'third' ? 'first' : 'third' }); return; }
       if (e.code === 'KeyE' && p === 'play' && !o) {
         const target = engine.current?.debugState().target;
         if (target) { e.preventDefault(); open('detail', target); }
@@ -147,7 +168,7 @@ export default function Game() {
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [open, close]);
+  }, [open, close, changeAvatar]);
 
   const walking = phase === 'play' && !overlay;
   const targetExhibit = exhibitAt(hud.target);
@@ -164,6 +185,7 @@ export default function Game() {
             <div><strong>藏宝阁</strong><small data-testid="floor">{FLOOR[hud.floor]}</small></div>
           </div>
           <nav className="t10-actions" aria-label="游戏菜单">
+            <CharacterButton onClick={() => open('character')} />
             <button type="button" aria-keyshortcuts="B" onClick={() => open('backpack')}>背包<kbd aria-hidden="true">B</kbd></button>
             <button type="button" onClick={() => open('menu')}>菜单<kbd>M</kbd></button>
           </nav>
@@ -171,8 +193,9 @@ export default function Game() {
         {walking && <span className="t10-crosshair" aria-hidden="true" />}
         {walking && hud.target && <div className="t10-prompt" role="status"><kbd>E</kbd>{targetExhibit ? <>查看 <b>{targetExhibit.name}</b><small>{slotLabel(hud.target)}</small></> : <>查看 {slotLabel(hud.target)}</>}</div>}
         {galleryNotice && !overlay && <div className="t10-notice" role="status">{galleryNotice}</div>}
+        {avatarNotice && !overlay && <div className="t10-notice" role="status">{avatarNotice}</div>}
         <footer className="t10-hud-bottom">
-          <span>WASD 行走 · Shift 快走 · 空格跳跃 · 鼠标环顾 · Esc 释放鼠标</span>
+          <span>{WALK_HINT}</span>
           <span className="t10-meta">{gallery ? `展出 ${shown} / 30` : '展陈读取中'} · {hud.fps} FPS</span>
         </footer>
       </>}
@@ -194,14 +217,14 @@ export default function Game() {
       {phase === 'intro' && <div className="t10-screen veil">
         <span className="t10-seal big">藏</span>
         <h1>藏宝阁</h1>
-        <p className="t10-sub">二层古阁 · 三十展位</p>
+        <p className="t10-sub">二层古阁 · 三十展位 · 北侧楼梯可上二层</p>
         <button type="button" className="t10-primary" onClick={play} autoFocus>进入藏宝阁</button>
-        <p className="t10-hint">点击后锁定鼠标环顾 · WASD 行走 · 空格跳跃 · 北侧楼梯可上二层</p>
+        <p className="t10-hint">{WALK_HINT}</p>
         <p className="desktop-input-hint">请使用配有键盘和鼠标的电脑操作 3D 场景。</p>
       </div>}
 
       {phase === 'paused' && !overlay && <div className="t10-paused">
-        <strong>已暂停</strong><span>点击画面继续参观 · B 打开背包 · M 打开菜单</span>
+        <strong>已暂停</strong><span>点击画面继续参观 · C 选择角色 · B 打开背包 · M 打开菜单</span>
       </div>}
 
       {overlay === 'menu' && <div className="t10-modal-backdrop" onClick={close}>
@@ -224,6 +247,8 @@ export default function Game() {
             <div><dt>Shift</dt><dd>快走</dd></div>
             <div><dt>鼠标</dt><dd>环顾（点击画面锁定）</dd></div>
             <div><dt>E</dt><dd>对准展台时查看</dd></div>
+            <div><dt>V</dt><dd>切换第三人称 / 第一人称</dd></div>
+            <div><dt>C</dt><dd>选择角色</dd></div>
             <div><dt>B</dt><dd>打开背包</dd></div>
             <div><dt>M</dt><dd>菜单</dd></div>
             <div><dt>Esc</dt><dd>关闭浮层 / 释放鼠标</dd></div>
@@ -237,6 +262,7 @@ export default function Game() {
         if (profile && returnToExhibit.current) closeAccount();
       }} />
       <Backpack open={overlay === 'backpack'} close={close} />
+      {overlay === 'character' && <CharacterPicker prefs={avatar} pick={pickCharacter} close={close} />}
 
       {overlay === 'detail' && detail && <div className="t10-modal-backdrop" onClick={close}>
         <section className={`t10-detail${detailExhibit ? ' t10-exhibit' : ''}`} role="dialog" aria-modal="true" aria-label={detailExhibit ? `${detailExhibit.name}详情` : `展位 ${detail.id}`} onClick={e => e.stopPropagation()}>

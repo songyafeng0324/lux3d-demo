@@ -3,7 +3,10 @@ import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import pavilionUrl from '../../../../assets/t10/pavilion-v1.glb?url';
 import layout from '../../../../assets/t10/pavilion-layout.json';
-import { buildNavWorld, stepFirstPerson, targetSlot, floorOf, BODY, MOVE_KEYS, type ExhibitSlot, type FirstPerson, type NavWorld } from './navigation.js';
+import { buildNavWorld, pavilionCamera, stepFirstPerson, supportAt, targetSlot, floorOf, BODY, MOVE_KEYS, type ExhibitSlot, type FirstPerson, type NavWorld } from './navigation.js';
+import { AvatarRig } from './avatar.js';
+import type { AvatarPrefs, ViewMode } from './avatar-prefs.js';
+import { boomLength, clampFollowPitch, easeBoom, FOLLOW, viewDirection, type Vec3 } from './follow-camera.js';
 import { exhibitFit, slotMarker, EXHIBIT_FIT, type GallerySlot, type RoomModel } from '@aholo/contracts';
 import { disposeResources } from '../scene/assets.js';
 
@@ -15,10 +18,13 @@ export interface EngineHooks {
   hud(state: HudState): void;
   /** Pointer lock was lost while movement was enabled (user pressed Esc / switched tab). */
   lockLost(): void;
+  /** The chosen character could not be loaded; the engine has fallen back to first person. */
+  avatarFailed?(message: string): void;
 }
 interface LightMarker { position: [number, number, number]; color: [number, number, number]; power: number; type: string }
 
 export const ENTRY_YAW = 0;
+
 
 /** Full-viewport first-person pavilion. React owns the HUD; this owns WebGL, input and walking. */
 export class PavilionEngine {
@@ -31,8 +37,13 @@ export class PavilionEngine {
   private exhibitToken = 0;
   private player: FirstPerson = { ...this.world.entry, velocityY: null };
   private yaw = ENTRY_YAW;
-  private pitch = 0.05;
+  private pitch: number = FOLLOW.entryPitch;
   private eyeY = BODY.eye;
+  private view: ViewMode = 'third';
+  private avatar: AvatarRig;
+  private boom: number = FOLLOW.distance;
+  private camera3 = pavilionCamera(this.world);
+  private velocity: [number, number] = [0, 0];
   private keys = new Set<string>();
   private jumpQueued = false;
   private enabled = false;
@@ -64,11 +75,13 @@ export class PavilionEngine {
     this.scene.background = new T.Color('#5d6f7b');
     this.scene.fog = new T.Fog('#5d6f7b', 40, 120);
     this.scene.add(this.building, this.exhibits);
+    this.avatar = new AvatarRig(this.scene);
+    this.avatar.face(ENTRY_YAW + Math.PI);
     this.lights();
     this.observer = new ResizeObserver(() => this.fit());
     this.observer.observe(host);
     this.fit();
-    this.placeCamera();
+    this.placeCamera(0);
     window.addEventListener('keydown', this.keyDown);
     window.addEventListener('keyup', this.keyUp);
     window.addEventListener('blur', this.clearKeys);
@@ -198,13 +211,33 @@ export class PavilionEngine {
   }
   resetToEntry() {
     this.player = { ...this.world.entry, velocityY: null };
-    this.yaw = ENTRY_YAW; this.pitch = 0.05; this.eyeY = BODY.eye;
+    this.yaw = ENTRY_YAW; this.pitch = this.entryPitch(); this.eyeY = BODY.eye;
+    this.avatar.face(ENTRY_YAW + Math.PI);
     this.clearKeys();
-    this.placeCamera();
+    this.boom = FOLLOW.distance;
+    this.placeCamera(0);
   }
   look(yaw: number, pitch = this.pitch) {
     this.yaw = yaw;
-    this.pitch = T.MathUtils.clamp(pitch, -1.35, 1.35);
+    this.pitch = this.view === 'third' ? clampFollowPitch(pitch) : T.MathUtils.clamp(pitch, -1.35, 1.35);
+  }
+  /** Character and view from the visitor's per-browser preference (T15). */
+  setAvatar(prefs: AvatarPrefs) {
+    this.setView(prefs.view);
+    this.avatar.setCharacter(prefs.character).catch(error => {
+      if (this.closed) return;
+      this.setView('first');
+      this.hooks.avatarFailed?.(error instanceof Error ? error.message : '角色模型读取失败');
+    });
+  }
+  private entryPitch() { return this.view === 'third' ? FOLLOW.entryPitch : 0.05; }
+  setView(view: ViewMode) {
+    const atEntryView = this.pitch === this.entryPitch();
+    this.view = view;
+    this.boom = FOLLOW.distance;
+    // A view the visitor has not turned yet starts from that view's own entry pitch.
+    this.look(this.yaw, atEntryView ? this.entryPitch() : this.pitch);
+    this.placeCamera(0);
   }
 
   private clearKeys = () => { this.keys.clear(); this.jumpQueued = false; this.dragging = false; };
@@ -239,9 +272,18 @@ export class PavilionEngine {
     if (this.enabled) this.hooks.lockLost();
   };
 
-  private placeCamera() {
-    this.camera.position.set(this.player.x, this.player.y + this.eyeY, this.player.z);
+  private pivot(): Vec3 { return [this.player.x, this.player.y + FOLLOW.pivot, this.player.z]; }
+  private placeCamera(dt: number) {
     this.camera.rotation.set(this.pitch, this.yaw, 0, 'YXZ');
+    if (this.view === 'first') {
+      this.camera.position.set(this.player.x, this.player.y + this.eyeY, this.player.z);
+      return;
+    }
+    // Third person: orbit the pivot behind the view direction, pulled in by walls, slabs and floors.
+    const pivot = this.pivot(), [dx, dy, dz] = viewDirection(this.yaw, this.pitch), back: Vec3 = [-dx, -dy, -dz];
+    const target = boomLength(this.camera3.world, pivot, back, FOLLOW.distance, this.camera3.blockers);
+    this.boom = dt ? easeBoom(this.boom, target, dt) : target;
+    this.camera.position.set(pivot[0] + back[0] * this.boom, pivot[1] + back[1] * this.boom, pivot[2] + back[2] * this.boom);
   }
 
   private frame = (now: number) => {
@@ -251,10 +293,17 @@ export class PavilionEngine {
       let forward = 0, right = 0;
       for (const k of this.keys) { const v = MOVE_KEYS[k]; if (v) { forward += v[0]; right += v[1]; } }
       const run = this.keys.has('ShiftLeft') || this.keys.has('ShiftRight');
+      const before = this.player;
       this.player = stepFirstPerson(this.world, this.player, { forward, right, run }, this.yaw, dt, this.jumpQueued);
       this.jumpQueued = false;
-    }
-    this.placeCamera();
+      this.velocity = dt ? [(this.player.x - before.x) / dt, (this.player.z - before.z) / dt] : [0, 0];
+    } else this.velocity = [0, 0];
+    this.placeCamera(dt);
+    this.avatar.update(dt, {
+      feet: this.player, velocity: this.velocity,
+      ground: supportAt(this.world, this.player.x, this.player.z, this.player.y + 0.01),
+      visible: this.view === 'third' && this.boom >= FOLLOW.hideBelow,
+    });
     this.renderer.render(this.scene, this.camera);
     this.frames.push(now);
     while (this.frames.length && now - this.frames[0] > 1000) this.frames.shift();
@@ -270,7 +319,8 @@ export class PavilionEngine {
   private hud(): HudState {
     const d = new T.Vector3();
     this.camera.getWorldDirection(d);
-    const p = this.camera.position;
+    // Third person aims from the character's pivot along the view, so the same plinth is reachable.
+    const p = this.view === 'third' ? new T.Vector3(...this.pivot()) : this.camera.position;
     return {
       floor: floorOf(this.player.y),
       target: this.enabled ? targetSlot(this.world, [p.x, p.y, p.z], [d.x, d.y, d.z]) : null,
@@ -332,6 +382,7 @@ export class PavilionEngine {
     return {
       player: { x, y, z }, airborne: velocityY !== null, yaw: this.yaw, pitch: this.pitch, enabled: this.enabled, keys: [...this.keys],
       locked: document.pointerLockElement === this.renderer.domElement, ...this.hud(),
+      view: this.view, boom: this.boom, camera: this.camera.position.toArray(), avatar: this.avatar.debug(),
       meshes: this.building.children.length, exhibits: this.exhibits.children.map(o => ({ ...o.userData, position: o.position.toArray(), scale: o.scale.x, bounds: (b => [b.min.toArray(), b.max.toArray()])(new T.Box3().setFromObject(o)) })),
       triangles: this.renderer.info.render.triangles,
       viewport: [this.host.clientWidth, this.host.clientHeight], pixelRatio: this.renderer.getPixelRatio(),
@@ -341,13 +392,24 @@ export class PavilionEngine {
   debugPlace(x: number, z: number, y: number, yaw: number, pitch: number) {
     this.player = { x, y, z, velocityY: null };
     this.look(yaw, pitch);
-    this.placeCamera();
+    this.placeCamera(0);
   }
   /** Ray-cast the real GLB geometry straight down: used to check nav surfaces match the model. */
   probeGround(x: number, z: number, fromY: number) {
     const ray = new T.Raycaster(new T.Vector3(x, fromY, z), new T.Vector3(0, -1, 0), 0, 30);
     const hit = ray.intersectObject(this.building, true)[0];
     return hit ? hit.point.y : null;
+  }
+
+  /**
+   * Debug only (scripts/t15-third-person-browser.mjs): ray-cast the real GLB from the pivot to the
+   * camera. The game itself never does this; it is the evidence that the analytic boom matches the model.
+   */
+  debugCameraClearance() {
+    if (this.view !== 'third') return null;
+    const pivot = new T.Vector3(...this.pivot()), toCamera = this.camera.position.clone().sub(pivot), length = toCamera.length();
+    const hit = new T.Raycaster(pivot, toCamera.normalize(), 0, length).intersectObject(this.building, true)[0];
+    return { boom: length, hit: hit ? { distance: hit.distance, mesh: hit.object.name } : null };
   }
 
   dispose() {
@@ -365,6 +427,7 @@ export class PavilionEngine {
     window.removeEventListener('pointermove', this.pointerMove);
     document.removeEventListener('pointerlockchange', this.lockChange);
     this.exhibitToken++;
+    this.avatar.dispose();
     disposeResources([...this.exhibits.children]);
     this.exhibits.clear();
     this.scene.traverse(o => {

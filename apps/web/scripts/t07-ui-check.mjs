@@ -9,6 +9,8 @@ const shot = async (page, name) => { if (evidenceDir) { await page.waitForTimeou
 const BASE = process.env.T07_UI_BASE || 'http://localhost:5173';
 const browser = await chromium.launch({ channel: 'chrome', headless: true, args: ['--enable-unsafe-swiftshader'] });
 const context = await browser.newContext({ viewport: { width: 1440, height: 900 } });
+// These checks measure walking through the first-person eye; T15 made third person the default view.
+await context.addInitScript(() => localStorage.setItem('aholo.avatar.v1', JSON.stringify({ character: 'humanoid-tabby', view: 'first' })));
 const errors = [], writes = [], receipts = new Map(), modelReads = [], renewals = [];
 let roomVersion = 0, roomName = '初始小屋', placements = [{ id: 'placement-1', assetId: 'asset-1', position: [0, 0, 0], rotation: [0, 0, 0], scale: 1 }];
 let shareEnabled = false, loseSave = true, rejectSave = 0, loadFailed = false, delaySave = null, releaseAck;
@@ -152,7 +154,7 @@ try {
     const [, , z] = await target.evaluate(() => window.__room.engine.debug().camera);
     assert.ok(z >= 3.03 && z < 3.2, 'scaled asset stops first-person movement before its front face');
   };
-  await page.getByRole('button', { name: '第一人称参观', exact: true }).click();
+  await page.getByRole('button', { name: '漫游参观', exact: true }).click();
   await lock(page);
   await checkAssetBlocks(page);
   await checkJump(page);

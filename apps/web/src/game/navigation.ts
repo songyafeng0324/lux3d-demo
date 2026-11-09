@@ -272,3 +272,38 @@ export function targetSlot(world: NavWorld, origin: [number, number, number], di
   }
   return best;
 }
+
+/** Hanging lanterns (build_t10.py lines 171–178): centre (x, y, z), paper radius, paper height. */
+const LANTERNS: [number, number, number, number, number][] = [
+  [0, 7.4, 1.5, 0.5, 0.9], [-7.1, 3.3, -7, 0.24, 0.5], [7.1, 3.3, -7, 0.24, 0.5], [-7.1, 3.3, 8, 0.24, 0.5], [7.1, 3.3, 8, 0.24, 0.5],
+  [-9, 7.6, -6, 0.24, 0.5], [9, 7.6, -6, 0.24, 0.5], [-9, 7.6, 9, 0.24, 0.5], [9, 7.6, 9, 0.24, 0.5],
+];
+
+/**
+ * T15 third-person camera geometry for the pavilion. Besides the walking colliders the boom stops at:
+ * - the upper-slab undersides and mezzanine beams (the jump ceilings) and the roof ties (lines 92–99);
+ * - the end walls' inner trim: EndWallPosts, WallPanels and EndWallBeams stand up to 0.19 m inside the
+ *   walking wall line (lines 108–112), and the EntryLintel closes the doorway above 3.7 m (line 107);
+ * - side-wall posts and lattice (lines 99–103), slightly proud of the side walls;
+ * - hanging lanterns with their frames and suspension rods (lines 171–178);
+ * - column capitals (lines 89–90), wider than the column shafts.
+ * The entry threshold stays a blocker too: EndWallBeams cross the doorway at y≈1, so a camera
+ * outside the door would see the avatar cut in half.
+ */
+export function pavilionCamera(world: NavWorld): { world: { colliders: readonly Collider[]; surfaces: readonly Surface[]; floorY: number; passThrough: ReadonlySet<string> }; blockers: Collider[] } {
+  const H = 9.2;
+  return {
+    world: { colliders: world.colliders, surfaces: world.surfaces, floorY: 0, passThrough: new Set<string>() },
+    blockers: [
+      ...world.airColliders,
+      box('roof-ties', -12, 12, -14, 14, 8.65, 9.6),
+      box('north-wall-trim', -12.2, 12.2, -14.2, -13.68, 0, H), box('south-wall-trim', -12.2, 12.2, 13.68, 14.2, 0, H),
+      box('west-wall-trim', -12.2, -11.82, -14.2, 14.2, 0, H), box('east-wall-trim', 11.82, 12.2, -14.2, 14.2, 0, H),
+      ...LANTERNS.flatMap(([x, y, z, r, h], i): Collider[] => [
+        { id: `lantern-${i}`, kind: 'circle', x, z, r: r + 0.06, y0: y - h / 2 - 0.08, y1: y + h / 2 + 0.04 },
+        { id: `lantern-rod-${i}`, kind: 'circle', x, z, r: 0.03, y0: y + h / 2, y1: 8.9 },
+      ]),
+      ...COLUMNS.map(([x, z], i) => box(`column-capital-${i}`, x - 0.73, x + 0.73, z - 0.43, z + 0.43, 8.59, 9.05)),
+    ],
+  };
+}

@@ -1,0 +1,71 @@
+{
+  "version": 1,
+  "source": "scripts/build-characters.mjs",
+  "textures": "1024px JPEG q88, unreferenced buffer data dropped",
+  "animations": [
+    "Idle",
+    "Run"
+  ],
+  "items": [
+    {
+      "id": "shin-chan",
+      "label": "蜡笔小新",
+      "file": "shin-chan.glb",
+      "byteSize": 2525196,
+      "sha256": "242fd26894e038cc8058e2d337f9ed9fdc6fa0193470b2bc64f8a294f22cbc58",
+      "source": "shin-chan/shin-chan.glb",
+      "sourceSha256": "45737f9bc0deffefb02067ea389bc49ff59f3d13fd06ffc718f99039e686ecab",
+      "sourceByteSize": 14763352
+    },
+    {
+      "id": "humanoid-tabby",
+      "label": "拟人橘猫",
+      "file": "humanoid-tabby.glb",
+      "byteSize": 3004972,
+      "sha256": "349970e39776d199b52c8907a5ec12bcc3ac6a8d6274651a52081f2d28d15c74",
+      "source": "humanoid-tabby/humanoid-tabby.glb",
+      "sourceSha256": "25fc13d434e4654cd7bf1df0cd2a4b87c1d88991076cb20d623268853cf4bfed",
+      "sourceByteSize": 20030468
+    },
+    {
+      "id": "maruko-tpose",
+      "label": "红衣小丸子",
+      "file": "maruko-tpose.glb",
+      "byteSize": 2945988,
+      "sha256": "6f6314738521d56422bbf987557d319ce1f680fd5f4b9077328db35304f13012",
+      "source": "maruko-tpose/maruko-tpose.glb",
+      "sourceSha256": "841d94e8124e90cae13c96ac7f85c0608bffae77c912f5b0e0e5cd5e4498d596",
+      "sourceByteSize": 15974956
+    },
+    {
+      "id": "bull-tpose",
+      "label": "黄衣牛角人",
+      "file": "bull-tpose.glb",
+      "byteSize": 2774768,
+      "sha256": "d614f35c05f68be3a5d072b447006eeda6833fa5c3a43d869842d089c9dd3d49",
+      "source": "bull-tpose/bull-tpose.glb",
+      "sourceSha256": "a3a8010ed2e16ac12de9d11e1f86de7a12cd639c91839c889883407b5c5479fd",
+      "sourceByteSize": 14725352
+    },
+    {
+      "id": "white-shirt-boy",
+      "label": "白衣男孩",
+      "file": "white-shirt-boy.glb",
+      "byteSize": 3168148,
+      "sha256": "7f2789103842757a8606a1be29d7a586cc366359dec9223731ffd044f31f7cce",
+      "source": "white-shirt-boy/white-shirt-boy.glb",
+      "sourceSha256": "60e14af09a1865d674b44d9076f48866ccfd7614b732a44f689c4183e8c8dc57",
+      "sourceByteSize": 17490580
+    },
+    {
+      "id": "pink-shorts-girl",
+      "label": "粉裤女孩",
+      "file": "pink-shorts-girl.glb",
+      "byteSize": 3049044,
+      "sha256": "39f4df98300e0f05d2a90131d5b56c3f373f45077e1ac232ff5954c528a8bae4",
+      "source": "pink-shorts-girl/pink-shorts-girl.glb",
+      "sourceSha256": "66e6470822bd7c4a05b79779994b0a91e1e12cb3f9e55097e4ea792a1529009a",
+      "sourceByteSize": 17147368
+    }
+  ]
+}
