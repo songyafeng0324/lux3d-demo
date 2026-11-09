@@ -14,32 +14,32 @@
   },
   {
    "name": "admin reviews earliest pending with rotatable model and original, approves into candidates",
-   "ms": 2382
+   "ms": 2415
   },
   {
    "name": "admin arranges slots 1/2/19 from more candidates and publishes one gallery version",
-   "ms": 377
+   "ms": 386
   },
   {
    "name": "visitor sees real exhibits fitted on plinths in the full-viewport pavilion and opens E detail",
-   "ms": 3099
+   "ms": 3153
   },
   {
    "name": "T13 collection preview, current author, room save, share and uncollect",
-   "ms": 8907
+   "ms": 8984
   },
   {
    "name": "admin adjusts only today's quota for the collector",
-   "ms": 206
+   "ms": 204
   },
   {
    "name": "risk delete clears room placement, candidate and slot; open page keeps loaded scene, refresh shows the result",
-   "ms": 1631
+   "ms": 1592
   },
   {
    "name": "T14 room shortcut, porch entrance, signed-in directory and irreversible likes",
-   "ms": 8428
+   "ms": 8427
   }
  ],
- "ms": 29594
+ "ms": 29739
 }

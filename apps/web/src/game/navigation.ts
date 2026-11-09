@@ -217,8 +217,9 @@ export function stepFirstPerson(world: WalkingWorld, p: FirstPerson, input: Move
   for (let i = 0; i < n; i++) {
     const previous = current;
     if (moving) current = moveInAir(world, colliders, current, vx * slice, vz * slice);
-    // Landed on a riser while falling: the rest of the frame is ordinary walking.
-    if (current.velocityY === null) return { ...step(world, current, input, yaw, (n - i - 1) * slice), velocityY: null };
+    // Lifted onto a riser while falling: the rest of the frame is ordinary walking. (Standing on a collider
+    // top — a plinth — also has velocityY null but no lift; it keeps the airborne path, as before.)
+    if (current.velocityY === null && current.y > previous.y) return { ...step(world, current, input, yaw, (n - i - 1) * slice), velocityY: null };
     current = verticalMove(world, colliders, current, previous, slice);
   }
   return current;

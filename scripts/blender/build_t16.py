@@ -176,7 +176,9 @@ def runner(x0, x1, z0, z1):
     box('carpet', 'Floor', x0, x1, -0.4, 0, z0, z1, skip=('-y',), faces={'+y': 'Carpet'}, uvf={'+y': carpet_uv('z', x0, x1 - x0)})
 fl(-HX, -2, ZN, ZS); fl(2, HX, ZN, ZS); fl(-2, 2, ZN, ZSTAIR); fl(-2, 2, -2, 6)
 runner(-2, 2, ZSTAIR, -2); runner(-2, 2, 6, ZS)
-surface('ground', -HX, HX, ZN, ZS, 0)
+# The ground floor stops at the central flight: the space under its treads is solid stone, not floor
+# (the side flights stay open beneath). The rails run to the floor along both sides of the flight.
+surface('ground', -HX, -CX, ZN, ZS, 0); surface('ground', CX, HX, ZN, ZS, 0); surface('ground', -CX, CX, ZSTAIR, ZS, 0)
 lathe('array-inlay', 'Gold', 0, 2, [(5.0, 0.0), (5.0, 0.01)], sides=64, cap_mat='Array')   # the Treasure's array: an inlay, not a step
 box('threshold', 'Marble', -DOOR, DOOR, -0.4, 0, ZS, ZS + WT, skip=('-y',))
 box('terrace', 'Marble', TERRACE[0], TERRACE[1], -0.4, 0, ZS + WT, TERRACE[3], skip=('-y',))
@@ -217,7 +219,7 @@ for sx in (-1, 1):
     annulus_xy('Gold', kx, 1.86, ZS - 0.29, ZS - 0.24, 0.16, 0.2, sides=24)
     for cy0, cy1 in ((0, 0.42), (3.0, 3.4)):
         box('door-plate', 'Gold', min(sx * DOOR, sx * (DOOR + 0.42)), max(sx * DOOR, sx * (DOOR + 0.42)), cy0, cy1, ZS - 0.24, ZS - 0.2)
-    nav_box('colliders', uid('door-studs'), min(sx * DOOR, sx * (DOOR + 3.6)), max(sx * DOOR, sx * (DOOR + 3.6)), 0, 3.4, ZS - 0.3, ZS - 0.2)
+    nav_box('colliders', uid('door-studs'), min(sx * DOOR, sx * (DOOR + 3.6)), max(sx * DOOR, sx * (DOOR + 3.6)), 0, 7.0, ZS - 0.3, ZS - 0.2)   # studs, plates and the lattice above them
 box('door-head', 'Gold', -(DOOR - 0.4), DOOR - 0.4, 6.6, 7.0, ZS - 0.2, ZS + WT + 0.2, nav=('cam',))
 box('plaque-outside', 'Gold', -2.5, 2.5, 8.0, 8.0 + 5 / 1.5, ZS + WT, ZS + WT + 0.2, nav=('cam',), faces={'+z': 'Plaque'}, fit={'+z': (1, 1)})
 box('plaque-inside', 'Gold', -2.0, 2.0, 12.0, 12.0 + 4 / 1.5, ZS - 0.2, ZS, nav=('block',), faces={'-z': 'Plaque'}, fit={'-z': (1, 1)})   # reachable by a jump from the upper floor
@@ -311,7 +313,9 @@ box('fascia', 'Lacquer', -10.1, 10.1, 7.8, UP - SLAB, ATR[2] - 0.3, ATR[2] + 0.3
 for sx in (-1, 1):
     for z in COLZ + [-19.0, -26.0, HALL_Z]:
         end = 11.9 if z in COLZ or z == HALL_Z else 11.0
-        box('beam', 'Lacquer', sx * (HX - 0.06), sx * end, 7.6, UP - SLAB, z - .25, z + .25, nav=('cam',), **gilt('-y', HX - 0.06 - end, 0.5))
+        # Jump ceilings too: from the landing edge a jump puts the head ~0.3 m into a stair-hall beam (reach audit).
+        i = box('beam', 'Lacquer', sx * (HX - 0.06), sx * end, 7.6, UP - SLAB, z - .25, z + .25, nav=('air',), **gilt('-y', HX - 0.06 - end, 0.5))
+        nav_box('cameraBlockers', i + '-cam', sx * (HX - 0.06), sx * end, 7.6, UP - SLAB, z - .25, z + .25)
     for z in COLZ + [-19.0, -26.0, 22.5]:
         end = 12.0 if z in COLZ else 11.0
         box('beam', 'Lacquer', sx * HX, sx * end, CEIL - 0.8, CEIL, z - .25, z + .25, nav=('cam',), **gilt('-y', HX - end, 0.5))
@@ -581,6 +585,9 @@ for o in objs: o.select_set(True)
 glb = OUT / 'pavilion-t16.glb'
 bpy.ops.export_scene.gltf(filepath=str(glb), export_format='GLB', use_selection=True, export_yup=True, export_apply=True, export_lights=False,
                           export_cameras=False, export_extras=False, export_image_format='JPEG', export_jpeg_quality=85, export_image_quality=85)
+# bake_t16.py bakes from this .blend: stamp it with the GLB it was exported with, so a bake can never pair
+# lightmaps with a different export.
+scene['t16_glb_sha256'] = hashlib.sha256(glb.read_bytes()).hexdigest()
 bpy.ops.wm.save_as_mainfile(filepath=str(OUT / 'pavilion-t16.blend'))
 
 src = b''.join(p.read_bytes() for p in (Path(__file__), Path(kit.__file__), Path(mats.__file__), Path(props.__file__), props.ROOT / 'assets/t16/props/props-manifest.json'))

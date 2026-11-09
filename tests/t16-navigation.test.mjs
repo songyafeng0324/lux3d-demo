@@ -209,3 +209,14 @@ test('baked lightmaps belong to the current GLB and every map file exists', asyn
   assert.ok(Object.keys(manifest.maps).length >= 10);
   for (const m of Object.values(manifest.maps)) for (const f of [m.ao, m.gi]) assert.ok(existsSync(new URL(f, dir)), f);
 });
+
+test('standing on a plinth top (a collider, not a walk surface) still walks across it and steps off', () => {
+  // Lotus guard of T03: circle r 1.2 at (-11, -8.5), top 0.8. Cross-model review 2026-11-10: landing on a
+  // riser hands the frame to ground walking only after a real lift, never while merely on a collider top.
+  let p = { x: -11, y: 0.8, z: -8.5, velocityY: null };
+  const start = { ...p };
+  for (let t = 0; t < 0.15; t += 1 / 60) p = stepFirstPerson(world, p, { forward: 1, right: 0, run: false }, Math.PI / 2, 1 / 60, false);
+  assert.ok(Math.abs(p.x - start.x) > 0.3 && p.y === 0.8, `moved across the top: ${JSON.stringify(p)}`);
+  for (let t = 0; t < 1.5; t += 1 / 60) p = stepFirstPerson(world, p, { forward: 1, right: 0, run: false }, Math.PI / 2, 1 / 60, false);
+  assert.ok(p.y === 0 && p.velocityY === null && p.x < -12.5, `stepped off onto the floor: ${JSON.stringify(p)}`);
+});

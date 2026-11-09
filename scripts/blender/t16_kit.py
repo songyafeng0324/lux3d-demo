@@ -338,15 +338,44 @@ def coplanar():
 BODY_R, BODY_H, STEP_UP, JUMP_REACH = 0.3, 1.7, 0.3, 1.75
 
 
+def _body_fits(p, R, walking):
+    """Can a body standing on (walking) or jumping from walk surface R = (x0, x1, z0, z1, y) put its centre
+    within BODY_R of point p without overlapping a collider active at its height? Candidate centres: the
+    point of R nearest p and eight more around p, all clipped into R."""
+    px, py, pz = p; x0, x1, z0, z1, ry = R
+    feet = ry if walking else max(ry, py - BODY_H)
+    lst = NAV['colliders'] + ([] if walking else NAV['airColliders'])
+    act = [c for c in lst if c['y1'] > feet + (1e-6 if c.get('solid') else STEP_UP) and c['y0'] < feet + BODY_H]
+    clip = lambda x, z: (min(x1, max(x0, x)), min(z1, max(z0, z)))
+    cands = [clip(px, pz)] + [clip(px + BODY_R * .999 * math.cos(a), pz + BODY_R * .999 * math.sin(a)) for a in [k * math.pi / 4 for k in range(8)]]
+    for cx, cz in cands:
+        if math.hypot(cx - px, cz - pz) > BODY_R: continue
+        free = True
+        for c in act:
+            if c['kind'] == 'circle':
+                if math.hypot(cx - c['x'], cz - c['z']) < BODY_R + c['r'] - 1e-3: free = False; break
+            else:
+                qx, qz = min(c['x1'], max(c['x0'], cx)), min(c['z1'], max(c['z0'], cz))
+                if math.hypot(cx - qx, cz - qz) < BODY_R - 1e-3: free = False; break
+        if free: return True
+    return False
+
+
 def reach_gaps(margin=0.05, step=0.12):
-    """Every render part a visitor can touch must be solid to the walker. A sample point inside a part
-    (shrunk by `margin`; round parts sampled inside their inscribed ellipse) is reachable when it lies
-    above a walk surface, within that surface's rect grown by the body radius, between the surface and
-    head height (walking) or jump reach (airborne). A reachable point must be inside a walking collider,
-    or (airborne band only) a jump ceiling, or below a walk surface at that spot (surfaces are solid tops).
-    Parts at most STEP_UP proud of the floor they sit on are stepped over and exempt."""
+    """Every render part a visitor can touch must be solid to the walker.
+
+    A sample point inside a part (shrunk by `margin`, a single sample across any dimension thinner than
+    that; round parts sampled inside their inscribed ellipse) is reachable from a walk surface R when it
+    lies within R's rect grown by the body radius, between R and head height (walking) or up to jump reach
+    (airborne). It is then safe only if it is inside a walking collider (airborne band: or a jump ceiling),
+    or shielded: inside the rect of a walk surface S whose top is above the point but less than a body
+    height above R. navigation.ts treats such an S as solid mass (lift onto it within a step, a wall
+    otherwise), so a body coming from R can never pass under S's top there. Upper floors far above R
+    shield nothing (2026-11-10 cross-model review: the first version exempted everything under any
+    surface). Parts at most STEP_UP proud of the floor they sit on are stepped over and exempt."""
     import numpy as np
-    S = np.array([(s['x0'], s['x1'], s['z0'], s['z1'], s['y']) for s in NAV['surfaces']], float)
+    S = np.array([(s['x0'], s['x1'], s['z0'], s['z1'], s['y'] if s.get('y') is not None else max(s['ramp']['y0'], s['ramp']['y1']))
+                  for s in NAV['surfaces']], float)
     def colls(lst):
         b = np.array([(c['x0'], c['x1'], c['z0'], c['z1'], c['y0'], c['y1']) for c in lst if c['kind'] == 'box'], float).reshape(-1, 6)
         c = np.array([(c['x'], c['z'], c['r'], c['y0'], c['y1']) for c in lst if c['kind'] == 'circle'], float).reshape(-1, 5)
@@ -362,28 +391,37 @@ def reach_gaps(margin=0.05, step=0.12):
     gaps = []
     for pid, lo, hi, _pierce, is_box in PARTS:
         lo, hi = np.array(lo, float), np.array(hi, float)
-        # Quick reject: no surface whose reach volume touches this part.
         near = (S[:, 0] - BODY_R < hi[0]) & (S[:, 1] + BODY_R > lo[0]) & (S[:, 2] - BODY_R < hi[2]) & (S[:, 3] + BODY_R > lo[2]) \
             & (S[:, 4] < hi[1]) & (S[:, 4] + BODY_H + JUMP_REACH > lo[1])
         if not near.any(): continue
+        base = S[near & (S[:, 4] <= lo[1] + 1e-6), 4]
+        if len(base) and hi[1] - base.max() <= STEP_UP: continue
         a, b = lo + margin, hi - margin
-        if (b <= a).any(): continue
-        axes = [np.linspace(a[k], b[k], max(2, int(np.ceil((b[k] - a[k]) / step)) + 1)) for k in range(3)]
+        thin = b <= a; a[thin] = b[thin] = ((lo + hi) / 2)[thin]
+        axes = [np.linspace(a[k], b[k], max(2, int(np.ceil((b[k] - a[k]) / step)) + 1)) if b[k] > a[k] else np.array([a[k]]) for k in range(3)]
         P = np.stack(np.meshgrid(*axes, indexing='ij'), -1).reshape(-1, 3)
         if not is_box:
-            c, h = (lo + hi) / 2, (hi - lo) / 2 - margin
+            c, h = (lo + hi) / 2, np.maximum((hi - lo) / 2 - margin, 1e-3)
             P = P[((P[:, 0] - c[0]) / h[0]) ** 2 + ((P[:, 2] - c[2]) / h[2]) ** 2 <= 1]
         if not len(P): continue
         x, y, z = P[:, :1], P[:, 1:2], P[:, 2:3]
-        inS = (x >= S[:, 0] - BODY_R) & (x <= S[:, 1] + BODY_R) & (z >= S[:, 2] - BODY_R) & (z <= S[:, 3] + BODY_R)
-        under = ((x >= S[:, 0]) & (x <= S[:, 1]) & (z >= S[:, 2]) & (z <= S[:, 3]) & (y <= S[:, 4] + 1e-6)).any(1)
+        src = (x >= S[:, 0] - BODY_R) & (x <= S[:, 1] + BODY_R) & (z >= S[:, 2] - BODY_R) & (z <= S[:, 3] + BODY_R)   # point × R
         dy = y - S[:, 4]
-        # The floor a part stands on: the highest surface at or below its base.
-        base = S[((S[:, 0] - BODY_R < hi[0]) & (S[:, 1] + BODY_R > lo[0]) & (S[:, 2] - BODY_R < hi[2]) & (S[:, 3] + BODY_R > lo[2]) & (S[:, 4] <= lo[1] + 1e-6)), 4]
-        if len(base) and hi[1] - base.max() <= STEP_UP: continue
-        walk = (inS & (dy >= -1e-6) & (dy <= BODY_H)).any(1)
-        air = (inS & (dy > BODY_H) & (dy <= BODY_H + JUMP_REACH)).any(1)
-        bad = ~under & ((walk & ~inside(P, walkB, walkC)) | (air & ~walk & ~inside(P, airB, airC)))
+        walk = src & (dy >= -1e-6) & (dy <= BODY_H)
+        air = src & (dy > BODY_H) & (dy <= BODY_H + JUMP_REACH)
+        cover = (x >= S[:, 0]) & (x <= S[:, 1]) & (z >= S[:, 2]) & (z <= S[:, 3]) & (y <= S[:, 4] + 1e-6)                # point × S
+        # shielded[p, R]: some S over p with S.y - R.y < BODY_H (and S above R).
+        rise = S[None, :, 4] - S[:, None, 4]                                                                      # [R, S] = S.y - R.y
+        ok = (rise > -1e-6) & (rise < BODY_H)
+        shielded = (cover.astype(np.int32) @ ok.T.astype(np.int32)) > 0                                           # point × R
+        need_walk = (walk & ~shielded).any(1)
+        need_air = (air & ~shielded).any(1) & ~need_walk
+        bad = (need_walk & ~inside(P, walkB, walkC)) | (need_air & ~inside(P, airB, airC))
+        # Second pass, only for flagged points: a body centred on R within its radius of the point must also
+        # fit there without overlapping an active collider (a point behind a rail is not reachable).
+        for k in np.flatnonzero(bad):
+            bad[k] = any(_body_fits(P[k], S[j], bool(walk[k, j]))
+                         for j in np.flatnonzero((walk[k] | air[k]) & ~shielded[k]))
         if bad.any():
             q = P[bad][0]
             gaps.append([pid, int(bad.sum()), int(len(P)), [round(float(v), 2) for v in q]])

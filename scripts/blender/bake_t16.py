@@ -22,6 +22,9 @@ GLB = ROOT / 'assets/t16/pavilion-t16.glb'
 AO_DISTANCE, AO_SAMPLES, GI_SAMPLES = 1.6, 96, 384
 
 scene = bpy.context.scene
+GLB_SHA = hashlib.sha256(GLB.read_bytes()).hexdigest()
+if scene.get('t16_glb_sha256') != GLB_SHA:
+    sys.exit('pavilion-t16.blend and pavilion-t16.glb come from different exports: rerun build_t16.py, then bake')
 scene.render.engine = 'CYCLES'
 cy = scene.cycles
 try:
@@ -73,7 +76,14 @@ def bake(ob, kind):
     return a.reshape(res, res, 4)[..., :3]
 
 
+def linear_to_srgb(a):
+    """Blender writes byte-image pixels as given (a 0.5 lands as 128), so sRGB-tagged maps are encoded here."""
+    a = np.clip(a, 0, 1)
+    return np.where(a <= 0.0031308, a * 12.92, 1.055 * np.power(a, 1 / 2.4) - 0.055)
+
+
 def save(a, name, srgb):
+    if srgb: a = linear_to_srgb(a)
     h, w = a.shape[:2]
     img = bpy.data.images.new(name, w, h, alpha=False)
     img.colorspace_settings.name = 'sRGB' if srgb else 'Non-Color'
@@ -98,7 +108,7 @@ for mat, g in gi.items():
     save(g / scale, f'{mat}-gi', srgb=True)
     entries['T16_' + mat] = {'ao': f'{mat}-ao.jpg', 'gi': f'{mat}-gi.jpg', 'size': int(bpy.data.objects['T16_' + mat]['lightmap_res'])}
 manifest = {
-    'source': 'scripts/blender/bake_t16.py', 'glbSHA256': hashlib.sha256(GLB.read_bytes()).hexdigest(),
+    'source': 'scripts/blender/bake_t16.py', 'glbSHA256': GLB_SHA, 'encoding': {'ao': 'linear', 'gi': 'sRGB (encoded before saving)'},
     'uv': 'TEXCOORD_1 (UVLight)', 'giScale': scale, 'aoDistance': AO_DISTANCE, 'samples': {'ao': AO_SAMPLES, 'gi': GI_SAMPLES},
     'maps': entries,
 }

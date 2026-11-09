@@ -63,7 +63,7 @@ export class PavilionEngine {
   readonly world: NavWorld = buildNavWorld(LAYOUT);
   private renderer: T.WebGLRenderer;
   private scene = new T.Scene();
-  private camera = new T.PerspectiveCamera(68, 1, 0.05, 1200);
+  private camera = new T.PerspectiveCamera(68, 1, 0.1, 1200);   // near 0.1 keeps depth precision with the 1.2 km sky
   private building = new T.Group();
   private exhibits = new T.Group();
   private exhibitToken = 0;
@@ -98,6 +98,7 @@ export class PavilionEngine {
   private atmosphere = new PavilionAtmosphere(LAYOUT.oculus, LAYOUT.floorY);
   private elapsed = 0;
   private lightmapped = 0;
+  private envTarget: T.WebGLRenderTarget | null = null;
 
   constructor(private host: HTMLElement, private hooks: EngineHooks) {
     this.renderer = new T.WebGLRenderer({ antialias: true, powerPreference: 'high-performance' });
@@ -116,10 +117,11 @@ export class PavilionEngine {
     host.append(canvas);
     // Until the shell has loaded, a dim neutral room probe; once it has, captureReflections() replaces it
     // with the hall itself (lanterns, columns, sky in the oculus) for the polished floor and the gilt.
-    const pmrem = new T.PMREMGenerator(this.renderer);
-    this.scene.environment = pmrem.fromScene(new RoomEnvironment(), 0.04).texture;
+    const pmrem = new T.PMREMGenerator(this.renderer), room = new RoomEnvironment();
+    this.envTarget = pmrem.fromScene(room, 0.04);
+    this.scene.environment = this.envTarget.texture;
     this.scene.environmentIntensity = 0.28;
-    pmrem.dispose();
+    pmrem.dispose(); room.dispose();
     // D3: the dusk/starlit dome, cloud sea, mountains and isles replace the flat backdrop; the fog only
     // softens the far end of the long halls and never touches the sky (its materials opt out).
     this.scene.background = new T.Color('#2b2a45');
@@ -233,9 +235,12 @@ export class PavilionEngine {
       t.flipY = false; t.channel = 1; t.colorSpace = srgb ? T.SRGBColorSpace : T.NoColorSpace;
       return t;
     };
+    // A missing or broken map only costs that material its bake; the pavilion still loads.
     await Promise.all(Object.entries(LIGHTMAPS.maps).map(async ([name, m]) => {
-      const [ao, gi] = await Promise.all([tex(m.ao, false), tex(m.gi, true)]);
-      out.set(name, { ao, gi });
+      const [ao, gi] = await Promise.allSettled([tex(m.ao, false), tex(m.gi, true)]);
+      if (ao.status === 'fulfilled' && gi.status === 'fulfilled') { out.set(name, { ao: ao.value, gi: gi.value }); return; }
+      for (const r of [ao, gi]) if (r.status === 'fulfilled') r.value.dispose();
+      console.warn(`光照贴图 ${name} 读取失败，该材质不使用烘焙光照`);
     }));
     return out;
   }
@@ -256,10 +261,11 @@ export class PavilionEngine {
     cube.update(this.renderer, this.scene);
     hidden.forEach((o, i) => { o.visible = was[i]; });
     const pmrem = new T.PMREMGenerator(this.renderer);
-    const env = pmrem.fromCubemap(target.texture).texture;
+    const env = pmrem.fromCubemap(target.texture);
     pmrem.dispose(); target.dispose();
-    this.scene.environment?.dispose();
-    this.scene.environment = env;
+    this.envTarget?.dispose(); this.scene.environment?.dispose();
+    this.envTarget = env;
+    this.scene.environment = env.texture;
     this.scene.environmentIntensity = 0.85;
   }
   private avatarRoots(): T.Object3D[] {
@@ -452,26 +458,37 @@ export class PavilionEngine {
       this.renderer.setRenderTarget(this.bloomComposer.renderTarget2); this.renderer.clear(); this.renderer.setRenderTarget(null);
       return;
     }
-    const background = this.scene.background;
+    const background = this.scene.background, shadows = this.renderer.shadowMap.needsUpdate;
+    // A pending shadow refresh belongs to the real render below, with the real materials.
+    this.renderer.shadowMap.needsUpdate = false;
     this.scene.background = BLACK;
     this.sky.group.visible = this.atmosphere.group.visible = false;
-    this.scene.traverseVisible(o => {
-      const mesh = o as T.Mesh;
-      if (!mesh.isMesh || BLOOM_SOURCES.has(mesh.name)) return;
-      this.swapped.push([mesh, mesh.material]);
-      mesh.material = Array.isArray(mesh.material) ? mesh.material.map(m => this.darkOf(m)) : this.darkOf(mesh.material);
-    });
-    this.bloomComposer.render(dt);
-    for (const [mesh, material] of this.swapped) mesh.material = material;
-    this.swapped.length = 0;
-    this.scene.background = background;
-    this.sky.group.visible = this.atmosphere.group.visible = true;
+    try {
+      this.scene.traverseVisible(o => {
+        const mesh = o as T.Mesh;
+        if (!mesh.isMesh || BLOOM_SOURCES.has(mesh.name)) return;
+        this.swapped.push([mesh, mesh.material]);
+        mesh.material = Array.isArray(mesh.material) ? mesh.material.map(m => this.darkOf(m)) : this.darkOf(mesh.material);
+      });
+      this.bloomComposer.render(dt);
+    } finally {
+      for (const [mesh, material] of this.swapped) mesh.material = material;
+      this.swapped.length = 0;
+      this.scene.background = background;
+      this.sky.group.visible = this.atmosphere.group.visible = true;
+      this.renderer.shadowMap.needsUpdate = shadows;
+    }
   }
   private darkOf(m: T.Material) {
     let d = this.dark.get(m);
     if (!d) {
-      const src = m as T.MeshStandardMaterial;
-      d = new T.MeshBasicMaterial({ color: 0, fog: false, side: src.side, map: src.alphaTest > 0 ? src.map : null, alphaTest: src.alphaTest });
+      // Keep everything that shapes the silhouette (cut-outs, alpha maps, see-through), so a glass or a
+      // hair card dims the glow behind it as much as it really hides it, and no more.
+      const src = m as T.MeshStandardMaterial, cut = src.alphaTest > 0 || src.transparent;
+      d = new T.MeshBasicMaterial({
+        color: 0, fog: false, side: src.side, map: cut ? src.map ?? null : null, alphaMap: src.alphaMap ?? null,
+        alphaTest: src.alphaTest, transparent: src.transparent, opacity: src.opacity, depthWrite: src.depthWrite,
+      });
       this.dark.set(m, d);
     }
     return d;
@@ -610,9 +627,10 @@ export class PavilionEngine {
     this.bloomComposer.dispose();
     this.composer.dispose();
     this.dark.forEach(m => m.dispose());
+    this.envTarget?.dispose(); this.envTarget = null;
     this.scene.traverse(o => {
       const mesh = o as T.Mesh;
-      if (mesh.isMesh) { mesh.geometry.dispose(); (mesh.material as T.Material).dispose(); }
+      if (mesh.isMesh) { mesh.geometry.dispose(); ([] as T.Material[]).concat(mesh.material).forEach(m => m.dispose()); }
       if (o instanceof T.DirectionalLight || o instanceof T.SpotLight) o.shadow.dispose();
     });
     this.renderer.renderLists.dispose();
