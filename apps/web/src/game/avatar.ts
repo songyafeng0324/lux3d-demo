@@ -159,7 +159,7 @@ export class AvatarRig {
       this.active!.crossFadeTo(next, 0.18, false);
       this.active = next;
     }
-    this.run!.timeScale = Math.min(1.6, Math.max(0.6, this.speed / RUN_REFERENCE));
+    this.run!.timeScale = Math.min(2.5, Math.max(0.6, this.speed / RUN_REFERENCE));
     this.mixer.update(dt);
     if (ground !== null) {
       const height = Math.max(0, feet.y - ground);

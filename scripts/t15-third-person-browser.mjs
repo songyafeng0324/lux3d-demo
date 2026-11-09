@@ -6,13 +6,14 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs/promises';
 
 const BASE = process.env.T15_BASE || 'http://localhost:5173';
-const OUT = new URL('../docs/validation/evidence/t15/', import.meta.url);
+const OUT = new URL(process.env.T15_EVIDENCE_DIR ? `file://${process.env.T15_EVIDENCE_DIR.replace(/\/?$/, '/')}` : '../docs/validation/evidence/t16/third-person/', import.meta.url);
 await fs.mkdir(OUT, { recursive: true });
 const channel = process.env.CHROME_CHANNEL ?? 'chrome';
 const browser = await chromium.launch({ headless: true, ...(channel ? { channel } : {}), args: ['--disable-background-timer-throttling', '--disable-renderer-backgrounding', '--enable-unsafe-swiftshader'] });
 const results = { base: BASE, browser: browser.version(), started: new Date().toISOString() };
 const shot = (page, name) => page.screenshot({ path: new URL(name, OUT).pathname });
 const errors = [];
+const LAYOUT_ENTRY_Z = 24; // assets/t16/pavilion-layout.json entry
 const LABEL_ID = { 拟人橘猫: 'humanoid-tabby', 白衣男孩: 'white-shirt-boy', 粉裤女孩: 'pink-shorts-girl', 黄衣牛角人: 'bull-tpose', 红衣小丸子: 'maruko-tpose', 蜡笔小新: 'shin-chan' };
 
 async function pavilion() {
@@ -38,7 +39,7 @@ async function pavilion() {
   await page.waitForTimeout(900);
   s = await st();
   await page.keyboard.up('KeyW');
-  assert.ok(s.player.z < 11.5, 'walked forward');
+  assert.ok(s.player.z < LAYOUT_ENTRY_Z - 0.5, 'walked forward');
   assert.ok(Math.abs(Math.abs(s.avatar.facing) - Math.PI) < 0.1, `facing ${s.avatar.facing}`);
   await shot(page, '02-pavilion-run.png');
   await page.waitForFunction(() => window.__t10.engine.debugState().avatar.clip === 'Idle', null, { timeout: 3000 });
@@ -56,7 +57,7 @@ async function pavilion() {
     for (const s of w.surfaces) {
       for (let x = s.x0 + 0.5; x <= s.x1 - 0.5; x += 2.3) for (let z = s.z0 + 0.5; z <= s.z1 - 0.5; z += 2.3) {
         const r = s.ramp, y = r ? r.y0 + (r.y1 - r.y0) * Math.min(1, Math.max(0, (z - r.zA) / (r.zB - r.zA))) : s.y;
-        if (blocked(x, z, y) || (s.id === 'ground' && Math.abs(x) < 2.9 && z < -6.5)) continue;
+        if (blocked(x, z, y)) continue;
         for (let k = 0; k < 8; k++) for (const pitch of pitches) {
           e.debugPlace(x, z, y, k * Math.PI / 4, pitch);
           const c = e.debugCameraClearance();
@@ -71,9 +72,10 @@ async function pavilion() {
     return out;
   });
   assert.ok(results.cameraProbe.views > 1500, 'too few camera probes');
+  assert.deepEqual(results.cameraProbe.hits, [], 'camera clipped into the model');
 
   // Framing shots on both floors and the stairs.
-  for (const [name, x, z, y, yaw, pitch] of [['03-pavilion-hall.png', 3, 2, 0, 0.5, -0.25], ['04-pavilion-stairs.png', 1.5, -9, 1.15, 0, -0.3], ['05-pavilion-upper.png', -9, 4, 4.8, Math.PI, -0.3], ['06-pavilion-wall.png', 8, 13.3, 0, 0, -0.2]]) {
+  for (const [name, x, z, y, yaw, pitch] of [['03-pavilion-hall.png', 5, 9, 0, 0.5, -0.25], ['04-pavilion-stairs.png', 0, -19, 2.34, 0, -0.3], ['05-pavilion-upper.png', -16, 4, 9, -Math.PI / 2, -0.3], ['06-pavilion-wall.png', 8, 26.5, 0, 0, -0.2]]) {
     await page.evaluate(([x, z, y, yaw, pitch]) => window.__t10.engine.debugPlace(x, z, y, yaw, pitch), [x, z, y, yaw, pitch]);
     await page.waitForTimeout(350);
     await shot(page, name);

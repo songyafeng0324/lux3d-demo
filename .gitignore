@@ -11,3 +11,7 @@ playwright-report/
 # Blender auto-backups
 *.blend1
 .tmp-stage/
+
+# T16 prepared textures (rebuilt by scripts/blender/build_t16.py)
+assets/t16/textures/.build/
+__pycache__/

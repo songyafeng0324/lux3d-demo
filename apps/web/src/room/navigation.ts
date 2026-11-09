@@ -39,7 +39,7 @@ export function buildRoomWorld(placements: RoomPlacement[], bounds: ReadonlyMap<
     colliders.push(box(placement.id, min[0], max[0], min[2], max[2], min[1], max[1]));
   }
   return {
-    surfaces, colliders, walkSpeed: 2.6,
+    surfaces, colliders,
     airColliders: [
       box('house-foundation', -platform.x, platform.x, -platform.z, platform.z, ground, indoor),
       box('porch-step', PORCH_STEP.x0, PORCH_STEP.x1, PORCH_STEP.z0, PORCH_STEP.z1, ground, PORCH_STEP.y),

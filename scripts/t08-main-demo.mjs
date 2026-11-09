@@ -38,7 +38,7 @@ try{
  else log(`already exhibited in slot ${slotNo}`);
  const view=await call('GET','/gallery');assert.equal(view.slots[slotNo-1].exhibit?.candidateId,candidate.id);result.galleryVersion=view.version;result.slotNo=slotNo;result.exhibits=view.slots.filter(s=>s.exhibit).length;
  // Chrome: a logged-out visitor sees the real model on its plinth and opens the E detail.
- const layout=JSON.parse(await fs.readFile('assets/t10/pavilion-layout.json','utf8')),marker=layout.exhibitSlots.find(s=>s.id==='T'+String(slotNo).padStart(2,'0'));
+ const layout=JSON.parse(await fs.readFile('assets/t16/pavilion-layout.json','utf8')),marker=layout.exhibitSlots.find(s=>s.id==='T'+String(slotNo).padStart(2,'0'));
  browser=await chromium.launch({channel:'chrome',headless:true,args:['--enable-webgl','--ignore-gpu-blocklist']});const errors=[];
  const vp=await (await browser.newContext({viewport:{width:1440,height:900}})).newPage();vp.setDefaultTimeout(60000);vp.on('pageerror',e=>errors.push(e.message));
  await vp.goto(base+'/');await vp.waitForFunction(()=>window.__t10?.ui().phase==='intro',null,{timeout:90000});await vp.getByRole('button',{name:'进入藏宝阁'}).click();

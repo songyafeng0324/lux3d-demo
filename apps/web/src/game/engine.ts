@@ -1,9 +1,10 @@
 import * as T from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
-import pavilionUrl from '../../../../assets/t10/pavilion-v1.glb?url';
-import layout from '../../../../assets/t10/pavilion-layout.json';
-import { buildNavWorld, pavilionCamera, stepFirstPerson, supportAt, targetSlot, floorOf, BODY, MOVE_KEYS, type ExhibitSlot, type FirstPerson, type NavWorld } from './navigation.js';
+import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
+import pavilionUrl from '../../../../assets/t16/pavilion-t16.glb?url';
+import layout from '../../../../assets/t16/pavilion-layout.json';
+import { buildNavWorld, pavilionCamera, stepFirstPerson, supportAt, targetSlot, floorOf, BODY, MOVE_KEYS, type ExhibitSlot, type FirstPerson, type NavWorld, type PavilionLayout } from './navigation.js';
 import { AvatarRig } from './avatar.js';
 import type { AvatarPrefs, ViewMode } from './avatar-prefs.js';
 import { boomLength, clampFollowPitch, easeBoom, FOLLOW, viewDirection, type Vec3 } from './follow-camera.js';
@@ -21,14 +22,17 @@ export interface EngineHooks {
   /** The chosen character could not be loaded; the engine has fallen back to first person. */
   avatarFailed?(message: string): void;
 }
-interface LightMarker { position: [number, number, number]; color: [number, number, number]; power: number; type: string }
+interface LightMarker { role: string; position: [number, number, number]; color: [number, number, number]; power: number }
+const LAYOUT = layout as unknown as PavilionLayout & { lights: LightMarker[] };
 
-export const ENTRY_YAW = 0;
+export const ENTRY_YAW = LAYOUT.entryYaw;
+/** Feet follow each 0.18 m tread exactly; what the eye and the avatar show glides over them. */
+const STEP_GLIDE = 14;
 
 
 /** Full-viewport first-person pavilion. React owns the HUD; this owns WebGL, input and walking. */
 export class PavilionEngine {
-  readonly world: NavWorld = buildNavWorld(layout.exhibitSlots as unknown as ExhibitSlot[]);
+  readonly world: NavWorld = buildNavWorld(LAYOUT);
   private renderer: T.WebGLRenderer;
   private scene = new T.Scene();
   private camera = new T.PerspectiveCamera(68, 1, 0.05, 220);
@@ -36,6 +40,7 @@ export class PavilionEngine {
   private exhibits = new T.Group();
   private exhibitToken = 0;
   private player: FirstPerson = { ...this.world.entry, velocityY: null };
+  private viewY = this.world.entry.y;
   private yaw = ENTRY_YAW;
   private pitch: number = FOLLOW.entryPitch;
   private eyeY = BODY.eye;
@@ -72,8 +77,14 @@ export class PavilionEngine {
     canvas.tabIndex = 0;
     canvas.setAttribute('aria-label', '藏宝阁三维场景');
     host.append(canvas);
-    this.scene.background = new T.Color('#5d6f7b');
-    this.scene.fog = new T.Fog('#5d6f7b', 40, 120);
+    // Gilt, lacquer and polished stone need something to reflect: a dim neutral room probe (D2).
+    // The baked lighting and the real sky arrive in D3.
+    const pmrem = new T.PMREMGenerator(this.renderer);
+    this.scene.environment = pmrem.fromScene(new RoomEnvironment(), 0.04).texture;
+    this.scene.environmentIntensity = 0.35;
+    pmrem.dispose();
+    this.scene.background = new T.Color('#2b3350');
+    this.scene.fog = new T.Fog('#2b3350', 70, 220);
     this.scene.add(this.building, this.exhibits);
     this.avatar = new AvatarRig(this.scene);
     this.avatar.face(ENTRY_YAW + Math.PI);
@@ -93,44 +104,35 @@ export class PavilionEngine {
     void this.load();
   }
 
-  /** Same lighting basis as the validated T10-B preview; Blender lights are not in the GLB. */
+  /**
+   * D1 graybox lighting: cool sky through the oculus (the only shadow caster), warm lantern points
+   * from the exported light markers, hemisphere fill. Final lighting is baked in D3.
+   */
   private lights() {
-    this.scene.add(new T.HemisphereLight(0xb3cee1, 0x6e4c31, 1.2));
-    const sky = new T.DirectionalLight(0xd3e6ff, 2.1);
-    sky.position.set(0, 18, 5);
+    this.scene.add(new T.HemisphereLight(0x9db2d6, 0x3a2414, 1.1));
+    const sky = new T.DirectionalLight(0xd6e4ff, 3.2);
+    sky.position.set(7, 60, 12);
+    sky.target.position.set(0, 0, 2);
     sky.castShadow = true;
-    sky.shadow.mapSize.set(2048, 2048);
-    Object.assign(sky.shadow.camera, { left: -17, right: 17, top: 19, bottom: -19, near: 0.5, far: 60 });
+    sky.shadow.mapSize.set(4096, 4096);
+    Object.assign(sky.shadow.camera, { left: -38, right: 38, top: 40, bottom: -40, near: 1, far: 120 });
     sky.shadow.camera.updateProjectionMatrix();
-    sky.shadow.bias = -0.0003;
-    sky.shadow.normalBias = 0.015;
+    sky.shadow.bias = -0.0004;
+    sky.shadow.normalBias = 0.03;
     this.scene.add(sky, sky.target);
-    for (const m of (layout.lightMarkers as unknown as LightMarker[]).filter(m => m.type === 'POINT')) {
-      const [x, y, z] = m.position;
-      const color = new T.Color(...m.color);
-      // Two lanterns on each level also light the floor from below its ceiling.
-      const floorLamp = (y < 4 && z > 0) || (y > 7 && x !== 0 && z < 0);
-      const light = new T.PointLight(color, m.power * (floorLamp ? .11 : .25), 12, 2);
+    const perRole: Record<string, { every: number; scale: number }> = {
+      atrium: { every: 1, scale: 0.55 }, portal: { every: 1, scale: 0.6 }, entry: { every: 1, scale: 0.5 },
+      terrace: { every: 1, scale: 0.5 }, hall: { every: 2, scale: 0.9 }, upper: { every: 2, scale: 0.9 },
+    };
+    const seen: Record<string, number> = {};
+    for (const m of LAYOUT.lights) {
+      const rule = perRole[m.role];
+      if (!rule) continue;
+      const n = seen[m.role] = (seen[m.role] ?? 0) + 1;
+      if ((n - 1) % rule.every) continue;
+      const light = new T.PointLight(new T.Color(...m.color), m.power * rule.scale, 0, 2);
       light.position.fromArray(m.position);
       this.scene.add(light);
-      if (floorLamp) {
-        const key = new T.SpotLight(color, m.power * .20, 12, Math.PI / 2.8, .40, 2);
-        key.position.copy(light.position);
-        key.target.position.set(x * .9, y < 4 ? 0 : 4.8, z * .75);
-        key.castShadow = true;
-        key.shadow.mapSize.set(1024, 1024);
-        key.shadow.camera.near = .2;
-        key.shadow.camera.far = 12;
-        key.shadow.bias = -.00016;
-        key.shadow.normalBias = .012;
-        key.shadow.intensity = .9;
-        this.scene.add(key, key.target);
-      }
-    }
-    for (const x of [-10, 10]) {
-      const fill = new T.PointLight(0xb8d2eb, 170, 30, 2);
-      fill.position.set(x, 6.8, 1);
-      this.scene.add(fill);
     }
   }
 
@@ -161,7 +163,7 @@ export class PavilionEngine {
     }
   }
 
-  /** The static shell has ~191 meshes; merging by material cuts draw calls to roughly one per material. */
+  /** Merging the static shell by material cuts draw calls to roughly one per material. */
   private mergeByMaterial(root: T.Object3D) {
     root.updateMatrixWorld(true);
     const groups = new Map<string, { material: T.Material; geometries: T.BufferGeometry[] }>();
@@ -180,6 +182,11 @@ export class PavilionEngine {
       const merged = mergeGeometries(geometries, false);
       geometries.forEach(g => g.dispose());
       if (!merged) throw new Error('建筑网格合并失败');
+      // Grazing views across the long floor and carpets need anisotropic filtering.
+      const aniso = Math.min(8, this.renderer.capabilities.getMaxAnisotropy());
+      for (const v of Object.values(material)) if (v instanceof T.Texture) v.anisotropy = aniso;
+      // Lattice is alpha-clipped: let MSAA dither the cut-out so thin bars fade instead of sparkling far away.
+      if (material.alphaTest > 0) material.alphaToCoverage = true;
       const mesh = new T.Mesh(merged, material);
       mesh.castShadow = mesh.receiveShadow = true;
       mesh.name = material.name;
@@ -211,6 +218,7 @@ export class PavilionEngine {
   }
   resetToEntry() {
     this.player = { ...this.world.entry, velocityY: null };
+    this.viewY = this.player.y;
     this.yaw = ENTRY_YAW; this.pitch = this.entryPitch(); this.eyeY = BODY.eye;
     this.avatar.face(ENTRY_YAW + Math.PI);
     this.clearKeys();
@@ -272,11 +280,11 @@ export class PavilionEngine {
     if (this.enabled) this.hooks.lockLost();
   };
 
-  private pivot(): Vec3 { return [this.player.x, this.player.y + FOLLOW.pivot, this.player.z]; }
+  private pivot(): Vec3 { return [this.player.x, this.viewY + FOLLOW.pivot, this.player.z]; }
   private placeCamera(dt: number) {
     this.camera.rotation.set(this.pitch, this.yaw, 0, 'YXZ');
     if (this.view === 'first') {
-      this.camera.position.set(this.player.x, this.player.y + this.eyeY, this.player.z);
+      this.camera.position.set(this.player.x, this.viewY + this.eyeY, this.player.z);
       return;
     }
     // Third person: orbit the pivot behind the view direction, pulled in by walls, slabs and floors.
@@ -298,9 +306,11 @@ export class PavilionEngine {
       this.jumpQueued = false;
       this.velocity = dt ? [(this.player.x - before.x) / dt, (this.player.z - before.z) / dt] : [0, 0];
     } else this.velocity = [0, 0];
+    const dy = this.player.y - this.viewY;
+    this.viewY = this.player.velocityY !== null || Math.abs(dy) > 0.6 ? this.player.y : this.viewY + dy * (1 - Math.exp(-dt * STEP_GLIDE));
     this.placeCamera(dt);
     this.avatar.update(dt, {
-      feet: this.player, velocity: this.velocity,
+      feet: { x: this.player.x, y: this.viewY, z: this.player.z }, velocity: this.velocity,
       ground: supportAt(this.world, this.player.x, this.player.z, this.player.y + 0.01),
       visible: this.view === 'third' && this.boom >= FOLLOW.hideBelow,
     });
@@ -348,13 +358,18 @@ export class PavilionEngine {
       try {
         const source = await this.loadModel(model, headers);
         if (this.closed || token !== this.exhibitToken) { disposeResources([source]); return; }
-        const fit = exhibitFit(model.bounds);
-        const holder = new T.Group();
+        // Each slot's tier sets the largest edge and the height the model rests (floats) at; the
+        // model is centred on the slot axis and turned to face the visitor's side.
+        const fit = exhibitFit(model.bounds, marker.fit?.maxSize ?? EXHIBIT_FIT.maxSize);
+        const holder = new T.Group(), fitted = new T.Group();
         holder.name = `exhibit-${slot.slotNo}`;
-        holder.userData = { slotNo: slot.slotNo, candidateId: slot.exhibit!.candidateId };
-        holder.position.set(marker.position[0] + fit.offset[0], marker.position[1] + EXHIBIT_FIT.plinthTop + fit.offset[1], marker.position[2] + fit.offset[2]);
-        holder.scale.setScalar(fit.scale);
-        holder.add(source);
+        holder.userData = { slotNo: slot.slotNo, candidateId: slot.exhibit!.candidateId, fitScale: fit.scale };
+        holder.position.set(marker.position[0], marker.fit?.restY ?? marker.position[1] + EXHIBIT_FIT.plinthTop, marker.position[2]);
+        holder.rotation.y = marker.yaw ?? 0;
+        fitted.position.fromArray(fit.offset);
+        fitted.scale.setScalar(fit.scale);
+        fitted.add(source);
+        holder.add(fitted);
         source.traverse(o => { const m = o as T.Mesh; if (m.isMesh) { m.castShadow = true; m.receiveShadow = true; } });
         this.exhibits.add(holder);
         this.renderer.shadowMap.needsUpdate = true;
@@ -383,7 +398,7 @@ export class PavilionEngine {
       player: { x, y, z }, airborne: velocityY !== null, yaw: this.yaw, pitch: this.pitch, enabled: this.enabled, keys: [...this.keys],
       locked: document.pointerLockElement === this.renderer.domElement, ...this.hud(),
       view: this.view, boom: this.boom, camera: this.camera.position.toArray(), avatar: this.avatar.debug(),
-      meshes: this.building.children.length, exhibits: this.exhibits.children.map(o => ({ ...o.userData, position: o.position.toArray(), scale: o.scale.x, bounds: (b => [b.min.toArray(), b.max.toArray()])(new T.Box3().setFromObject(o)) })),
+      meshes: this.building.children.length, exhibits: this.exhibits.children.map(o => ({ ...o.userData, position: o.position.toArray(), scale: o.userData.fitScale as number, bounds: (b => [b.min.toArray(), b.max.toArray()])(new T.Box3().setFromObject(o)) })),
       triangles: this.renderer.info.render.triangles,
       viewport: [this.host.clientWidth, this.host.clientHeight], pixelRatio: this.renderer.getPixelRatio(),
     };
@@ -391,12 +406,13 @@ export class PavilionEngine {
   /** Screenshot framing only (never used by the walking check): place the camera on a valid surface. */
   debugPlace(x: number, z: number, y: number, yaw: number, pitch: number) {
     this.player = { x, y, z, velocityY: null };
+    this.viewY = y;
     this.look(yaw, pitch);
     this.placeCamera(0);
   }
   /** Ray-cast the real GLB geometry straight down: used to check nav surfaces match the model. */
   probeGround(x: number, z: number, fromY: number) {
-    const ray = new T.Raycaster(new T.Vector3(x, fromY, z), new T.Vector3(0, -1, 0), 0, 30);
+    const ray = new T.Raycaster(new T.Vector3(x, fromY, z), new T.Vector3(0, -1, 0), 0, 40);
     const hit = ray.intersectObject(this.building, true)[0];
     return hit ? hit.point.y : null;
   }
@@ -430,6 +446,9 @@ export class PavilionEngine {
     this.avatar.dispose();
     disposeResources([...this.exhibits.children]);
     this.exhibits.clear();
+    disposeResources([this.building]);   // the textured shell: geometries, materials and their maps
+    this.building.clear();
+    this.scene.environment?.dispose();
     this.scene.traverse(o => {
       const mesh = o as T.Mesh;
       if (mesh.isMesh) { mesh.geometry.dispose(); (mesh.material as T.Material).dispose(); }

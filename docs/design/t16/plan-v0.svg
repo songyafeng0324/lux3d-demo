@@ -1,0 +1,165 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1040 860" font-family="PingFang SC, Hiragino Sans GB, sans-serif" font-size="11">
+  <!-- T16 藏宝阁 v0 草图：1F 平面 10px/m，2F 平面与南北剖面 6px/m。尺寸为灰盒前草案。 -->
+  <rect width="1040" height="860" fill="#f6f1e7"/>
+  <style>
+    .wall{fill:none;stroke:#2b1d14;stroke-width:3}
+    .void{fill:#d9e4ea;stroke:#5b7584;stroke-width:1;stroke-dasharray:5 3}
+    .old{fill:none;stroke:#c0392b;stroke-width:1.5;stroke-dasharray:6 4}
+    .col{fill:#2b1d14}
+    .colb{fill:#c9a24a;stroke:#2b1d14;stroke-width:.8}
+    .s{fill:#e8c56a;stroke:#7a5a12;stroke-width:1}
+    .a{fill:#b23a2a;stroke:#5e1a10;stroke-width:1}
+    .b{fill:#3f6e5a;stroke:#1f3a2e;stroke-width:1}
+    .stair{fill:#e6d3b3;stroke:#6b4a2b;stroke-width:1}
+    .rail{stroke:#6b4a2b;stroke-width:2.5}
+    .lbl{fill:#2b1d14}
+    .sm{font-size:9.5px;fill:#4a3a2c}
+    .h{font-size:14px;font-weight:600;fill:#2b1d14}
+  </style>
+
+  <!-- ================= 1F 平面 ================= -->
+  <text x="40" y="34" class="h">一层平面（44 × 60 m，北在上）</text>
+  <text x="40" y="50" class="sm">红色虚线 = 旧阁 24 × 28 m 同比例轮廓</text>
+  <!-- 月台 -->
+  <rect x="160" y="660" width="200" height="60" fill="#ece6da" stroke="#8a7a66"/>
+  <text x="232" y="700" class="sm">汉白玉月台 · 云海</text>
+  <!-- 外墙（南门 8 m 缺口） -->
+  <polyline class="wall" points="220,660 40,660 40,60 480,60 480,660 300,660"/>
+  <!-- 神道长毯 -->
+  <rect x="240" y="230" width="40" height="430" fill="#c98a7a" opacity=".45"/>
+  <!-- 天井 -->
+  <rect x="150" y="260" width="220" height="280" class="void" fill-opacity=".55"/>
+  <text x="300" y="276" class="sm">天井 22 × 28 m</text>
+  <text x="300" y="288" class="sm">通高约 28 m</text>
+  <!-- 北殿：楼梯与平台 -->
+  <rect x="170" y="60" width="180" height="95" class="stair"/>
+  <text x="176" y="146" class="sm">中段平台 +4.5 m</text>
+  <rect x="230" y="155" width="60" height="75" class="stair"/>
+  <g stroke="#6b4a2b" stroke-width=".6">
+    <line x1="230" y1="165" x2="290" y2="165"/><line x1="230" y1="175" x2="290" y2="175"/><line x1="230" y1="185" x2="290" y2="185"/>
+    <line x1="230" y1="195" x2="290" y2="195"/><line x1="230" y1="205" x2="290" y2="205"/><line x1="230" y1="215" x2="290" y2="215"/>
+    <line x1="170" y1="170" x2="210" y2="170"/><line x1="170" y1="185" x2="210" y2="185"/><line x1="170" y1="200" x2="210" y2="200"/><line x1="170" y1="215" x2="210" y2="215"/>
+    <line x1="310" y1="170" x2="350" y2="170"/><line x1="310" y1="185" x2="350" y2="185"/><line x1="310" y1="200" x2="350" y2="200"/><line x1="310" y1="215" x2="350" y2="215"/>
+  </g>
+  <rect x="170" y="155" width="40" height="75" class="stair" fill-opacity=".6"/>
+  <rect x="310" y="155" width="40" height="75" class="stair" fill-opacity=".6"/>
+  <text x="243" y="246" class="sm">↑ 上</text>
+  <text x="166" y="246" class="sm">↓ 折回二层</text>
+  <text x="306" y="246" class="sm">↓ 折回二层</text>
+  <!-- 月洞门 -->
+  <path d="M220,62 A40,40 0 0 0 300,62" fill="none" stroke="#c9a24a" stroke-width="4"/>
+  <text x="236" y="92" class="sm" fill="#7a5a12">月洞门 ⌀8 m</text>
+  <!-- 柱 -->
+  <g class="colb">
+    <circle cx="150" cy="260" r="8"/><circle cx="150" cy="330" r="8"/><circle cx="150" cy="400" r="8"/><circle cx="150" cy="470" r="8"/><circle cx="150" cy="540" r="8"/>
+    <circle cx="370" cy="260" r="8"/><circle cx="370" cy="330" r="8"/><circle cx="370" cy="400" r="8"/><circle cx="370" cy="470" r="8"/><circle cx="370" cy="540" r="8"/>
+  </g>
+  <g class="col">
+    <circle cx="95" cy="260" r="5"/><circle cx="95" cy="330" r="5"/><circle cx="95" cy="400" r="5"/><circle cx="95" cy="470" r="5"/><circle cx="95" cy="540" r="5"/>
+    <circle cx="425" cy="260" r="5"/><circle cx="425" cy="330" r="5"/><circle cx="425" cy="400" r="5"/><circle cx="425" cy="470" r="5"/><circle cx="425" cy="540" r="5"/>
+  </g>
+  <!-- 镇阁法阵台 -->
+  <circle cx="260" cy="400" r="40" class="s" fill-opacity=".55"/>
+  <circle cx="260" cy="400" r="28" fill="none" stroke="#7a5a12" stroke-dasharray="3 2"/>
+  <text x="236" y="404" class="lbl" font-weight="600">镇阁之宝</text>
+  <!-- 甲档 -->
+  <g class="a">
+    <rect x="172" y="307" width="26" height="26"/><rect x="172" y="387" width="26" height="26"/><rect x="172" y="467" width="26" height="26"/>
+    <rect x="322" y="307" width="26" height="26"/><rect x="322" y="387" width="26" height="26"/><rect x="322" y="467" width="26" height="26"/>
+    <rect x="247" y="97" width="26" height="26"/>
+  </g>
+  <!-- 乙档壁龛 1F -->
+  <g class="b">
+    <rect x="42" y="284" width="12" height="12"/><rect x="42" y="354" width="12" height="12"/><rect x="42" y="424" width="12" height="12"/><rect x="42" y="494" width="12" height="12"/><rect x="42" y="564" width="12" height="12"/>
+    <rect x="466" y="284" width="12" height="12"/><rect x="466" y="354" width="12" height="12"/><rect x="466" y="424" width="12" height="12"/><rect x="466" y="494" width="12" height="12"/><rect x="466" y="564" width="12" height="12"/>
+    <rect x="189" y="84" width="12" height="12"/><rect x="319" y="84" width="12" height="12"/>
+  </g>
+  <!-- 旧阁轮廓 -->
+  <rect x="140" y="240" width="240" height="280" class="old"/>
+  <!-- 出生点 -->
+  <circle cx="260" cy="630" r="5" fill="#1d6fa5"/><text x="270" y="634" class="sm" fill="#1d6fa5">出生点，面向北</text>
+  <!-- 区域名 -->
+  <text x="62" y="420" class="lbl">西侧殿</text><text x="62" y="434" class="sm">11 m 深</text>
+  <text x="430" y="420" class="lbl">东侧殿</text>
+  <text x="228" y="600" class="lbl">门厅</text>
+  <text x="372" y="110" class="lbl">北殿</text><text x="372" y="124" class="sm">分叉大楼梯</text>
+  <text x="196" y="676" class="sm">南门 8 m 宽</text>
+  <!-- 比例尺 -->
+  <line x1="40" y1="760" x2="140" y2="760" stroke="#2b1d14" stroke-width="2"/><text x="72" y="776" class="sm">10 m</text>
+  <!-- 图例 -->
+  <g transform="translate(40,800)">
+    <circle cx="6" cy="0" r="6" class="s"/><text x="16" y="4" class="sm">镇阁 ×1（约 5 m，悬浮）</text>
+    <rect x="160" y="-6" width="12" height="12" class="a"/><text x="178" y="4" class="sm">甲 ×7（约 2.5 m）</text>
+    <rect x="290" y="-6" width="12" height="12" class="b"/><text x="308" y="4" class="sm">乙 ×22（约 1.6 m，壁龛）</text>
+    <text x="0" y="24" class="sm">一层：镇阁 1 + 甲 7 + 乙 12；二层：乙 10；合计 30，与数据库一致</text>
+  </g>
+
+  <!-- ================= 2F 平面 ================= -->
+  <text x="580" y="34" class="h">二层平面（+9 m）</text>
+  <rect x="580" y="60" width="264" height="360" fill="#efe4cf" stroke="#2b1d14" stroke-width="2.5"/>
+  <rect x="646" y="180" width="132" height="168" class="void"/>
+  <text x="680" y="262" class="sm">天井（空）</text>
+  <rect x="658" y="60" width="108" height="102" class="void"/>
+  <text x="676" y="110" class="sm">楼梯厅（空）</text>
+  <g class="rail" fill="none">
+    <polyline points="646,180 646,348 778,348 778,180 766,180"/><line x1="646" y1="180" x2="658" y2="180"/>
+    <polyline points="658,162 658,60"/><polyline points="766,162 766,60"/><line x1="680" y1="162" x2="744" y2="162"/>
+  </g>
+  <text x="684" y="176" class="sm">北桥 3 m</text>
+  <g class="colb">
+    <circle cx="646" cy="180" r="5"/><circle cx="646" cy="222" r="5"/><circle cx="646" cy="264" r="5"/><circle cx="646" cy="306" r="5"/><circle cx="646" cy="348" r="5"/>
+    <circle cx="778" cy="180" r="5"/><circle cx="778" cy="222" r="5"/><circle cx="778" cy="264" r="5"/><circle cx="778" cy="306" r="5"/><circle cx="778" cy="348" r="5"/>
+  </g>
+  <g class="b">
+    <rect x="582" y="92" width="9" height="9"/><rect x="582" y="164" width="9" height="9"/><rect x="582" y="236" width="9" height="9"/><rect x="582" y="308" width="9" height="9"/><rect x="582" y="380" width="9" height="9"/>
+    <rect x="833" y="92" width="9" height="9"/><rect x="833" y="164" width="9" height="9"/><rect x="833" y="236" width="9" height="9"/><rect x="833" y="308" width="9" height="9"/><rect x="833" y="380" width="9" height="9"/>
+  </g>
+  <text x="596" y="270" class="lbl">西展厅</text><text x="596" y="284" class="sm">11 m 深</text>
+  <text x="786" y="270" class="lbl">东展厅</text>
+  <text x="682" y="388" class="lbl">南前廊</text><text x="676" y="402" class="sm">12 m 深，俯瞰天井</text>
+  <text x="664" y="150" class="sm">两侧梯在此上到二层</text>
+
+  <!-- ================= 南北剖面 ================= -->
+  <text x="580" y="470" class="h">南北剖面（沿中轴，北在左）</text>
+  <!-- 光柱 -->
+  <polygon points="760,610 808,610 812,786 756,786" fill="#f3d27a" opacity=".35"/>
+  <!-- 外屋顶示意 -->
+  <polyline points="560,684 600,664 700,598 868,598 920,664 960,684" fill="none" stroke="#3d4a52" stroke-width="2"/>
+  <text x="884" y="612" class="sm">外屋顶（示意）</text>
+  <!-- 内顶、藻井、天窗 -->
+  <polyline class="wall" points="580,790 580,670 700,670 700,634 760,610"/>
+  <polyline class="wall" points="808,610 868,634 868,670 940,670 940,748"/>
+  <text x="764" y="604" class="sm">天窗</text>
+  <text x="710" y="628" class="sm">藻井</text>
+  <!-- 地面 + 月台 -->
+  <line x1="580" y1="790" x2="988" y2="790" stroke="#2b1d14" stroke-width="2"/>
+  <text x="948" y="806" class="sm">月台</text>
+  <!-- 二层楼板 -->
+  <rect x="868" y="733" width="72" height="4" fill="#6b4a2b"/>
+  <rect x="682" y="733" width="18" height="4" fill="#6b4a2b"/>
+  <!-- 楼梯 -->
+  <polyline points="682,790 682,787 673,787 673,782 664,782 664,777 655,777 655,772 646,772 646,767 637,767 637,763" fill="none" stroke="#6b4a2b" stroke-width="1.5"/>
+  <line x1="580" y1="763" x2="637" y2="763" stroke="#6b4a2b" stroke-width="3"/>
+  <line x1="637" y1="763" x2="682" y2="736" stroke="#6b4a2b" stroke-dasharray="3 2"/>
+  <text x="586" y="756" class="sm">平台 +4.5</text>
+  <!-- 月洞门 -->
+  <line x1="582" y1="763" x2="582" y2="715" stroke="#c9a24a" stroke-width="4"/>
+  <text x="588" y="712" class="sm" fill="#7a5a12">月洞门</text>
+  <!-- 法阵台与悬浮镇阁 -->
+  <rect x="760" y="786" width="48" height="4" class="s"/>
+  <polygon points="784,724 799,739 784,754 769,739" class="s"/>
+  <text x="804" y="752" class="sm">镇阁悬浮 6～11 m</text>
+  <!-- 旧阁剖面同比例 -->
+  <rect x="772" y="722" width="168" height="68" class="old"/>
+  <text x="872" y="716" class="sm" fill="#c0392b">旧阁 28 × 11.4 m</text>
+  <!-- 角色 -->
+  <line x1="916" y1="790" x2="916" y2="782" stroke="#1d6fa5" stroke-width="2"/><circle cx="916" cy="780" r="1.6" fill="#1d6fa5"/>
+  <text x="900" y="826" class="sm" fill="#1d6fa5">角色 1.5 m</text>
+  <line x1="916" y1="818" x2="916" y2="794" stroke="#1d6fa5" stroke-width=".6"/>
+  <!-- 尺寸 -->
+  <line x1="1000" y1="790" x2="1000" y2="610" stroke="#2b1d14" stroke-width=".8"/>
+  <text x="1004" y="704" class="sm">≈30 m</text>
+  <line x1="960" y1="790" x2="960" y2="736" stroke="#2b1d14" stroke-width=".8"/>
+  <text x="964" y="766" class="sm">9 m</text>
+  <text x="580" y="846" class="sm">草案尺寸，灰盒实走后修订；概念图只看气质，不作为尺寸依据。</text>
+</svg>

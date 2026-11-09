@@ -1,0 +1,100 @@
+{
+ "source": "https://polyhaven.com",
+ "license": "CC0 1.0",
+ "resolution": "1k",
+ "sets": {
+  "lacquered_cherry_wood": {
+   "use": "columns, beams, rails, frames (dark lacquer)",
+   "sizeMetres": [
+    1,
+    1
+   ],
+   "authors": [
+    "Jenelle van Heerden",
+    "Rico Cilliers"
+   ],
+   "maps": {
+    "Diffuse": "lacquered_cherry_wood_diff_1k.jpg",
+    "nor_gl": "lacquered_cherry_wood_nor_gl_1k.jpg",
+    "Rough": "lacquered_cherry_wood_rough_1k.jpg"
+   }
+  },
+  "dark_wood": {
+   "use": "wall panels, doors, alcove frames",
+   "sizeMetres": [
+    2,
+    2
+   ],
+   "authors": [
+    "Dario Barresi",
+    "Dimitrios Savva",
+    "Rico Cilliers"
+   ],
+   "maps": {
+    "Diffuse": "dark_wood_diff_1k.jpg",
+    "nor_gl": "dark_wood_nor_gl_1k.jpg",
+    "Rough": "dark_wood_rough_1k.jpg"
+   }
+  },
+  "dark_wooden_planks": {
+   "use": "upper floor boards, ceilings",
+   "sizeMetres": [
+    2,
+    2
+   ],
+   "authors": [
+    "Amal Kumar"
+   ],
+   "maps": {
+    "Diffuse": "dark_wooden_planks_diff_1k.jpg",
+    "nor_gl": "dark_wooden_planks_nor_gl_1k.jpg",
+    "Rough": "dark_wooden_planks_rough_1k.jpg"
+   }
+  },
+  "granite_tile": {
+   "use": "ground floor polished dark stone",
+   "sizeMetres": [
+    2.3,
+    2.3
+   ],
+   "authors": [
+    "Charlotte Baglioni"
+   ],
+   "maps": {
+    "Diffuse": "granite_tile_diff_1k.jpg",
+    "nor_gl": "granite_tile_nor_gl_1k.jpg",
+    "Rough": "granite_tile_rough_1k.jpg"
+   }
+  },
+  "marble_01": {
+   "use": "terrace, stairs, pedestals, lions (white marble)",
+   "sizeMetres": [
+    1.5,
+    1.5
+   ],
+   "authors": [
+    "Rob Tuytel"
+   ],
+   "maps": {
+    "Diffuse": "marble_01_diff_1k.jpg",
+    "nor_gl": "marble_01_nor_gl_1k.jpg",
+    "Rough": "marble_01_rough_1k.jpg"
+   }
+  },
+  "grey_roof_tiles": {
+   "use": "roofs, eaves, alcove canopies",
+   "sizeMetres": [
+    3,
+    3
+   ],
+   "authors": [
+    "Rob Tuytel"
+   ],
+   "maps": {
+    "Diffuse": "grey_roof_tiles_diff_1k.jpg",
+    "nor_gl": "grey_roof_tiles_nor_gl_1k.jpg",
+    "Rough": "grey_roof_tiles_rough_1k.jpg"
+   }
+  }
+ }
+}

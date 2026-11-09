@@ -1,11 +1,12 @@
 /**
- * T10-C pavilion navigation contract (metres, Web Y up, north = -Z, east = +X).
+ * Pavilion navigation contract (metres, Web Y up, north = -Z, east = +X).
  *
- * Every surface and collider below is transcribed from the geometry that
- * scripts/blender/build_t10.py actually builds for pavilion-v1.glb (line refs
- * in comments). Walk surfaces are what feet stand on; colliders are vertical
- * blockers checked against the body circle. The browser check compares these
- * surfaces with real downward rays against the GLB, so drift is detectable.
+ * The geometry is NOT written here: scripts/blender/build_t16.py declares every part once and
+ * exports both the render GLB and assets/t16/pavilion-layout.json (walk surfaces, colliders, jump
+ * ceilings, camera-only blockers, exhibit slots). This module only runs the walking rules on that
+ * data. Walk surfaces are what feet stand on (stairs are one flat surface per tread); colliders are
+ * vertical blockers checked against the body circle. The browser check compares the surfaces with
+ * real downward rays against the GLB, so drift is detectable.
  *
  * Pure TypeScript with no runtime dependencies, so node --test can import it.
  */
@@ -16,9 +17,21 @@ export interface Surface extends Rect { id: string; y?: number; ramp?: { zA: num
 export interface BoxCollider extends Rect { id: string; kind: 'box'; y0: number; y1: number; solid?: boolean }
 export interface CircleCollider { id: string; kind: 'circle'; x: number; z: number; r: number; y0: number; y1: number }
 export type Collider = BoxCollider | CircleCollider;
-export interface ExhibitSlot { id: string; floor: number; position: [number, number, number]; footprint: [number, number] }
-export interface WalkingWorld { surfaces: Surface[]; colliders: Collider[]; airColliders: Collider[]; entry: Player; walkSpeed?: number }
-export interface NavWorld extends WalkingWorld { slots: ExhibitSlot[] }
+/** Exhibit slot n = marker `T0n`. `fit` is the tier's largest edge and the height the model rests at. */
+export interface ExhibitSlot {
+  id: string; floor: number; position: [number, number, number]; footprint: [number, number];
+  tier?: 'S' | 'A' | 'B'; label?: string; yaw?: number;
+  fit?: { maxSize: number; restY: number };
+  /** Vertical extent of the box E-targeting aims at (defaults to the old 1.25 m plinth). */
+  target?: { y0: number; y1: number };
+}
+export interface WalkingWorld { surfaces: Surface[]; colliders: Collider[]; airColliders: Collider[]; entry: Player }
+export interface NavWorld extends WalkingWorld { slots: ExhibitSlot[]; cameraBlockers: Collider[]; floorY: number; entryYaw: number }
+/** The exported layout (assets/t16/pavilion-layout.json), as far as walking needs it. */
+export interface PavilionLayout {
+  upperY: number; floorY: number; entry: Player; entryYaw: number;
+  exhibitSlots: ExhibitSlot[]; surfaces: Surface[]; colliders: Collider[]; airColliders: Collider[]; cameraBlockers: Collider[];
+}
 export interface Player { x: number; y: number; z: number }
 export interface FirstPerson extends Player { velocityY: number | null }
 export interface MoveInput { forward: number; right: number; run: boolean }
@@ -27,78 +40,17 @@ export const MOVE_KEYS: Record<string, [number, number]> = {
   KeyA: [0, -1], ArrowLeft: [0, -1], KeyD: [0, 1], ArrowRight: [0, 1],
 };
 
-export const BODY = { radius: 0.3, height: 1.7, eye: 1.6, stepUp: 0.3, maxDrop: 0.45, walk: 3.0, run: 5.2, substep: 0.05, jump: 6.9, gravity: 14 } as const;
-export const UPPER_Y = 4.8;
-const RAIL_TOP = 1.15 + 0.1; // rail(): top beam at height, posts +0.07, caps +0.09
-const STAIR_RAIL_TOP = 1.05 + 0.1;
-const WALL_IN = { x: 11.89, z: 13.88 }; // walls 0.22–0.24 thick centred on ±12 / ±14
+/** walk = the old Shift speed (2026-11-09); Shift multiplies it by the same 1.73× again. */
+export const BODY = { radius: 0.3, height: 1.7, eye: 1.6, stepUp: 0.3, maxDrop: 0.45, walk: 5.2, run: 9.0, substep: 0.05, jump: 6.9, gravity: 14 } as const;
+/** Upper floor height of the T16 pavilion (checked against the layout by the tests). */
+export const UPPER_Y = 9;
 
-const box = (id: string, x0: number, x1: number, z0: number, z1: number, y0: number, y1: number): BoxCollider =>
-  ({ id, kind: 'box', x0: Math.min(x0, x1), x1: Math.max(x0, x1), z0: Math.min(z0, z1), z1: Math.max(z0, z1), y0, y1 });
-/** A rail segment from (xa,za) to (xb,zb) as a thin box. */
-const rail = (id: string, xa: number, za: number, xb: number, zb: number, y0: number, y1: number, t = 0.1): BoxCollider =>
-  box(id, Math.min(xa, xb) - t, Math.max(xa, xb) + t, Math.min(za, zb) - t, Math.max(za, zb) + t, y0, y1);
-
-export const COLUMNS: [number, number][] = [[-6.4, -4.9], [-6.4, 1.5], [-6.4, 7.9], [6.4, -4.9], [6.4, 1.5], [6.4, 7.9]];
-
-export function buildNavWorld(slots: ExhibitSlot[]): NavWorld {
-  const surfaces: Surface[] = [
-    // GroundBase top y=0 (line 77); interior bounded by walls.
-    { id: 'ground', x0: -WALL_IN.x, x1: WALL_IN.x, z0: -WALL_IN.z, z1: WALL_IN.z, y: 0 },
-    // UpperSlab parts (line 82): ring minus atrium and stair well, top 4.8.
-    { id: 'upper-west', x0: -WALL_IN.x, x1: -6, z0: -WALL_IN.z, z1: WALL_IN.z, y: UPPER_Y },
-    { id: 'upper-east', x0: 6, x1: WALL_IN.x, z0: -WALL_IN.z, z1: WALL_IN.z, y: UPPER_Y },
-    { id: 'upper-south', x0: -6, x1: 6, z0: 7.5, z1: WALL_IN.z, y: UPPER_Y },
-    { id: 'upper-north-strip', x0: -6, x1: 6, z0: -WALL_IN.z, z1: -13, y: UPPER_Y },
-    { id: 'upper-well-west', x0: -6, x1: -2.7, z0: -13, z1: -6.7, y: UPPER_Y },
-    { id: 'upper-well-east', x0: 2.7, x1: 6, z0: -13, z1: -6.7, y: UPPER_Y },
-    { id: 'upper-north-crossing', x0: -6, x1: 6, z0: -6.7, z1: -4.5, y: UPPER_Y },
-    // Stairs (lines 117–121): 15 treads × 0.16 per flight, walked as a smooth ramp.
-    { id: 'east-flight', x0: 0.3, x1: 2.7, z0: -11.5, z1: -6.7, ramp: { zA: -6.7, zB: -11.5, y0: 0, y1: 2.4 } },
-    { id: 'landing', x0: -2.7, x1: 2.7, z0: -13, z1: -11.5, y: 2.4 },
-    { id: 'west-flight', x0: -2.7, x1: -0.3, z0: -11.5, z1: -6.7, ramp: { zA: -11.5, zB: -6.7, y0: 2.4, y1: UPPER_Y } },
-  ];
-  const H = 9.2, up = UPPER_Y, guard = up + RAIL_TOP;
-  const colliders: Collider[] = [
-    // Outer walls (lines 101–111); entry gap x∈[-2,2] closed by an invisible threshold.
-    box('wall-west', -12.2, -WALL_IN.x, -14.2, 14.2, 0, H),
-    box('wall-east', WALL_IN.x, 12.2, -14.2, 14.2, 0, H),
-    box('wall-north', -12.2, 12.2, -14.2, -WALL_IN.z, 0, H),
-    box('wall-south-w', -12.2, -2, WALL_IN.z, 14.2, 0, H),
-    box('wall-south-e', 2, 12.2, WALL_IN.z, 14.2, 0, H),
-    box('entry-threshold', -2, 2, WALL_IN.z, 14.2, 0, 3.7),
-    // Columns r≈0.40 with 0.53 stone bases (lines 85–88).
-    ...COLUMNS.map(([x, z], i): CircleCollider => ({ id: `column-${i}`, kind: 'circle', x, z, r: 0.45, y0: 0, y1: H })),
-    // Upper atrium guards (line 127).
-    rail('atrium-guard-n', -6, -4.5, 6, -4.5, up, guard), rail('atrium-guard-s', -6, 7.5, 6, 7.5, up, guard),
-    rail('atrium-guard-w', -6, -4.5, -6, 7.5, up, guard), rail('atrium-guard-e', 6, -4.5, 6, 7.5, up, guard),
-    // Stair-well guards (line 128): open only at the west flight exit x∈[-2.7,-0.3].
-    rail('well-guard-n', -2.7, -13, 2.7, -13, up, guard), rail('well-guard-w', -2.7, -13, -2.7, -6.7, up, guard),
-    rail('well-guard-e', 2.7, -13, 2.7, -6.7, up, guard), rail('well-guard-s', -0.3, -6.7, 2.7, -6.7, up, guard),
-    // Flight handrails (lines 129–131), boxed over their full sloped height.
-    rail('east-rail-in', 0.36, -11.5, 0.36, -6.7, 0, 2.4 + STAIR_RAIL_TOP, 0.08),
-    rail('east-rail-out', 2.64, -11.5, 2.64, -6.7, 0, 2.4 + STAIR_RAIL_TOP, 0.08),
-    rail('west-rail-in', -0.36, -11.5, -0.36, -6.7, 2.4, up + STAIR_RAIL_TOP, 0.08),
-    rail('west-rail-out', -2.64, -11.5, -2.64, -6.7, 2.4, up + STAIR_RAIL_TOP, 0.08),
-    rail('landing-rail', -2.64, -12.94, 2.64, -12.94, 2.4, 2.4 + STAIR_RAIL_TOP, 0.08),
-    // Under-stair closure (lines 124–125) plus ground blockers that seal the gap
-    // the model leaves north of z=-12.65 below the landing ("no access below").
-    box('under-stair-south', -2.7, 0.3, -6.78, -6.66, 0, 2.2),
-    box('under-stair-west', -2.82, -2.58, -WALL_IN.z, -6.7, 0, 2.2),
-    box('under-stair-east', 2.58, 2.82, -WALL_IN.z, -6.7, 0, 2.2),
-    // Exhibit plinths 1.2×1.2, 1.17 tall (lines 133–138).
-    ...slots.map(s => {
-      const [x, y, z] = s.position, hx = s.footprint[0] / 2 + 0.02, hz = s.footprint[1] / 2 + 0.02;
-      return box(`slot-${s.id}`, x - hx, x + hx, z - hz, z + hz, y, y + 1.2);
-    }),
-  ];
-  // Use the solid undersides during a jump, keeping the grounded stair path as before.
-  const airColliders = surfaces.filter(s => s.y === up).map(s => box(s.id, s.x0, s.x1, s.z0, s.z1, up - 0.3, up));
-  airColliders.push(box('west-mezzanine-beam', -6.64, -6.16, -13.7, 13.7, 4.225, 4.575),
-    box('east-mezzanine-beam', 6.16, 6.64, -13.7, 13.7, 4.225, 4.575),
-    box('north-mezzanine-beam', -6.4, 6.4, -5.12, -4.68, 4.23, 4.53),
-    box('south-mezzanine-beam', -6.4, 6.4, 7.68, 8.12, 4.23, 4.53));
-  return { surfaces, colliders, airColliders, slots, entry: { x: 0, y: 0, z: 12.2 } };
+export function buildNavWorld(layout: PavilionLayout): NavWorld {
+  return {
+    surfaces: layout.surfaces, colliders: layout.colliders, airColliders: layout.airColliders,
+    cameraBlockers: layout.cameraBlockers, slots: layout.exhibitSlots,
+    entry: { ...layout.entry }, entryYaw: layout.entryYaw, floorY: layout.floorY,
+  };
 }
 
 function surfaceY(s: Surface, z: number): number {
@@ -177,7 +129,7 @@ function tryMove(world: WalkingWorld, p: Player, dx: number, dz: number): Player
  */
 function velocity(world: WalkingWorld, input: MoveInput, yaw: number): [number, number] {
   const { forward: f, right: r } = input;
-  const speed = (input.run ? BODY.run : world.walkSpeed ?? BODY.walk) / (Math.hypot(f, r) || 1);
+  const speed = (input.run ? BODY.run : BODY.walk) / (Math.hypot(f, r) || 1);
   return [(-Math.sin(yaw) * f + Math.cos(yaw) * r) * speed, (-Math.cos(yaw) * f - Math.sin(yaw) * r) * speed];
 }
 
@@ -260,7 +212,7 @@ export function targetSlot(world: NavWorld, origin: [number, number, number], di
   let best: ExhibitSlot | null = null, bestT = maxDist;
   for (const s of world.slots) {
     const [x, y, z] = s.position, hx = s.footprint[0] / 2, hz = s.footprint[1] / 2;
-    const lo = [x - hx, y, z - hz], hi = [x + hx, y + 1.25, z + hz];
+    const lo = [x - hx, s.target?.y0 ?? y, z - hz], hi = [x + hx, s.target?.y1 ?? y + 1.25, z + hz];
     let t0 = 0, t1 = bestT, ok = true;
     for (let a = 0; a < 3 && ok; a++) {
       if (Math.abs(dir[a]) < 1e-9) { if (origin[a] < lo[a] || origin[a] > hi[a]) ok = false; continue; }
@@ -273,37 +225,14 @@ export function targetSlot(world: NavWorld, origin: [number, number, number], di
   return best;
 }
 
-/** Hanging lanterns (build_t10.py lines 171–178): centre (x, y, z), paper radius, paper height. */
-const LANTERNS: [number, number, number, number, number][] = [
-  [0, 7.4, 1.5, 0.5, 0.9], [-7.1, 3.3, -7, 0.24, 0.5], [7.1, 3.3, -7, 0.24, 0.5], [-7.1, 3.3, 8, 0.24, 0.5], [7.1, 3.3, 8, 0.24, 0.5],
-  [-9, 7.6, -6, 0.24, 0.5], [9, 7.6, -6, 0.24, 0.5], [-9, 7.6, 9, 0.24, 0.5], [9, 7.6, 9, 0.24, 0.5],
-];
-
 /**
- * T15 third-person camera geometry for the pavilion. Besides the walking colliders the boom stops at:
- * - the upper-slab undersides and mezzanine beams (the jump ceilings) and the roof ties (lines 92–99);
- * - the end walls' inner trim: EndWallPosts, WallPanels and EndWallBeams stand up to 0.19 m inside the
- *   walking wall line (lines 108–112), and the EntryLintel closes the doorway above 3.7 m (line 107);
- * - side-wall posts and lattice (lines 99–103), slightly proud of the side walls;
- * - hanging lanterns with their frames and suspension rods (lines 171–178);
- * - column capitals (lines 89–90), wider than the column shafts.
- * The entry threshold stays a blocker too: EndWallBeams cross the doorway at y≈1, so a camera
- * outside the door would see the avatar cut in half.
+ * Third-person camera geometry: the walking colliders and surfaces, plus the jump ceilings (slab and
+ * tread undersides) and the camera-only blockers the build script exports for everything else the
+ * boom could pass through (capitals, clerestory, caisson rings, lanterns, alcove canopies, door head).
  */
 export function pavilionCamera(world: NavWorld): { world: { colliders: readonly Collider[]; surfaces: readonly Surface[]; floorY: number; passThrough: ReadonlySet<string> }; blockers: Collider[] } {
-  const H = 9.2;
   return {
-    world: { colliders: world.colliders, surfaces: world.surfaces, floorY: 0, passThrough: new Set<string>() },
-    blockers: [
-      ...world.airColliders,
-      box('roof-ties', -12, 12, -14, 14, 8.65, 9.6),
-      box('north-wall-trim', -12.2, 12.2, -14.2, -13.68, 0, H), box('south-wall-trim', -12.2, 12.2, 13.68, 14.2, 0, H),
-      box('west-wall-trim', -12.2, -11.82, -14.2, 14.2, 0, H), box('east-wall-trim', 11.82, 12.2, -14.2, 14.2, 0, H),
-      ...LANTERNS.flatMap(([x, y, z, r, h], i): Collider[] => [
-        { id: `lantern-${i}`, kind: 'circle', x, z, r: r + 0.06, y0: y - h / 2 - 0.08, y1: y + h / 2 + 0.04 },
-        { id: `lantern-rod-${i}`, kind: 'circle', x, z, r: 0.03, y0: y + h / 2, y1: 8.9 },
-      ]),
-      ...COLUMNS.map(([x, z], i) => box(`column-capital-${i}`, x - 0.73, x + 0.73, z - 0.43, z + 0.43, 8.59, 9.05)),
-    ],
+    world: { colliders: world.colliders, surfaces: world.surfaces, floorY: world.floorY, passThrough: new Set<string>() },
+    blockers: [...world.airColliders, ...world.cameraBlockers],
   };
 }

@@ -11,8 +11,8 @@ import { CHARACTERS, DEFAULT_PREFS, loadPrefs, parsePrefs, PREFS_KEY, savePrefs 
 register(); // room/navigation.ts imports '../game/navigation.js' (TS source) and @aholo/contracts
 const { buildRoomWorld, roomEntrance, ROOM_CAMERA_BLOCKERS } = await import('../apps/web/src/room/navigation.ts');
 
-const layout = JSON.parse(readFileSync(new URL('../assets/t10/pavilion-layout.json', import.meta.url)));
-const world = buildNavWorld(layout.exhibitSlots);
+const layout = JSON.parse(readFileSync(new URL('../assets/t16/pavilion-layout.json', import.meta.url)));
+const world = buildNavWorld(layout);
 const cam = pavilionCamera(world);
 const close = (a, b, eps = 1e-9) => a.every((v, i) => Math.abs(v - b[i]) < eps);
 
@@ -42,29 +42,32 @@ test('view direction matches a YXZ (pitch, yaw) camera', () => {
   assert.equal(clampFollowPitch(-5), FOLLOW.pitch.min);
 });
 
-test('pavilion entry: the camera stays inside the doorway (a wall beam crosses it at 1 m)', () => {
+test('pavilion entry: the camera stays inside the hall, in front of the door', () => {
   const { boom, at } = cameraAt(cam.world, cam.blockers, world.entry, 0, 0.05);
-  assert.ok(at[2] < 13.88 - 0.1, `camera z ${at[2]}`);
+  assert.ok(at[2] < 28 - 0.1, `camera z ${at[2]}`);
   assert.ok(boom > FOLLOW.hideBelow, `avatar still visible at the entry (boom ${boom})`);
 });
 
 test('walls, columns and slab undersides shorten the boom', () => {
   // Facing east at the west wall: the camera is pressed against the wall, not through it.
-  const wall = cameraAt(cam.world, cam.blockers, { x: -11, y: 0, z: 0 }, -Math.PI / 2, 0);
-  assert.ok(wall.boom < 0.9 && wall.at[0] > -11.89, `wall boom ${wall.boom}`);
-  // Directly in front of a column, looking away from it.
-  const [cx, cz] = [-6.4, 1.5];
-  const column = cameraAt(cam.world, cam.blockers, { x: cx, y: 0, z: cz - 1.2 }, 0, 0);
-  assert.ok(column.boom < 1.2 - 0.45 && column.boom > 0.4, `column boom ${column.boom}`);
-  // Under the upper west slab, looking steeply down: the camera stays below the slab underside.
-  const under = cameraAt(cam.world, cam.blockers, { x: -9, y: 0, z: 0 }, Math.PI / 2, FOLLOW.pitch.min);
-  assert.ok(under.at[1] < 4.5 - 0.1, `camera y ${under.at[1]}`);
+  const wall = cameraAt(cam.world, cam.blockers, { x: -21, y: 0, z: 0 }, -Math.PI / 2, 0);
+  assert.ok(wall.boom < 0.9 && wall.at[0] > -22, `wall boom ${wall.boom}`);
+  // Directly in front of an atrium column (r 0.8), looking away from it.
+  const [cx, cz] = [-11, 2];
+  const column = cameraAt(cam.world, cam.blockers, { x: cx, y: 0, z: cz - 2 }, 0, 0);
+  assert.ok(column.boom < 2 - 0.8 && column.boom > 0.6, `column boom ${column.boom}`);
+  // Under the upper west slab (underside 8.4), looking steeply down: the camera stays below it.
+  const under = cameraAt(cam.world, cam.blockers, { x: -19, y: 0, z: -1 }, Math.PI / 2, FOLLOW.pitch.min);
+  assert.ok(under.at[1] < 8.4 - 0.1, `camera y ${under.at[1]}`);
   // Looking up pulls the camera toward the floor; it never goes through.
-  const up = cameraAt(cam.world, cam.blockers, { x: -9, y: 0, z: 0 }, Math.PI / 2, FOLLOW.pitch.max);
+  const up = cameraAt(cam.world, cam.blockers, { x: -19, y: 0, z: -1 }, Math.PI / 2, FOLLOW.pitch.max);
   assert.ok(up.at[1] >= FOLLOW.floorClearance - 1e-6 && up.boom < FOLLOW.distance);
-  // Upper floor below the roof ties.
-  const roof = cameraAt(cam.world, cam.blockers, { x: 9, y: 4.8, z: 0 }, 0, FOLLOW.pitch.min);
-  assert.ok(roof.at[1] < 8.65, `camera y ${roof.at[1]}`);
+  // Under the side flights the camera stops below the treads.
+  for (const yaw of [0, Math.PI]) {
+    const flight = cameraAt(cam.world, cam.blockers, { x: 9.1, y: 0, z: -20 }, yaw, FOLLOW.pitch.min);
+    const tread = Math.ceil((flight.at[2] + 22.68) / 0.32), underside = 4.5 + tread * 0.18 - 0.6;
+    assert.ok(flight.at[1] < underside, `camera y ${flight.at[1]} vs tread ${tread} underside ${underside}`);
+  }
 });
 
 test('fuzz: reachable positions, any view — camera never inside a blocker or under the floor', () => {
@@ -156,13 +159,14 @@ test('Shift quick walk: the room uses the same run speed as the pavilion', () =>
   const room = buildRoomWorld([], new Map()), dt = 1 / 60;
   const walkFor = (w, run) => { let p = w === room ? roomEntrance(room) : { ...w.entry, velocityY: null }; const z0 = p.z; for (let i = 0; i < 30; i++) p = stepFirstPerson(w, p, { forward: 1, right: 0, run }, 0, dt, false); return (z0 - p.z) / (30 * dt); };
   const roomWalk = walkFor(room, false), roomRun = walkFor(room, true), hallRun = walkFor(world, true);
-  assert.ok(Math.abs(roomWalk - room.walkSpeed) < 0.05, `room walk ${roomWalk}`);
+  assert.ok(Math.abs(roomWalk - BODY.walk) < 0.05, `room walk ${roomWalk}`);
   assert.ok(Math.abs(roomRun - BODY.run) < 0.05, `room run ${roomRun}`);
   assert.ok(Math.abs(roomRun - hallRun) < 0.05, `room ${roomRun} vs pavilion ${hallRun}`);
 });
 
-test('lantern caps: a camera rising under a hanging lantern stops below its bottom frame', () => {
-  // Pivot beside the ground-floor lantern at (7.1, 3.3, -7), looking down steeply so the boom rises under it.
-  const { at, boom } = cameraAt(cam.world, cam.blockers, { x: 7.01, y: 0, z: -6.48 }, Math.PI, FOLLOW.pitch.min);
-  assert.ok(at[1] < 3.01 - 0.08, `camera y ${at[1]} (boom ${boom})`);
+test('alcove canopy: a camera rising into a wall niche stops below its roof', () => {
+  // Facing east in front of a west-wall alcove, looking down steeply: the boom rises back into the niche.
+  const { at, boom } = cameraAt(cam.world, cam.blockers, { x: -19, y: 0, z: 5 }, -Math.PI / 2, FOLLOW.pitch.min);
+  assert.ok(at[1] < 4.2, `camera y ${at[1]} (boom ${boom})`);
+  assert.ok(boom < FOLLOW.distance);
 });

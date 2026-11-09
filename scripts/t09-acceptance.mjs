@@ -21,7 +21,7 @@ async function verifyMain(base) {
   const original = await readJson('docs/validation/evidence/t06/real-delivery.json');
   const demo = await readJson(path.join(privateRoot, 't06/site-account.json'));
   const admin = await readJson(path.join(privateRoot, 't08/admin-account.json'));
-  const layout = await readJson('assets/t10/pavilion-layout.json');
+  const layout = await readJson('assets/t16/pavilion-layout.json');
   const pool = createPool(loadConfig().databaseUrl);
   let database;
   try {

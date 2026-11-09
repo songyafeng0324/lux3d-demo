@@ -113,8 +113,8 @@ try{
   await enter(vp);await vp.waitForFunction(()=>window.__t10.ui().exhibits===3,null,{timeout:90000});
   assert.deepEqual(await vp.locator('.t10-canvas canvas').evaluate(el=>{const r=el.getBoundingClientRect();return [r.x,r.y,r.width,r.height];}),[0,0,1440,900]);
   const st=await vp.evaluate(()=>window.__t10.engine.debugState());const e1=st.exhibits.find(e=>e.slotNo===1);const [min,max]=e1.bounds;
-  assert.ok(Math.abs(min[1]-1.17)<.02,'rests on plinth top '+min[1]);assert.ok(Math.abs((min[0]+max[0])/2+9.6)<.05&&Math.abs((min[2]+max[2])/2+10)<.05,'centred on T01');assert.ok(Math.max(max[0]-min[0],max[1]-min[1],max[2]-min[2])<=.801,'fitted size');
-  await faceSlot(vp,-7.9,-10,Math.PI/2);await vp.waitForFunction(()=>window.__t10.engine.debugState().target?.id==='T01');await vp.locator('.t10-prompt').getByText('紫檀靠背椅').waitFor();await vp.screenshot({path:path.join(out,'04-visitor-prompt.png')});
+  assert.ok(Math.abs(min[1]-1.35)<.02,'T01 (Treasure tier) rests just above its 1.2 m dais: '+min[1]);assert.ok(Math.abs((min[0]+max[0])/2)<.05&&Math.abs((min[2]+max[2])/2-2)<.05,'centred on T01');assert.ok(Math.max(max[0]-min[0],max[1]-min[1],max[2]-min[2])<=5.001,'fitted size');
+  await faceSlot(vp,0,7.5,0);await vp.waitForFunction(()=>window.__t10.engine.debugState().target?.id==='T01');await vp.locator('.t10-prompt').getByText('紫檀靠背椅').waitFor();await vp.screenshot({path:path.join(out,'04-visitor-prompt.png')});
   await vp.keyboard.press('KeyE');const dlg=vp.getByRole('dialog',{name:'紫檀靠背椅详情'});await dlg.getByText('作者：藏友小周',{exact:true}).waitFor();
   await dlg.getByText('简介：清代紫檀靠背椅，背板浮雕卷草纹。',{exact:true}).waitFor();
   for(const t of ['不详','紫檀','个人收藏','藏友小周','浙江杭州'])await dlg.getByText(t,{exact:true}).first().waitFor();
@@ -155,7 +155,7 @@ try{
   await bag.getByRole('button',{name:'生成任务',exact:true}).click();
   await bag.getByText('图片最好不要有背景，将背景处理为白色效果更好。',{exact:true}).waitFor();
   await vp.keyboard.press('Escape');await bag.waitFor({state:'hidden'});
-  await vp.locator('.t10-canvas').click();await vp.waitForFunction(()=>window.__t10.ui().phase==='play');await faceSlot(vp,-6.6,-8.6,Math.PI*.5);await vp.evaluate(()=>window.__t10.engine.look(Math.PI*.5,-.12));await vp.waitForTimeout(500);await vp.screenshot({path:path.join(out,'06-visitor-hall.png')});
+  await vp.locator('.t10-canvas').click();await vp.waitForFunction(()=>window.__t10.ui().phase==='play');await faceSlot(vp,0,14,0);await vp.evaluate(()=>window.__t10.engine.look(0,.25));await vp.waitForTimeout(500);await vp.screenshot({path:path.join(out,'06-visitor-hall.png')});
   oldVisitorExhibits=(await ui(vp)).exhibits;
  });
  await step('T13 collection preview, current author, room save, share and uncollect',async()=>{
@@ -209,14 +209,15 @@ try{
   await ap.getByRole('button',{name:'资产与上传'}).click();await ap.getByLabel('GLB 模型').waitFor();assert.deepEqual(await ap.locator('input[type=file]').evaluateAll(inputs=>inputs.map(input=>input.accept)),['.glb,model/gltf-binary']);await ap.locator('.adm-row',{hasText:'私藏靠背椅'}).click();await ap.getByRole('button',{name:'风险删除…'}).click();await ap.screenshot({path:path.join(out,'08-admin-delete-confirm.png')});
   await ap.getByRole('button',{name:'确认删除'}).click();await ap.getByText(/已删除。清理 1 间小屋中的 1 处摆放，移出候选库，展位 1 已清空/).waitFor();
   assert.equal((await ui(vp)).exhibits,oldVisitorExhibits,'already-open page keeps its loaded exhibits');
-  await enter(vp);await vp.waitForFunction(()=>window.__t10.ui().exhibits===2,null,{timeout:90000});await faceSlot(vp,-7.9,-10,Math.PI/2);await vp.waitForFunction(()=>window.__t10.engine.debugState().target?.id==='T01');await vp.keyboard.press('KeyE');await vp.getByText('虚位以待').waitFor();
+  await enter(vp);await vp.waitForFunction(()=>window.__t10.ui().exhibits===2,null,{timeout:90000});await faceSlot(vp,0,7.5,0);await vp.waitForFunction(()=>window.__t10.engine.debugState().target?.id==='T01');await vp.keyboard.press('KeyE');await vp.getByText('虚位以待').waitFor();
   const room=(await call('/rooms/me','GET',undefined,{cookie:collector.cookie})).data;assert.equal(room.placements.length,0);assert.equal((await fetch(base+'/api/v1/assets/'+assetId,{headers:{cookie:collector.cookie}})).status,404);
   await vp.screenshot({path:path.join(out,'09-visitor-after-delete.png')});
  });
  await step('T14 room shortcut, porch entrance, signed-in directory and irreversible likes',async()=>{
   const guest=await browser.newPage({viewport:{width:1440,height:900}});
   guest.on('pageerror',error=>errors.push('guest: '+error.message));
-  const entrance=page=>page.evaluate(()=>window.__room.engine.debug().camera.map(n=>Number(n.toFixed(3))));
+  // The walk starts on the porch at the entrance; compare the player's feet (x, z), not the camera, which sits behind the avatar in the default third-person view (T15).
+  const entrance=page=>page.evaluate(()=>{const p=window.__room.engine.debug().player;return [p.x,p.z].map(n=>Number(n.toFixed(3)));});
   async function switchAccount(page,username){
    const response=await page.request.post(base+'/api/v1/auth/login',{headers:{origin:base},data:{username,password:pw}});
    assert.equal(response.status(),200);
@@ -232,7 +233,7 @@ try{
    await roomName.fill('庭前小屋');
    await up.waitForFunction(()=>window.__room?.save?.state.status==='saved');
    await up.getByRole('button',{name:'漫游参观',exact:true}).click();
-   assert.deepEqual(await entrance(up),[0,1.425,5.1]);
+   assert.deepEqual(await entrance(up),[0,5.1]);
    await up.locator('.scene-canvas canvas').click();
    await up.waitForFunction(()=>Boolean(document.pointerLockElement));
    await up.keyboard.press('KeyB');
@@ -250,7 +251,7 @@ try{
    assert.equal(await guest.getByRole('button',{name:'逛一逛',exact:true}).isDisabled(),true);
    await guest.goto(href);
    assert.equal(await guest.getByRole('button',{name:'登录后可点赞',exact:true}).isDisabled(),true);
-   assert.deepEqual(await entrance(guest),[0,1.425,5.1]);
+   assert.deepEqual(await entrance(guest),[0,5.1]);
    await switchAccount(guest,'t13_visitor');
    assert.equal(await guest.getByRole('button',{name:'点赞',exact:true}).isEnabled(),true);
    await vp.goto(base+'/room');

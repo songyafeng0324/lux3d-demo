@@ -8,7 +8,7 @@
 - 根级 `docs/` — 集中内容层(项目"做出什么"):产品 / 架构 / `contracts/` 跨模块契约 / `modules/` 模块说明 / 评审和产出说明
 - `apps/web/`、`apps/api/`、`apps/worker/` — 网页、HTTP服务、后台进程；`packages/domain/`、`packages/contracts/` — 领域基础与DTO。各模块有局部入口，仍共用根级控制层。
 - `migrations/`、`scripts/`、`tests/` — 版本迁移、环境与运行管理、基础验证。运行入口见 `docs/本地运行.md`；实际结果见 `docs/validation/本地基础工程验证.md`。
-- `assets/t10/` — Blender建筑源、GLB、布局标记及离线依赖的资产预览；制作脚本在 `scripts/blender/`，运行验证在 `docs/validation/`。
+- `assets/t16/` — 现行藏宝阁：Blender 源、GLB 与布局/行走数据（由 `scripts/blender/build_t16.py` 导出），`textures/polyhaven/` 为入库的 CC0 贴图（`scripts/fetch-t16-textures.mjs` 下载）；`assets/t10/` 为旧二层阁的历史资产。运行验证在 `docs/validation/`。
 - `DESIGN.md` — 古建筑场景、家具及交互的设计决策入口；具体方案按需放 `docs/design/`。
 - **判据**:协调 / 推进总体项目的 → 根级 `flow/`;需要统一发现的知识和方案 → 根级 `docs/`;代码 → 对应子项目。默认不在子项目重复建 `flow/` 或 `docs/`
 
@@ -88,7 +88,7 @@
 ## 沉浸式体验与建模方向
 - 最新产品增量见 `docs/product/2026-11-04-沉浸场景与建模确认.md`，总体执行依据见 `docs/architecture/沉浸式MVP实施计划.md`：前台全视口游戏式3D、Agent用Blender MCP制作可上下楼二层古阁；先框架/完整功能，细节后补。
 - 2026-11-05用户已明确启动T10；T10（A设计、B建筑框架、C全视口前台）已全部完成并经Mac真机验证；T06/T07/T08正式业务也已完成，T09 已完成 Mac 本地功能验收与独立复核。Blender/MCP实际状态和只读探针见环境记录，不把连接检查当成模型交付。
-- 首页 `/` 为全屏藏宝阁，与 `/room` 共用背包及 `B` 快捷键，两处菜单均有账号设置。健康诊断入口为 `/api/v1/health/ready`。行走碰撞以`apps/web/src/game/navigation.ts`为合同（按build_t10.py几何抄录），改建筑几何必须同步此文件（含第三人称镜头遮挡 `pavilionCamera()`）并跑`npm test`、`npm run test:t10`与`npm run test:t15`（含GLB射线对照）；不要改用渲染网格做碰撞或镜头遮挡。
+- 首页 `/` 为全屏藏宝阁，与 `/room` 共用背包及 `B` 快捷键，两处菜单均有账号设置。健康诊断入口为 `/api/v1/health/ready`。T16 起藏宝阁的模型与行走数据同源：`scripts/blender/build_t16.py` 一次导出 GLB 和 `assets/t16/pavilion-layout.json`（可走面、碰撞、跳跃顶、镜头遮挡、30 展位分档），`navigation.ts` 只跑规则不写几何，禁止手抄坐标。改建筑就改脚本重新导出（构件库 `t16_kit.py`、材质 `t16_materials.py`；导出前构件穿插与同向共面检查须为零，新装饰须带碰撞或镜头遮挡），再跑 `npm test`、`npm run test:t10` 与 `npm run test:t15`（含 GLB 射线对照、镜头穿模为零）；不要改用渲染网格做碰撞或镜头遮挡。
 - T15 第三人称：默认第三人称，`V` 切回第一人称；三个可行走场景右上角都有「角色」按钮，`C` 打开共用选角框（`game/CharacterPicker.tsx`），操作提示统一用 `WALK_HINT`；角色和视角只存本机浏览器；规则见 `docs/product/2026-11-09-第三人称角色接入.md`，验证见 `docs/validation/T15第三人称验证.md`。运行版角色 GLB 和选角缩略图由 `npm run build:characters` 从 `assets/characters/<id>/` 生成。
 - 云端容器只有软件WebGL（约1帧/秒），性能与实走结论以用户M5/Chrome为准。
 

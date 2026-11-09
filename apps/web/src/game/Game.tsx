@@ -11,7 +11,7 @@ import type { ExhibitCollectionStatus, ExhibitDetail, GalleryExhibit, GalleryVie
 
 type Phase = 'loading' | 'failed' | 'intro' | 'play' | 'paused';
 type Overlay = null | 'menu' | 'account' | 'backpack' | 'detail' | 'help' | 'character';
-const FLOOR = { ground: '一层 · 中庭', stairs: '楼梯 · 半层', upper: '二层 · 回廊' } as const;
+const FLOOR = { ground: '一层 · 大殿', stairs: '北殿 · 大楼梯', upper: '二层 · 展厅' } as const;
 
 declare global { interface Window { __t10?: { engine: PavilionEngine; ui: () => { avatar: AvatarPrefs; phase: Phase; overlay: Overlay; detail: string | null; galleryVersion: number | null; exhibits: number; detailName: string | null } } } }
 type DetailState = { status: 'loading' } | { status: 'failed'; message: string } | { status: 'ready'; data: ExhibitDetail };
@@ -20,7 +20,7 @@ const slotNoOf = (s: ExhibitSlot) => Number(s.id.slice(1));
 const grantHeaders = (g: GalleryView['grant']) => ({ Authorization: 'Bearer ' + g.token, 'X-Snapshot-Grant': g.id });
 
 function slotLabel(s: ExhibitSlot) {
-  return `${s.floor === 0 ? '一层' : '二层'}${s.position[0] < 0 ? '西' : '东'}侧 · 展位 ${s.id}`;
+  return `${s.label ?? (s.floor === 0 ? '一层' : '二层')} · 展位 ${s.id}`;
 }
 
 export default function Game() {
@@ -217,7 +217,7 @@ export default function Game() {
       {phase === 'intro' && <div className="t10-screen veil">
         <span className="t10-seal big">藏</span>
         <h1>藏宝阁</h1>
-        <p className="t10-sub">二层古阁 · 三十展位 · 北侧楼梯可上二层</p>
+        <p className="t10-sub">通高天井 · 三十展位 · 北殿大楼梯可上二层</p>
         <button type="button" className="t10-primary" onClick={play} autoFocus>进入藏宝阁</button>
         <p className="t10-hint">{WALK_HINT}</p>
         <p className="desktop-input-hint">请使用配有键盘和鼠标的电脑操作 3D 场景。</p>
@@ -253,7 +253,7 @@ export default function Game() {
             <div><dt>M</dt><dd>菜单</dd></div>
             <div><dt>Esc</dt><dd>关闭浮层 / 释放鼠标</dd></div>
           </dl>
-          <p>楼梯在大厅北侧：从右侧上楼，在半层平台折返，左侧上到二层。</p>
+          <p>大楼梯在北殿：沿长毯向北，中间石阶上到月洞门平台，再从左右两侧的楼梯折回上二层。</p>
           <button type="button" autoFocus onClick={play}>继续参观</button>
         </section>
       </div>}

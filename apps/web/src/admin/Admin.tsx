@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent, type ReactNode } from 'react';
-import layout from '../../../../assets/t10/pavilion-layout.json';
+import layout from '../../../../assets/t16/pavilion-layout.json';
 import { DEFAULT_DAILY_QUOTA, GALLERY_SLOT_COUNT, slotMarker, type PublicDetails, type RoomModel } from '@aholo/contracts';
 import ModelPreview from '../game/ModelPreview.js';
 import PasswordField, { credentialError } from '../game/PasswordField.js';
@@ -20,8 +20,8 @@ const SOURCE = { personal: '用户个人', furniture: '官方家具', official_c
 const STATUS: Record<string, string> = { pending: '待审核', approved: '已通过', rejected: '已驳回', withdrawn: '已撤回', deleted: '模型已删除' };
 const OWNERSHIP = { museum: '博物馆', personal_collection: '个人收藏' } as const;
 const PUBLIC_KEYS = ['name', 'description', 'era', 'material', 'ownershipType', 'holderName', 'location', 'officialUrl'] as const;
-const slotInfo = new Map((layout.exhibitSlots as Array<{ id: string; floor: number; position: number[] }>).map(s => [s.id, s]));
-const slotName = (n: number) => { const s = slotInfo.get(slotMarker(n)); return `${s?.floor === 1 ? '二层' : '一层'}${s && s.position[0] < 0 ? '西' : '东'} · ${n}`; };
+const slotInfo = new Map((layout.exhibitSlots as Array<{ id: string; label: string }>).map(s => [s.id, s]));
+const slotName = (n: number) => `${slotInfo.get(slotMarker(n))?.label ?? '展位'} · ${n}`;
 const time = (v: string | null) => v ? new Date(v).toLocaleString('zh-CN', { hour12: false }) : '—';
 
 export default function Admin() {
