@@ -39,6 +39,7 @@ test('layout agrees with the walking constants and the 30-slot contract', () => 
   assert.equal(layout.upperY, UPPER_Y);
   assert.equal(layout.source, 'scripts/blender/build_t16.py');
   assert.deepEqual(layout.stats.overlaps, [], 'render parts must not interpenetrate');
+  assert.deepEqual(layout.stats.reachGaps, [], 'every part a visitor can touch is solid to the walker');
   assert.equal(world.slots.length, 30);
   assert.deepEqual(world.slots.map(s => s.id), Array.from({ length: 30 }, (_, i) => `T${String(i + 1).padStart(2, '0')}`));
   const tiers = world.slots.reduce((m, s) => ({ ...m, [s.tier]: (m[s.tier] ?? 0) + 1 }), {});
@@ -188,3 +189,12 @@ for (const dt of [1 / 60, 1 / 30, .25]) for (const run of [false, true]) for (co
     assert.ok(Math.abs(p.y - YLAND) < 1e-6 && p.z < ZLAND && p.velocityY === null, `ended at ${JSON.stringify(p)}`);
   });
 }
+
+test('the export reach audit uses the same body as the walker', () => {
+  const kit = readFileSync(new URL('../scripts/blender/t16_kit.py', import.meta.url), 'utf8');
+  const m = kit.match(/BODY_R, BODY_H, STEP_UP, JUMP_REACH = ([\d.]+), ([\d.]+), ([\d.]+), ([\d.]+)/);
+  assert.ok(m, 'reach constants not found in t16_kit.py');
+  const peak = BODY.jump ** 2 / (2 * BODY.gravity);
+  assert.deepEqual(m.slice(1, 4).map(Number), [BODY.radius, BODY.height, BODY.stepUp]);
+  assert.ok(Number(m[4]) >= peak - 1e-9, `jump reach ${m[4]} must cover the jump peak ${peak.toFixed(3)}`);
+});

@@ -331,3 +331,60 @@ def coplanar():
                 (ia, ua, va), (ib, ub, vb) = fs[a], fs[b]
                 if min(ua[1], ub[1]) - max(ua[0], ub[0]) > 1e-3 and min(va[1], vb[1]) - max(va[0], vb[0]) > 1e-3: bad.append([ia, ib])
     return bad
+
+
+# ---------------------------------------------------------------- reach audit (D3, after the stair-jump bug)
+# Body constants mirrored from apps/web/src/game/navigation.ts (BODY); the web tests check they still match.
+BODY_R, BODY_H, STEP_UP, JUMP_REACH = 0.3, 1.7, 0.3, 1.75
+
+
+def reach_gaps(margin=0.05, step=0.12):
+    """Every render part a visitor can touch must be solid to the walker. A sample point inside a part
+    (shrunk by `margin`; round parts sampled inside their inscribed ellipse) is reachable when it lies
+    above a walk surface, within that surface's rect grown by the body radius, between the surface and
+    head height (walking) or jump reach (airborne). A reachable point must be inside a walking collider,
+    or (airborne band only) a jump ceiling, or below a walk surface at that spot (surfaces are solid tops).
+    Parts at most STEP_UP proud of the floor they sit on are stepped over and exempt."""
+    import numpy as np
+    S = np.array([(s['x0'], s['x1'], s['z0'], s['z1'], s['y']) for s in NAV['surfaces']], float)
+    def colls(lst):
+        b = np.array([(c['x0'], c['x1'], c['z0'], c['z1'], c['y0'], c['y1']) for c in lst if c['kind'] == 'box'], float).reshape(-1, 6)
+        c = np.array([(c['x'], c['z'], c['r'], c['y0'], c['y1']) for c in lst if c['kind'] == 'circle'], float).reshape(-1, 5)
+        return b, c
+    walkB, walkC = colls(NAV['colliders'])
+    airB, airC = colls(NAV['colliders'] + NAV['airColliders'])
+    def inside(P, B, C):
+        x, y, z = P[:, :1], P[:, 1:2], P[:, 2:3]
+        hit = np.zeros(len(P), bool)
+        if len(B): hit |= ((x >= B[:, 0] - 1e-6) & (x <= B[:, 1] + 1e-6) & (z >= B[:, 2] - 1e-6) & (z <= B[:, 3] + 1e-6) & (y >= B[:, 4] - 1e-6) & (y <= B[:, 5] + 1e-6)).any(1)
+        if len(C): hit |= (((x - C[:, 0]) ** 2 + (z - C[:, 1]) ** 2 <= (C[:, 2] + 1e-6) ** 2) & (y >= C[:, 3] - 1e-6) & (y <= C[:, 4] + 1e-6)).any(1)
+        return hit
+    gaps = []
+    for pid, lo, hi, _pierce, is_box in PARTS:
+        lo, hi = np.array(lo, float), np.array(hi, float)
+        # Quick reject: no surface whose reach volume touches this part.
+        near = (S[:, 0] - BODY_R < hi[0]) & (S[:, 1] + BODY_R > lo[0]) & (S[:, 2] - BODY_R < hi[2]) & (S[:, 3] + BODY_R > lo[2]) \
+            & (S[:, 4] < hi[1]) & (S[:, 4] + BODY_H + JUMP_REACH > lo[1])
+        if not near.any(): continue
+        a, b = lo + margin, hi - margin
+        if (b <= a).any(): continue
+        axes = [np.linspace(a[k], b[k], max(2, int(np.ceil((b[k] - a[k]) / step)) + 1)) for k in range(3)]
+        P = np.stack(np.meshgrid(*axes, indexing='ij'), -1).reshape(-1, 3)
+        if not is_box:
+            c, h = (lo + hi) / 2, (hi - lo) / 2 - margin
+            P = P[((P[:, 0] - c[0]) / h[0]) ** 2 + ((P[:, 2] - c[2]) / h[2]) ** 2 <= 1]
+        if not len(P): continue
+        x, y, z = P[:, :1], P[:, 1:2], P[:, 2:3]
+        inS = (x >= S[:, 0] - BODY_R) & (x <= S[:, 1] + BODY_R) & (z >= S[:, 2] - BODY_R) & (z <= S[:, 3] + BODY_R)
+        under = ((x >= S[:, 0]) & (x <= S[:, 1]) & (z >= S[:, 2]) & (z <= S[:, 3]) & (y <= S[:, 4] + 1e-6)).any(1)
+        dy = y - S[:, 4]
+        # The floor a part stands on: the highest surface at or below its base.
+        base = S[((S[:, 0] - BODY_R < hi[0]) & (S[:, 1] + BODY_R > lo[0]) & (S[:, 2] - BODY_R < hi[2]) & (S[:, 3] + BODY_R > lo[2]) & (S[:, 4] <= lo[1] + 1e-6)), 4]
+        if len(base) and hi[1] - base.max() <= STEP_UP: continue
+        walk = (inS & (dy >= -1e-6) & (dy <= BODY_H)).any(1)
+        air = (inS & (dy > BODY_H) & (dy <= BODY_H + JUMP_REACH)).any(1)
+        bad = ~under & ((walk & ~inside(P, walkB, walkC)) | (air & ~walk & ~inside(P, airB, airC)))
+        if bad.any():
+            q = P[bad][0]
+            gaps.append([pid, int(bad.sum()), int(len(P)), [round(float(v), 2) for v in q]])
+    return gaps

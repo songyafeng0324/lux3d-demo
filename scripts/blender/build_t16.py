@@ -74,6 +74,7 @@ def finial(name, x, z, y):
 
 
 POST, POST_H = 0.22, 1.22
+RAIL_TOP = POST_H + 0.26                            # post plus gilt finial: the walking collider height of every balustrade
 
 
 def balustrade(name, axis, a0, a1, c0, c1, y, mat='Lacquer', panel='GoldBand', every=2.0):
@@ -100,7 +101,7 @@ def balustrade(name, axis, a0, a1, c0, c1, y, mat='Lacquer', panel='GoldBand', e
         B(name + '-rail', mat, p0, p1, cm - t * .42, cm + t * .42, y + 0.98, y + 1.1)
     i = uid(name)
     lo = (c0, a0) if axis == 'z' else (a0, c0); hi = (c1, a1) if axis == 'z' else (a1, c1)
-    nav_box('colliders', i, lo[0], hi[0], y, y + RAIL_H, lo[1], hi[1])
+    nav_box('colliders', i, lo[0], hi[0], y, y + RAIL_TOP, lo[1], hi[1])   # up to the finials: a jump cannot clip a post top
     nav_box('cameraBlockers', i + '-cam', lo[0], hi[0], y, y + POST_H + 0.26, lo[1], hi[1])
     return i
 
@@ -114,7 +115,7 @@ def stair_balustrade(name, c0, c1, bands, to_floor=False, every=4):
     posts = sorted(set(list(range(0, len(bands), every)) + [len(bands) - 1]))
     for k, (z0, z1, y) in enumerate(bands):
         i = uid(name)
-        nav_box('colliders', i, c0, c1, 0 if to_floor else y, y + RAIL_H, z0, z1)
+        nav_box('colliders', i, c0, c1, 0 if to_floor else y, y + RAIL_TOP, z0, z1)
         nav_box('cameraBlockers', i + '-cam', c0, c1, y, y + POST_H + 0.26, z0, z1)
         if k in posts:
             box(name + '-post', 'Lacquer', c0, c1, y, y + POST_H, z0, z1)
@@ -207,7 +208,8 @@ for sx in (-1, 1):
     box('door-lattice', 'Lattice', sx * (DOOR + 0.3), sx * (DOOR + 3.3), 3.4, 6.6, ZS - 0.24, ZS - 0.2, nav=('cam',), fit={'-z': (2, 2)})
 box('door-head', 'Gold', -(DOOR - 0.4), DOOR - 0.4, 6.6, 7.0, ZS - 0.2, ZS + WT + 0.2, nav=('cam',))
 box('plaque-outside', 'Gold', -2.5, 2.5, 8.0, 8.0 + 5 / 1.5, ZS + WT, ZS + WT + 0.2, nav=('cam',), faces={'+z': 'Plaque'}, fit={'+z': (1, 1)})
-box('plaque-inside', 'Gold', -2.0, 2.0, 12.0, 12.0 + 4 / 1.5, ZS - 0.2, ZS, nav=('cam',), faces={'-z': 'Plaque'}, fit={'-z': (1, 1)})
+box('plaque-inside', 'Gold', -2.0, 2.0, 12.0, 12.0 + 4 / 1.5, ZS - 0.2, ZS, nav=('block',), faces={'-z': 'Plaque'}, fit={'-z': (1, 1)})   # reachable by a jump from the upper floor
+nav_box('cameraBlockers', uid('plaque-inside-cam'), -2.0, 2.0, 12.0, 12.0 + 4 / 1.5, ZS - 0.2, ZS)
 
 # Interior wall dressing, ground floor (0..8.4) and upper floor (9..17.2).
 for y0, y1 in ((0, UP - SLAB), (UP, CEIL - 0.8)):
@@ -485,6 +487,7 @@ for sx in (-1, 1):
 # ---------------------------------------------------------------- export gates
 OVERLAPS = kit.overlaps()
 COPLANAR = kit.coplanar()
+REACH = kit.reach_gaps()   # every part a visitor can touch must be solid to the walker (D3)
 
 # ---------------------------------------------------------------- Blender scene, GLB, layout
 for s in list(bpy.data.scenes):
@@ -537,9 +540,9 @@ layout = {
               'props': len(props.PLACED),
               'materials': len([m for m, (v, *_) in MESH.items() if v]), 'renderParts': len(PARTS),
               'surfaces': len(NAV['surfaces']), 'colliders': len(NAV['colliders']), 'airColliders': len(NAV['airColliders']),
-              'cameraBlockers': len(NAV['cameraBlockers']), 'overlaps': OVERLAPS, 'coplanar': COPLANAR},
+              'cameraBlockers': len(NAV['cameraBlockers']), 'overlaps': OVERLAPS, 'coplanar': COPLANAR, 'reachGaps': REACH},
 }
 (OUT / 'pavilion-layout.json').write_text(json.dumps(layout, ensure_ascii=False, indent=1) + '\n')
 print(json.dumps({k: (v if not isinstance(v, list) else len(v)) for k, v in layout['stats'].items()}, ensure_ascii=False))
-if OVERLAPS or COPLANAR:
-    print('OVERLAPS', len(OVERLAPS), OVERLAPS[:30]); print('COPLANAR', len(COPLANAR), COPLANAR[:30]); sys.exit(1)
+if OVERLAPS or COPLANAR or REACH:
+    print('OVERLAPS', len(OVERLAPS), OVERLAPS[:30]); print('COPLANAR', len(COPLANAR), COPLANAR[:30]); print('REACH', len(REACH), REACH[:80]); sys.exit(1)
