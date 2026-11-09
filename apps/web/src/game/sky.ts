@@ -145,7 +145,7 @@ export class PavilionSky {
     }
   }
 
-  update(time: number, camera: T.Camera) {
+  update(time: number, camera: T.Object3D) {
     this.dome.position.copy(camera.position);
     this.dome.material.uniforms.time.value = time;
     for (const c of this.clouds) { c.position.x = camera.position.x; c.position.z = camera.position.z; c.material.uniforms.time.value = time; }

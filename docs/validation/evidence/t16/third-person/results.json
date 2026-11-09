@@ -1,14 +1,14 @@
 {
   "base": "http://localhost:5173",
   "browser": "157.0.8103.38",
-  "started": "2026-11-09T18:28:32.393Z",
+  "started": "2026-11-09T18:49:47.451Z",
   "cameraProbe": {
     "views": 28200,
-    "shortened": 8724,
+    "shortened": 8739,
     "hits": []
   },
   "exhibitDetail": {
-    "slot": "T02",
+    "slot": "T01",
     "opened": true
   },
   "characters": [
@@ -60,22 +60,22 @@
   },
   "fps": {
     "first": 60.2,
-    "third": 60.3,
+    "third": 60.2,
     "note": "headless Chrome; M5 real-device numbers are the acceptance basis"
   },
   "renderInfo": {
     "calls": 100,
-    "triangles": 1332555
+    "triangles": 1344891
   },
   "roomSpeed": {
-    "walk": 5.11,
+    "walk": 5.12,
     "shift": 8.84
   },
   "room": {
     "indoorCamera": [
       0,
       2.410741858544196,
-      -0.17010695090803019
+      -0.17010695090803152
     ],
     "indoorBoom": 3.2,
     "sharedCharacter": "pink-shorts-girl",

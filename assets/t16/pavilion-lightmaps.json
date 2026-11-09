@@ -1,0 +1,98 @@
+{
+ "source": "scripts/blender/bake_t16.py",
+ "glbSHA256": "354238a82c68b5a1277a02c7815b7e6effe3f292f00876468f19f0d2f44b16bf",
+ "uv": "TEXCOORD_1 (UVLight)",
+ "giScale": 0.08651618212461469,
+ "aoDistance": 1.6,
+ "samples": {
+  "ao": 96,
+  "gi": 384
+ },
+ "maps": {
+  "T16_Floor": {
+   "ao": "Floor-ao.jpg",
+   "gi": "Floor-gi.jpg",
+   "size": 1024
+  },
+  "T16_Carpet": {
+   "ao": "Carpet-ao.jpg",
+   "gi": "Carpet-gi.jpg",
+   "size": 1024
+  },
+  "T16_Gold": {
+   "ao": "Gold-ao.jpg",
+   "gi": "Gold-gi.jpg",
+   "size": 1024
+  },
+  "T16_Marble": {
+   "ao": "Marble-ao.jpg",
+   "gi": "Marble-gi.jpg",
+   "size": 1024
+  },
+  "T16_Stone": {
+   "ao": "Stone-ao.jpg",
+   "gi": "Stone-gi.jpg",
+   "size": 1024
+  },
+  "T16_WallWood": {
+   "ao": "WallWood-ao.jpg",
+   "gi": "WallWood-gi.jpg",
+   "size": 1024
+  },
+  "T16_Door": {
+   "ao": "Door-ao.jpg",
+   "gi": "Door-gi.jpg",
+   "size": 256
+  },
+  "T16_Plaque": {
+   "ao": "Plaque-ao.jpg",
+   "gi": "Plaque-gi.jpg",
+   "size": 256
+  },
+  "T16_Lacquer": {
+   "ao": "Lacquer-ao.jpg",
+   "gi": "Lacquer-gi.jpg",
+   "size": 2048
+  },
+  "T16_GoldBand": {
+   "ao": "GoldBand-ao.jpg",
+   "gi": "GoldBand-gi.jpg",
+   "size": 1024
+  },
+  "T16_Relief": {
+   "ao": "Relief-ao.jpg",
+   "gi": "Relief-gi.jpg",
+   "size": 1024
+  },
+  "T16_Slab": {
+   "ao": "Slab-ao.jpg",
+   "gi": "Slab-gi.jpg",
+   "size": 1024
+  },
+  "T16_Ceiling": {
+   "ao": "Ceiling-ao.jpg",
+   "gi": "Ceiling-gi.jpg",
+   "size": 1024
+  },
+  "T16_RoofTile": {
+   "ao": "RoofTile-ao.jpg",
+   "gi": "RoofTile-gi.jpg",
+   "size": 512
+  },
+  "T16_Caisson": {
+   "ao": "Caisson-ao.jpg",
+   "gi": "Caisson-gi.jpg",
+   "size": 512
+  },
+  "T16_Banner1": {
+   "ao": "Banner1-ao.jpg",
+   "gi": "Banner1-gi.jpg",
+   "size": 256
+  },
+  "T16_Banner2": {
+   "ao": "Banner2-ao.jpg",
+   "gi": "Banner2-gi.jpg",
+   "size": 256
+  }
+ }
+}

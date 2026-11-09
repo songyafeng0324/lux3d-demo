@@ -2,7 +2,7 @@
  "version": "t16-d3",
  "scene": "T16_Pavilion_D3",
  "source": "scripts/blender/build_t16.py",
- "sourceSHA256": "81e0edfe6092da5c485b3c79eaaec2f046e94e5b2bcb47b3065930883b755496",
+ "sourceSHA256": "6aaf0cdc1324d85d4809940463ebe611a06e27ec8b7d754bd007ccbf85be979d",
  "coordinates": "Web metres, Y up, north = -Z; Blender (x,-z,y)",
  "upperY": 9.0,
  "floorY": 0,
@@ -1560,6 +1560,16 @@
    "y1": 7.0
   },
   {
+   "id": "door-studs",
+   "kind": "box",
+   "x0": -7.6,
+   "x1": -4.0,
+   "z0": 27.7,
+   "z1": 27.8,
+   "y0": 0,
+   "y1": 3.4
+  },
+  {
    "id": "door-post-2",
    "kind": "box",
    "x0": 3.6,
@@ -1580,6 +1590,16 @@
    "y1": 7.0
   },
   {
+   "id": "door-studs-2",
+   "kind": "box",
+   "x0": 4.0,
+   "x1": 7.6,
+   "z0": 27.7,
+   "z1": 27.8,
+   "y0": 0,
+   "y1": 3.4
+  },
+  {
    "id": "plaque-inside",
    "kind": "box",
    "x0": -2.0,
@@ -1588,6 +1608,78 @@
    "z1": 28.0,
    "y0": 12.0,
    "y1": 14.6667
+  },
+  {
+   "id": "facade-column-4",
+   "kind": "circle",
+   "x": -21.6,
+   "z": 29.4,
+   "r": 0.8,
+   "y0": -0.4,
+   "y1": 16.4
+  },
+  {
+   "id": "facade-column-8",
+   "kind": "circle",
+   "x": -16.4,
+   "z": 29.4,
+   "r": 0.8,
+   "y0": -0.4,
+   "y1": 16.4
+  },
+  {
+   "id": "facade-column-12",
+   "kind": "circle",
+   "x": -11.0,
+   "z": 29.4,
+   "r": 0.8,
+   "y0": -0.4,
+   "y1": 16.4
+  },
+  {
+   "id": "facade-column-16",
+   "kind": "circle",
+   "x": -5.0,
+   "z": 29.4,
+   "r": 0.8,
+   "y0": 0.0,
+   "y1": 16.4
+  },
+  {
+   "id": "facade-column-20",
+   "kind": "circle",
+   "x": 5.0,
+   "z": 29.4,
+   "r": 0.8,
+   "y0": 0.0,
+   "y1": 16.4
+  },
+  {
+   "id": "facade-column-24",
+   "kind": "circle",
+   "x": 11.0,
+   "z": 29.4,
+   "r": 0.8,
+   "y0": -0.4,
+   "y1": 16.4
+  },
+  {
+   "id": "facade-column-28",
+   "kind": "circle",
+   "x": 16.4,
+   "z": 29.4,
+   "r": 0.8,
+   "y0": -0.4,
+   "y1": 16.4
+  },
+  {
+   "id": "facade-column-32",
+   "kind": "circle",
+   "x": 21.6,
+   "z": 29.4,
+   "r": 0.8,
+   "y0": -0.4,
+   "y1": 16.4
   },
   {
    "id": "wall-dressing",
@@ -5247,6 +5339,16 @@
    "z1": 28.0,
    "y0": 12.0,
    "y1": 14.6667
+  },
+  {
+   "id": "facade-architrave",
+   "kind": "box",
+   "x0": -22.6,
+   "x1": 22.6,
+   "z0": 28.6,
+   "z1": 30.0,
+   "y0": 16.4,
+   "y1": 17.2
   },
   {
    "id": "wall-dressing-cam",
@@ -9318,15 +9420,15 @@
   "y": 27.4
  },
  "stats": {
-  "glbBytes": 15244252,
-  "triangles": 532938,
+  "glbBytes": 16457848,
+  "triangles": 539106,
   "props": 104,
   "materials": 25,
-  "renderParts": 2139,
+  "renderParts": 2301,
   "surfaces": 79,
-  "colliders": 322,
+  "colliders": 332,
   "airColliders": 56,
-  "cameraBlockers": 385,
+  "cameraBlockers": 386,
   "overlaps": [],
   "coplanar": [],
   "reachGaps": []

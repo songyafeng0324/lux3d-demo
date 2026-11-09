@@ -206,10 +206,47 @@ for sx in (-1, 1):
     box('door-post', 'Gold', sx * (DOOR - 0.4), sx * DOOR, 0, 7.0, ZS - 0.2, ZS + WT + 0.2, nav=('block',))
     box('door-leaf', 'Door', sx * DOOR, sx * (DOOR + 3.6), 0, 7.0, ZS - 0.2, ZS, nav=('block',))
     box('door-lattice', 'Lattice', sx * (DOOR + 0.3), sx * (DOOR + 3.3), 3.4, 6.6, ZS - 0.24, ZS - 0.2, nav=('cam',), fit={'-z': (2, 2)})
+    # Concept 06: gilt door studs (5 × 4) on the lower leaf, a knocker plate and ring by the opening edge,
+    # gilt corner plates. The leaves stand open against the inner wall; studs face the hall.
+    for row in range(5):
+        for col in range(4):
+            cx = sx * (DOOR + 1.1 + col * 0.65); cy = 0.75 + row * 0.55
+            box('door-stud', 'Gold', cx - .05, cx + .05, cy - .05, cy + .05, ZS - 0.26, ZS - 0.2)
+    kx = sx * (DOOR + 0.5)
+    box('door-knocker', 'Gold', kx - .18, kx + .18, 1.82, 2.18, ZS - 0.24, ZS - 0.2)
+    annulus_xy('Gold', kx, 1.86, ZS - 0.29, ZS - 0.24, 0.16, 0.2, sides=24)
+    for cy0, cy1 in ((0, 0.42), (3.0, 3.4)):
+        box('door-plate', 'Gold', min(sx * DOOR, sx * (DOOR + 0.42)), max(sx * DOOR, sx * (DOOR + 0.42)), cy0, cy1, ZS - 0.24, ZS - 0.2)
+    nav_box('colliders', uid('door-studs'), min(sx * DOOR, sx * (DOOR + 3.6)), max(sx * DOOR, sx * (DOOR + 3.6)), 0, 3.4, ZS - 0.3, ZS - 0.2)
 box('door-head', 'Gold', -(DOOR - 0.4), DOOR - 0.4, 6.6, 7.0, ZS - 0.2, ZS + WT + 0.2, nav=('cam',))
 box('plaque-outside', 'Gold', -2.5, 2.5, 8.0, 8.0 + 5 / 1.5, ZS + WT, ZS + WT + 0.2, nav=('cam',), faces={'+z': 'Plaque'}, fit={'+z': (1, 1)})
 box('plaque-inside', 'Gold', -2.0, 2.0, 12.0, 12.0 + 4 / 1.5, ZS - 0.2, ZS, nav=('block',), faces={'-z': 'Plaque'}, fit={'-z': (1, 1)})   # reachable by a jump from the upper floor
 nav_box('cameraBlockers', uid('plaque-inside-cam'), -2.0, 2.0, 12.0, 12.0 + 4 / 1.5, ZS - 0.2, ZS)
+
+# Exterior (concept 06 seen from the terrace): a stone base under the whole hall rising from the cloud
+# sea, eight red-lacquer columns with gilt bands along the south facade, a gilt architrave and a row of
+# brackets under the eave. Columns on the terrace are walking colliders.
+BASE = 1.2
+box('base', 'Stone', -HX - WT - BASE, HX + WT + BASE, -6, -0.4, ZN - WT - BASE, ZS + WT)
+for sx in (-1, 1):
+    x0, x1 = sorted((sx * TERRACE[1], sx * (HX + WT + BASE)))
+    box('base-south', 'Stone', x0, x1, -6, -0.4, ZS + WT, ZS + WT + 1.6)
+FZ = ZS + WT + 0.8                                   # facade column axis, 0.8 m off the wall face
+for x in (-21.6, -16.4, -11.0, -5.0, 5.0, 11.0, 16.4, 21.6):
+    y0 = 0.0 if abs(x) < TERRACE[1] else -0.4
+    cylinder('facade-plinth', 'Marble', x, FZ, 0.8, y0, y0 + 0.35, sides=24)
+    cylinder('facade-column', 'Lacquer', x, FZ, 0.6, y0 + 0.35, 1.4, sides=24)
+    cylinder('facade-band', 'GoldBand', x, FZ, 0.64, 1.4, 2.2, sides=24, band=True, u_repeat=3)
+    cylinder('facade-column', 'Lacquer', x, FZ, 0.6, 2.2, 14.8, sides=24)
+    cylinder('facade-band', 'GoldBand', x, FZ, 0.64, 14.8, 15.6, sides=24, band=True, u_repeat=3)
+    cylinder('facade-column', 'Lacquer', x, FZ, 0.6, 15.6, 16.4, sides=24)
+    nav_circle('colliders', uid('facade-column'), x, FZ, 0.8, y0, 16.4)
+box('facade-architrave', 'Lacquer', -HX - WT, HX + WT, 16.4, 17.2, ZS + WT, ZS + WT + 1.4, nav=('cam',), **gilt('+z', 2 * (HX + WT), 0.8))
+c = -HX - WT + 0.7
+while c <= HX + WT - 0.7 + 1e-6:
+    box('facade-bracket-arm', 'Lacquer', c - .12, c + .12, 17.2, 17.45, ZS + WT, ZS + WT + 1.5)
+    box('facade-bracket', 'Gold', c - .17, c + .17, 17.45, 17.85, ZS + WT, ZS + WT + 1.3)
+    c += 1.4
 
 # Interior wall dressing, ground floor (0..8.4) and upper floor (9..17.2).
 for y0, y1 in ((0, UP - SLAB), (UP, CEIL - 0.8)):
@@ -510,6 +547,24 @@ for material, (vs, fs, uvs, sm) in MESH.items():
         bm.to_mesh(me); bm.free()
     me.materials.append(MAT[material]); me.update()
     ob = bpy.data.objects.new(f'T16_{material}', me); col.objects.link(ob); objs.append(ob)
+# Lightmap UVs (D3): a second, non-overlapping UV set "UVLight" on the static shell, which
+# bake_t16.py fills with AO and indirect light. Emissive, alpha-cut and tiny meshes are not baked.
+# Resolution per mesh: interior surfaces seen up close get more texels.
+LIGHTMAP_RES = {'Floor': 1024, 'Lacquer': 2048, 'WallWood': 1024, 'Ceiling': 1024, 'Relief': 1024, 'Stone': 1024,
+                'Marble': 1024, 'Slab': 1024, 'Gold': 1024, 'GoldBand': 1024, 'Carpet': 1024, 'RoofTile': 512,
+                'Caisson': 512, 'Door': 256, 'Banner1': 256, 'Banner2': 256, 'Plaque': 256}
+for ob in objs:
+    res = LIGHTMAP_RES.get(ob.name[len('T16_'):])
+    if not res: continue
+    me = ob.data
+    bpy.ops.object.select_all(action='DESELECT'); ob.select_set(True); bpy.context.view_layer.objects.active = ob
+    me.uv_layers.active = me.uv_layers.new(name='UVLight')
+    bpy.ops.object.mode_set(mode='EDIT'); bpy.ops.mesh.select_all(action='SELECT')
+    bpy.ops.uv.smart_project(angle_limit=math.radians(66), island_margin=0.0, area_weight=0.0, correct_aspect=True, scale_to_bounds=False)
+    bpy.ops.uv.pack_islands(rotate=True, margin_method='FRACTION', margin=4 / res)
+    bpy.ops.object.mode_set(mode='OBJECT')
+    me.uv_layers.active = me.uv_layers['UVMap']; me.uv_layers['UVMap'].active_render = True
+    ob['lightmap_res'] = res
 objs += props.objects(col)
 # Nav debug collection (not exported): surfaces as thin sheets, so the contract can be eyeballed in Blender.
 navc = bpy.data.collections.new('T16_Nav_Debug'); scene.collection.children.link(navc)

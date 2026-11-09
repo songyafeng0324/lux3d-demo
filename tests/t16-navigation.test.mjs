@@ -198,3 +198,14 @@ test('the export reach audit uses the same body as the walker', () => {
   assert.deepEqual(m.slice(1, 4).map(Number), [BODY.radius, BODY.height, BODY.stepUp]);
   assert.ok(Number(m[4]) >= peak - 1e-9, `jump reach ${m[4]} must cover the jump peak ${peak.toFixed(3)}`);
 });
+
+test('baked lightmaps belong to the current GLB and every map file exists', async () => {
+  const { createHash } = await import('node:crypto');
+  const { existsSync } = await import('node:fs');
+  const dir = new URL('../assets/t16/lightmaps/', import.meta.url);
+  const manifest = JSON.parse(readFileSync(new URL('../assets/t16/pavilion-lightmaps.json', import.meta.url)));
+  const glb = readFileSync(new URL('../assets/t16/pavilion-t16.glb', import.meta.url));
+  assert.equal(manifest.glbSHA256, createHash('sha256').update(glb).digest('hex'), 'GLB changed since the bake: rerun scripts/blender/bake_t16.py');
+  assert.ok(Object.keys(manifest.maps).length >= 10);
+  for (const m of Object.values(manifest.maps)) for (const f of [m.ao, m.gi]) assert.ok(existsSync(new URL(f, dir)), f);
+});

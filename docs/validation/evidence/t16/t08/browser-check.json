@@ -10,36 +10,36 @@
  "checks": [
   {
    "name": "user submits a backpack model with full public data, withdraws and resubmits",
-   "ms": 1747
+   "ms": 1705
   },
   {
    "name": "admin reviews earliest pending with rotatable model and original, approves into candidates",
-   "ms": 2418
+   "ms": 2382
   },
   {
    "name": "admin arranges slots 1/2/19 from more candidates and publishes one gallery version",
-   "ms": 378
+   "ms": 377
   },
   {
    "name": "visitor sees real exhibits fitted on plinths in the full-viewport pavilion and opens E detail",
-   "ms": 3037
+   "ms": 3099
   },
   {
    "name": "T13 collection preview, current author, room save, share and uncollect",
-   "ms": 15318
+   "ms": 8907
   },
   {
    "name": "admin adjusts only today's quota for the collector",
-   "ms": 242
+   "ms": 206
   },
   {
    "name": "risk delete clears room placement, candidate and slot; open page keeps loaded scene, refresh shows the result",
-   "ms": 1483
+   "ms": 1631
   },
   {
    "name": "T14 room shortcut, porch entrance, signed-in directory and irreversible likes",
-   "ms": 8568
+   "ms": 8428
   }
  ],
- "ms": 36518
+ "ms": 29594
 }

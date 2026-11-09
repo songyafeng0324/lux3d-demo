@@ -9,6 +9,7 @@ import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
 import { ShaderPass } from 'three/addons/postprocessing/ShaderPass.js';
 import pavilionUrl from '../../../../assets/t16/pavilion-t16.glb?url';
 import layout from '../../../../assets/t16/pavilion-layout.json';
+import lightmaps from '../../../../assets/t16/pavilion-lightmaps.json';
 import { buildNavWorld, pavilionCamera, stepFirstPerson, supportAt, targetSlot, floorOf, BODY, MOVE_KEYS, type ExhibitSlot, type FirstPerson, type NavWorld, type PavilionLayout } from './navigation.js';
 import { AvatarRig } from './avatar.js';
 import type { AvatarPrefs, ViewMode } from './avatar-prefs.js';
@@ -46,6 +47,15 @@ const BLOOM_SOURCES = new Set(['T16_Glow', 'T16_WindowGlow', 'T16_LanternPaper',
 /** Light tiers (style reference: a dim hall lit in pools): great lanterns > lamp cores > small lanterns > windows. */
 const EMISSIVE_BOOST: Record<string, number> = { T16_LanternPaper: 1.7, T16_Glow: 1.8, T16_LanternPaperSmall: 1.0, T16_WindowGlow: 1.0 };
 const BLACK = new T.Color(0);
+/**
+ * Baked AO and bounce light (scripts/blender/bake_t16.py) on the shell's second UV set. Direct light stays
+ * real time (the lantern tiers); the GI map adds only what those lanterns and the sky would bounce.
+ */
+const LIGHTMAP_URLS = import.meta.glob('../../../../assets/t16/lightmaps/*.jpg', { query: '?url', import: 'default', eager: true }) as Record<string, string>;
+const LIGHTMAPS = lightmaps as { giScale: number; maps: Record<string, { ao: string; gi: string }> };
+const GI_INTENSITY = 0.9, AO_INTENSITY = 1.0;
+/** Where the one-off reflection probe looks from: the middle of the atrium, at chest height. */
+const PROBE_AT = new T.Vector3(0, 2.2, 6);
 
 
 /** Full-viewport first-person pavilion. React owns the HUD; this owns WebGL, input and walking. */
@@ -87,6 +97,7 @@ export class PavilionEngine {
   private sky = new PavilionSky();
   private atmosphere = new PavilionAtmosphere(LAYOUT.oculus, LAYOUT.floorY);
   private elapsed = 0;
+  private lightmapped = 0;
 
   constructor(private host: HTMLElement, private hooks: EngineHooks) {
     this.renderer = new T.WebGLRenderer({ antialias: true, powerPreference: 'high-performance' });
@@ -103,8 +114,8 @@ export class PavilionEngine {
     canvas.tabIndex = 0;
     canvas.setAttribute('aria-label', '藏宝阁三维场景');
     host.append(canvas);
-    // Gilt, lacquer and polished stone need something to reflect: a dim neutral room probe (D2).
-    // The baked lighting and the real sky arrive in D3.
+    // Until the shell has loaded, a dim neutral room probe; once it has, captureReflections() replaces it
+    // with the hall itself (lanterns, columns, sky in the oculus) for the polished floor and the gilt.
     const pmrem = new T.PMREMGenerator(this.renderer);
     this.scene.environment = pmrem.fromScene(new RoomEnvironment(), 0.04).texture;
     this.scene.environmentIntensity = 0.28;
@@ -171,7 +182,7 @@ export class PavilionEngine {
     const perRole: Record<string, { every: number; scale: number }> = {
       // Great atrium lanterns carry the hall; small wall lanterns only pool light locally.
       atrium: { every: 1, scale: 0.5 }, portal: { every: 1, scale: 0.35 }, entry: { every: 1, scale: 0.3 },
-      terrace: { every: 1, scale: 0.4 }, hall: { every: 2, scale: 0.35 }, upper: { every: 2, scale: 0.35 },
+      terrace: { every: 1, scale: 0.7 }, hall: { every: 2, scale: 0.35 }, upper: { every: 2, scale: 0.35 },
     };
     const seen: Record<string, number> = {};
     for (const m of LAYOUT.lights) {
@@ -201,9 +212,10 @@ export class PavilionEngine {
       const bytes = new Uint8Array(received);
       let offset = 0;
       for (const c of chunks) { bytes.set(c, offset); offset += c.length; }
-      const gltf = await new GLTFLoader().parseAsync(bytes.buffer, '');
-      if (this.closed) return;
-      this.mergeByMaterial(gltf.scene);
+      const [gltf, maps] = await Promise.all([new GLTFLoader().parseAsync(bytes.buffer, ''), this.loadLightmaps()]);
+      if (this.closed) { maps.forEach(m => { m.ao.dispose(); m.gi.dispose(); }); return; }
+      this.mergeByMaterial(gltf.scene, maps);
+      this.captureReflections();
       this.renderer.shadowMap.needsUpdate = true;
       this.hooks.progress(1);
       this.hooks.ready();
@@ -212,8 +224,50 @@ export class PavilionEngine {
     }
   }
 
+  private async loadLightmaps() {
+    const loader = new T.TextureLoader(), out = new Map<string, { ao: T.Texture; gi: T.Texture }>();
+    const tex = async (file: string, srgb: boolean) => {
+      const url = LIGHTMAP_URLS[`../../../../assets/t16/lightmaps/${file}`];
+      if (!url) throw new Error(`缺少光照贴图 ${file}`);
+      const t = await loader.loadAsync(url);
+      t.flipY = false; t.channel = 1; t.colorSpace = srgb ? T.SRGBColorSpace : T.NoColorSpace;
+      return t;
+    };
+    await Promise.all(Object.entries(LIGHTMAPS.maps).map(async ([name, m]) => {
+      const [ao, gi] = await Promise.all([tex(m.ao, false), tex(m.gi, true)]);
+      out.set(name, { ao, gi });
+    }));
+    return out;
+  }
+
+  /**
+   * Reflections: render the loaded hall once into a cube map from the atrium and prefilter it, so polished
+   * stone and gilt mirror the real lanterns and columns. Static, so it costs nothing per frame (a
+   * per-frame planar mirror was the alternative; see the D3 decision log).
+   */
+  private captureReflections() {
+    const target = new T.WebGLCubeRenderTarget(256, { type: T.HalfFloatType });
+    const cube = new T.CubeCamera(0.1, 1200, target);
+    cube.position.copy(PROBE_AT);
+    const hidden = [this.atmosphere.group, this.exhibits, ...this.avatarRoots()];
+    const was = hidden.map(o => o.visible);
+    hidden.forEach(o => { o.visible = false; });
+    this.sky.update(this.elapsed, cube);
+    cube.update(this.renderer, this.scene);
+    hidden.forEach((o, i) => { o.visible = was[i]; });
+    const pmrem = new T.PMREMGenerator(this.renderer);
+    const env = pmrem.fromCubemap(target.texture).texture;
+    pmrem.dispose(); target.dispose();
+    this.scene.environment?.dispose();
+    this.scene.environment = env;
+    this.scene.environmentIntensity = 0.85;
+  }
+  private avatarRoots(): T.Object3D[] {
+    return this.scene.children.filter(o => o !== this.building && o !== this.exhibits && o !== this.sky.group && o !== this.atmosphere.group && !(o instanceof T.Light));
+  }
+
   /** Merging the static shell by material cuts draw calls to roughly one per material. */
-  private mergeByMaterial(root: T.Object3D) {
+  private mergeByMaterial(root: T.Object3D, maps: Map<string, { ao: T.Texture; gi: T.Texture }>) {
     root.updateMatrixWorld(true);
     const groups = new Map<string, { material: T.Material; geometries: T.BufferGeometry[] }>();
     root.traverse(o => {
@@ -238,6 +292,12 @@ export class PavilionEngine {
       if (material.alphaTest > 0) material.alphaToCoverage = true;
       const boost = EMISSIVE_BOOST[material.name];
       if (boost && material instanceof T.MeshStandardMaterial) material.emissiveIntensity *= boost;
+      const baked = maps.get(material.name);
+      if (baked && material instanceof T.MeshStandardMaterial && merged.getAttribute('uv1')) {
+        Object.assign(material, { aoMap: baked.ao, aoMapIntensity: AO_INTENSITY, lightMap: baked.gi, lightMapIntensity: GI_INTENSITY });
+        material.needsUpdate = true;
+        this.lightmapped++;
+      } else if (baked) { baked.ao.dispose(); baked.gi.dispose(); }
       const mesh = new T.Mesh(merged, material);
       mesh.castShadow = mesh.receiveShadow = true;
       mesh.name = material.name;
@@ -493,7 +553,7 @@ export class PavilionEngine {
       player: { x, y, z }, airborne: velocityY !== null, yaw: this.yaw, pitch: this.pitch, enabled: this.enabled, keys: [...this.keys],
       locked: document.pointerLockElement === this.renderer.domElement, ...this.hud(),
       view: this.view, boom: this.boom, camera: this.camera.position.toArray(), avatar: this.avatar.debug(),
-      meshes: this.building.children.length, exhibits: this.exhibits.children.map(o => ({ ...o.userData, position: o.position.toArray(), scale: o.userData.fitScale as number, bounds: (b => [b.min.toArray(), b.max.toArray()])(new T.Box3().setFromObject(o)) })),
+      meshes: this.building.children.length, lightmapped: this.lightmapped, exhibits: this.exhibits.children.map(o => ({ ...o.userData, position: o.position.toArray(), scale: o.userData.fitScale as number, bounds: (b => [b.min.toArray(), b.max.toArray()])(new T.Box3().setFromObject(o)) })),
       triangles: this.renderer.info.render.triangles,
       viewport: [this.host.clientWidth, this.host.clientHeight], pixelRatio: this.renderer.getPixelRatio(),
     };
