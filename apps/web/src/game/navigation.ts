@@ -147,9 +147,28 @@ export function step(world: WalkingWorld, p: Player, input: MoveInput, yaw: numb
   return cur;
 }
 
+/**
+ * Horizontal move while airborne. A walk surface is the top of solid mass (a tread, the landing): if it
+ * stands above the feet within the body's span, the feet may not slide into it from the side. Up to one
+ * step (BODY.stepUp) the feet are lifted onto it — landing if already falling — like walking up a riser;
+ * anything taller is a wall. Without this, a jump up the central flight could carry the feet past a
+ * riser, the tread would then count as "above the feet", and the fall landed on the floor inside the stairs.
+ */
 function moveInAir(world: WalkingWorld, colliders: readonly Collider[], p: FirstPerson, dx: number, dz: number): FirstPerson {
-  const tryAir = (x: number, z: number) => world.surfaces.some(surface => inRect(surface, x, z)) &&
-    !playerOverlaps(colliders, { x, y: p.y, z }) ? { ...p, x, z } : null;
+  const tryAir = (x: number, z: number): FirstPerson | null => {
+    let y = p.y, any = false;
+    for (const s of world.surfaces) {
+      if (!inRect(s, x, z)) continue;
+      any = true;
+      const h = surfaceY(s, z);
+      if (h <= p.y + EPSILON || h >= p.y + BODY.height) continue;
+      if (h - p.y > BODY.stepUp) return null;
+      y = Math.max(y, h);
+    }
+    if (!any) return null;
+    const next: FirstPerson = y > p.y ? { x, y, z, velocityY: (p.velocityY ?? 0) > 0 ? p.velocityY : null } : { ...p, x, z };
+    return playerOverlaps(colliders, next) ? null : next;
+  };
   return tryAir(p.x + dx, p.z + dz) ?? tryAir(p.x + dx, p.z) ?? tryAir(p.x, p.z + dz) ?? p;
 }
 
@@ -198,6 +217,8 @@ export function stepFirstPerson(world: WalkingWorld, p: FirstPerson, input: Move
   for (let i = 0; i < n; i++) {
     const previous = current;
     if (moving) current = moveInAir(world, colliders, current, vx * slice, vz * slice);
+    // Landed on a riser while falling: the rest of the frame is ordinary walking.
+    if (current.velocityY === null) return { ...step(world, current, input, yaw, (n - i - 1) * slice), velocityY: null };
     current = verticalMove(world, colliders, current, previous, slice);
   }
   return current;

@@ -2,6 +2,11 @@ import * as T from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
+import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
+import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
+import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
+import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
+import { ShaderPass } from 'three/addons/postprocessing/ShaderPass.js';
 import pavilionUrl from '../../../../assets/t16/pavilion-t16.glb?url';
 import layout from '../../../../assets/t16/pavilion-layout.json';
 import { buildNavWorld, pavilionCamera, stepFirstPerson, supportAt, targetSlot, floorOf, BODY, MOVE_KEYS, type ExhibitSlot, type FirstPerson, type NavWorld, type PavilionLayout } from './navigation.js';
@@ -10,6 +15,8 @@ import type { AvatarPrefs, ViewMode } from './avatar-prefs.js';
 import { boomLength, clampFollowPitch, easeBoom, FOLLOW, viewDirection, type Vec3 } from './follow-camera.js';
 import { exhibitFit, slotMarker, EXHIBIT_FIT, type GallerySlot, type RoomModel } from '@aholo/contracts';
 import { disposeResources } from '../scene/assets.js';
+import { PavilionSky } from './sky.js';
+import { PavilionAtmosphere, type Oculus } from './atmosphere.js';
 
 export interface HudState { floor: ReturnType<typeof floorOf>; target: ExhibitSlot | null; fps: number; calls: number }
 export interface EngineHooks {
@@ -23,11 +30,22 @@ export interface EngineHooks {
   avatarFailed?(message: string): void;
 }
 interface LightMarker { role: string; position: [number, number, number]; color: [number, number, number]; power: number }
-const LAYOUT = layout as unknown as PavilionLayout & { lights: LightMarker[] };
+const LAYOUT = layout as unknown as PavilionLayout & { lights: LightMarker[]; oculus: Oculus };
 
 export const ENTRY_YAW = LAYOUT.entryYaw;
 /** Feet follow each 0.18 m tread exactly; what the eye and the avatar show glides over them. */
 const STEP_GLIDE = 14;
+/**
+ * Selective bloom: only light sources glow. A brightness threshold cannot tell a lamp from a wall or
+ * a polished floor standing next to a point light (both exceed it), so the bloom is fed by a separate,
+ * half-resolution render in which everything except these materials is black (still depth-tested, so a
+ * column in front of a lantern hides its glow). glTF caps emissive at 1 without the strength extension,
+ * so the light sources are brightened here, per material name.
+ */
+const BLOOM_SOURCES = new Set(['T16_Glow', 'T16_WindowGlow', 'T16_LanternPaper', 'T16_LanternPaperSmall']);
+/** Light tiers (style reference: a dim hall lit in pools): great lanterns > lamp cores > small lanterns > windows. */
+const EMISSIVE_BOOST: Record<string, number> = { T16_LanternPaper: 1.7, T16_Glow: 1.8, T16_LanternPaperSmall: 1.0, T16_WindowGlow: 1.0 };
+const BLACK = new T.Color(0);
 
 
 /** Full-viewport first-person pavilion. React owns the HUD; this owns WebGL, input and walking. */
@@ -35,7 +53,7 @@ export class PavilionEngine {
   readonly world: NavWorld = buildNavWorld(LAYOUT);
   private renderer: T.WebGLRenderer;
   private scene = new T.Scene();
-  private camera = new T.PerspectiveCamera(68, 1, 0.05, 220);
+  private camera = new T.PerspectiveCamera(68, 1, 0.05, 1200);
   private building = new T.Group();
   private exhibits = new T.Group();
   private exhibitToken = 0;
@@ -61,13 +79,21 @@ export class PavilionEngine {
   private frames: number[] = [];
   private fps = 0;
   private abort = new AbortController();
+  private composer: EffectComposer;
+  private bloomComposer: EffectComposer;
+  private bloom: UnrealBloomPass;
+  private dark = new Map<T.Material, T.Material>();
+  private swapped: [T.Mesh, T.Material | T.Material[]][] = [];
+  private sky = new PavilionSky();
+  private atmosphere = new PavilionAtmosphere(LAYOUT.oculus, LAYOUT.floorY);
+  private elapsed = 0;
 
   constructor(private host: HTMLElement, private hooks: EngineHooks) {
     this.renderer = new T.WebGLRenderer({ antialias: true, powerPreference: 'high-performance' });
     this.renderer.setPixelRatio(Math.min(devicePixelRatio, 1.5));
     this.renderer.outputColorSpace = T.SRGBColorSpace;
     this.renderer.toneMapping = T.ACESFilmicToneMapping;
-    this.renderer.toneMappingExposure = 1.15;
+    this.renderer.toneMappingExposure = 1.0;
     this.renderer.shadowMap.enabled = true;
     this.renderer.shadowMap.type = T.PCFShadowMap;
     // Casters are static between building/exhibit changes.
@@ -81,11 +107,32 @@ export class PavilionEngine {
     // The baked lighting and the real sky arrive in D3.
     const pmrem = new T.PMREMGenerator(this.renderer);
     this.scene.environment = pmrem.fromScene(new RoomEnvironment(), 0.04).texture;
-    this.scene.environmentIntensity = 0.35;
+    this.scene.environmentIntensity = 0.28;
     pmrem.dispose();
-    this.scene.background = new T.Color('#2b3350');
-    this.scene.fog = new T.Fog('#2b3350', 70, 220);
-    this.scene.add(this.building, this.exhibits);
+    // D3: the dusk/starlit dome, cloud sea, mountains and isles replace the flat backdrop; the fog only
+    // softens the far end of the long halls and never touches the sky (its materials opt out).
+    this.scene.background = new T.Color('#2b2a45');
+    this.scene.fog = new T.Fog('#2b2a45', 80, 260);
+    this.scene.add(this.building, this.exhibits, this.sky.group, this.atmosphere.group);
+    // Selective bloom (see BLOOM_SOURCES): the bloom composer renders the light sources alone at half
+    // resolution; the main composer (MSAA half-float, keeps the lattice alpha-to-coverage) adds that glow
+    // to the full scene, and tone mapping happens once, in OutputPass. info is reset per frame by hand,
+    // because the composers issue several renders per frame.
+    this.renderer.info.autoReset = false;
+    this.bloomComposer = new EffectComposer(this.renderer, new T.WebGLRenderTarget(1, 1, { type: T.HalfFloatType }));
+    this.bloomComposer.renderToScreen = false;
+    this.bloomComposer.addPass(new RenderPass(this.scene, this.camera));
+    this.bloom = new UnrealBloomPass(new T.Vector2(1, 1), 0.6, 0.2, 0);
+    this.bloomComposer.addPass(this.bloom);
+    this.composer = new EffectComposer(this.renderer, new T.WebGLRenderTarget(1, 1, { type: T.HalfFloatType, samples: 4 }));
+    this.composer.addPass(new RenderPass(this.scene, this.camera));
+    const mix = new ShaderPass(new T.ShaderMaterial({
+      uniforms: { baseTexture: { value: null }, bloomTexture: { value: this.bloomComposer.renderTarget2.texture } },
+      vertexShader: 'varying vec2 vUv; void main() { vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }',
+      fragmentShader: 'uniform sampler2D baseTexture, bloomTexture; varying vec2 vUv; void main() { gl_FragColor = texture2D(baseTexture, vUv) + vec4(texture2D(bloomTexture, vUv).rgb, 0.0); }',
+    }), 'baseTexture');
+    this.composer.addPass(mix);
+    this.composer.addPass(new OutputPass());
     this.avatar = new AvatarRig(this.scene);
     this.avatar.face(ENTRY_YAW + Math.PI);
     this.lights();
@@ -109,8 +156,9 @@ export class PavilionEngine {
    * from the exported light markers, hemisphere fill. Final lighting is baked in D3.
    */
   private lights() {
-    this.scene.add(new T.HemisphereLight(0x9db2d6, 0x3a2414, 1.1));
-    const sky = new T.DirectionalLight(0xd6e4ff, 3.2);
+    // A dim fill: the hall should read in pools of lantern light, not evenly lit (D3 user feedback).
+    this.scene.add(new T.HemisphereLight(0x9db2d6, 0x3a2414, 0.5));
+    const sky = new T.DirectionalLight(0xd6e4ff, 2.0);
     sky.position.set(7, 60, 12);
     sky.target.position.set(0, 0, 2);
     sky.castShadow = true;
@@ -121,8 +169,9 @@ export class PavilionEngine {
     sky.shadow.normalBias = 0.03;
     this.scene.add(sky, sky.target);
     const perRole: Record<string, { every: number; scale: number }> = {
-      atrium: { every: 1, scale: 0.55 }, portal: { every: 1, scale: 0.6 }, entry: { every: 1, scale: 0.5 },
-      terrace: { every: 1, scale: 0.5 }, hall: { every: 2, scale: 0.9 }, upper: { every: 2, scale: 0.9 },
+      // Great atrium lanterns carry the hall; small wall lanterns only pool light locally.
+      atrium: { every: 1, scale: 0.5 }, portal: { every: 1, scale: 0.35 }, entry: { every: 1, scale: 0.3 },
+      terrace: { every: 1, scale: 0.4 }, hall: { every: 2, scale: 0.35 }, upper: { every: 2, scale: 0.35 },
     };
     const seen: Record<string, number> = {};
     for (const m of LAYOUT.lights) {
@@ -187,6 +236,8 @@ export class PavilionEngine {
       for (const v of Object.values(material)) if (v instanceof T.Texture) v.anisotropy = aniso;
       // Lattice is alpha-clipped: let MSAA dither the cut-out so thin bars fade instead of sparkling far away.
       if (material.alphaTest > 0) material.alphaToCoverage = true;
+      const boost = EMISSIVE_BOOST[material.name];
+      if (boost && material instanceof T.MeshStandardMaterial) material.emissiveIntensity *= boost;
       const mesh = new T.Mesh(merged, material);
       mesh.castShadow = mesh.receiveShadow = true;
       mesh.name = material.name;
@@ -198,6 +249,10 @@ export class PavilionEngine {
     const w = this.host.clientWidth, h = this.host.clientHeight;
     if (!w || !h) return;
     this.renderer.setSize(w, h);
+    this.composer.setPixelRatio(this.renderer.getPixelRatio());
+    this.composer.setSize(w, h);
+    this.bloomComposer.setPixelRatio(this.renderer.getPixelRatio() / 2);
+    this.bloomComposer.setSize(w, h);
     this.camera.aspect = w / h;
     this.camera.updateProjectionMatrix();
   }
@@ -314,7 +369,12 @@ export class PavilionEngine {
       ground: supportAt(this.world, this.player.x, this.player.z, this.player.y + 0.01),
       visible: this.view === 'third' && this.boom >= FOLLOW.hideBelow,
     });
-    this.renderer.render(this.scene, this.camera);
+    this.elapsed += dt;
+    this.sky.update(this.elapsed, this.camera);
+    this.atmosphere.update(this.elapsed, this.renderer.domElement.height);
+    this.renderer.info.reset();
+    this.renderBloom(dt);
+    this.composer.render(dt);
     this.frames.push(now);
     while (this.frames.length && now - this.frames[0] > 1000) this.frames.shift();
     if (now - this.lastHud > 120) {
@@ -325,6 +385,37 @@ export class PavilionEngine {
       if (key !== this.hudKey) { this.hudKey = key; this.hooks.hud(hud); }
     }
   };
+
+  /** Bloom input: the scene with every non-source material swapped for a black one (alpha cut-outs kept). */
+  private renderBloom(dt: number) {
+    if (!this.bloom.enabled) {   // debug comparison: leave no stale glow behind
+      this.renderer.setRenderTarget(this.bloomComposer.renderTarget2); this.renderer.clear(); this.renderer.setRenderTarget(null);
+      return;
+    }
+    const background = this.scene.background;
+    this.scene.background = BLACK;
+    this.sky.group.visible = this.atmosphere.group.visible = false;
+    this.scene.traverseVisible(o => {
+      const mesh = o as T.Mesh;
+      if (!mesh.isMesh || BLOOM_SOURCES.has(mesh.name)) return;
+      this.swapped.push([mesh, mesh.material]);
+      mesh.material = Array.isArray(mesh.material) ? mesh.material.map(m => this.darkOf(m)) : this.darkOf(mesh.material);
+    });
+    this.bloomComposer.render(dt);
+    for (const [mesh, material] of this.swapped) mesh.material = material;
+    this.swapped.length = 0;
+    this.scene.background = background;
+    this.sky.group.visible = this.atmosphere.group.visible = true;
+  }
+  private darkOf(m: T.Material) {
+    let d = this.dark.get(m);
+    if (!d) {
+      const src = m as T.MeshStandardMaterial;
+      d = new T.MeshBasicMaterial({ color: 0, fog: false, side: src.side, map: src.alphaTest > 0 ? src.map : null, alphaTest: src.alphaTest });
+      this.dark.set(m, d);
+    }
+    return d;
+  }
 
   private hud(): HudState {
     const d = new T.Vector3();
@@ -350,8 +441,11 @@ export class PavilionEngine {
     this.exhibits.clear();
     this.renderer.shadowMap.needsUpdate = true;
     disposeResources(old);
+    this.dark.forEach(m => m.dispose()); this.dark.clear();   // black stand-ins are rebuilt on demand
     const byMarker = new Map(this.world.slots.map(s => [s.id, s]));
     const queue = slots.filter(s => s.exhibit && byMarker.has(slotMarker(s.slotNo)));
+    const shown: ExhibitSlot[] = [];
+    this.atmosphere.setHalos(shown);
     let loaded = 0, failed = 0;
     const loadOne = async (slot: GallerySlot) => {
       const model = slot.exhibit!.model, marker = byMarker.get(slotMarker(slot.slotNo))!;
@@ -373,6 +467,7 @@ export class PavilionEngine {
         source.traverse(o => { const m = o as T.Mesh; if (m.isMesh) { m.castShadow = true; m.receiveShadow = true; } });
         this.exhibits.add(holder);
         this.renderer.shadowMap.needsUpdate = true;
+        shown.push(marker); this.atmosphere.setHalos(shown);
         loaded++;
       } catch { if (token === this.exhibitToken) failed++; }
     };
@@ -449,6 +544,12 @@ export class PavilionEngine {
     disposeResources([this.building]);   // the textured shell: geometries, materials and their maps
     this.building.clear();
     this.scene.environment?.dispose();
+    this.sky.dispose();
+    this.atmosphere.dispose();
+    this.bloom.dispose();
+    this.bloomComposer.dispose();
+    this.composer.dispose();
+    this.dark.forEach(m => m.dispose());
     this.scene.traverse(o => {
       const mesh = o as T.Mesh;
       if (mesh.isMesh) { mesh.geometry.dispose(); (mesh.material as T.Material).dispose(); }

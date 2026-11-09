@@ -15,3 +15,6 @@ playwright-report/
 # T16 prepared textures (rebuilt by scripts/blender/build_t16.py)
 assets/t16/textures/.build/
 __pycache__/
+
+# T16 raw Lux3D prop downloads (~85 MB; prepared copies in assets/t16/props/ are committed)
+assets/t16/props/source/

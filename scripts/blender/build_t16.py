@@ -1,4 +1,4 @@
-"""T16 pavilion (D2: structure and materials): one source for the render GLB AND the walking/camera data.
+"""T16 pavilion (D3: structure, materials and Lux3D props): one source for the render GLB AND the walking/camera data.
 
 Run headless from the repo root (Blender 4.5), after `node scripts/fetch-t16-textures.mjs`:
   ~/Applications/Blender.app/Contents/MacOS/Blender -b --factory-startup --python scripts/blender/build_t16.py
@@ -7,7 +7,8 @@ Every part is declared once in Web coordinates (metres, Y up, north = -Z, entran
 t16_kit, which emits the render faces (with UVs) and, as flagged, walking colliders, jump ceilings
 ("air") and camera blockers. Walk surfaces are declared next to the slabs/treads that carry them. The
 layout JSON written here is the navigation contract read by apps/web/src/game/navigation.ts; nothing
-is transcribed by hand. Materials (Poly Haven CC0 + the user's patterns) come from t16_materials.
+is transcribed by hand. Materials (Poly Haven CC0 + the user's patterns) come from t16_materials; the
+Lux3D props (prepared by prep_t16_props.py) are placed as instances through t16_props.
 The export fails if any two audited parts interpenetrate or two box faces z-fight.
 """
 import bpy, bmesh, math, json, hashlib, sys
@@ -17,10 +18,11 @@ import t16_kit as kit
 from t16_kit import (box, cylinder, lathe, prism, frustum, annulus_xy, annulus_y, disc_xy, slab_with_hole, sloped_bar,
                      surface, nav_box, nav_circle, light, uid, r4, NAV, PARTS, MESH, LIGHTS)
 import t16_materials as mats
+import t16_props as props
 
 ROOT = Path(__file__).resolve().parents[2]
 OUT = ROOT / 'assets/t16'; OUT.mkdir(parents=True, exist_ok=True)
-NAME = 'T16_Pavilion_D2'
+NAME = 'T16_Pavilion_D3'
 
 # ---------------------------------------------------------------- parameters (see docs/design/T16)
 HX, ZN, ZS, WT = 22.0, -32.0, 28.0, 0.6          # interior half width, north/south inner wall faces, wall thickness
@@ -181,16 +183,13 @@ box('terrace-podium', 'Stone', TERRACE[0], TERRACE[1], -6, -0.4, ZS + WT, TERRAC
 surface('terrace', TERRACE[0], TERRACE[1], ZS, TERRACE[3], 0)
 for sx in (-1, 1):
     balustrade('terrace-rail', 'z', ZS + WT, TERRACE[3], sx * (TERRACE[1] - RAIL_T), sx * TERRACE[1], 0, mat='Marble', panel='Marble')
-    # Lion pedestals (the Lux3D lions arrive in D3) and stone lamps.
+    # Lux3D guardian lions (B1, facing out; the east one mirrored) on marble pedestals, and two pairs
+    # of Lux3D stone lamps (B2) with a glowing core in the openwork chamber.
     box('lion-pedestal', 'Marble', sx * 5.7, sx * 7.3, 0, 0.8, 32.7, 34.3, nav=('block',))
-    box('lion', 'Stone', sx * 5.9, sx * 7.1, 0.8, 2.8, 32.9, 34.1, nav=('block',))
-    lx = sx * 8.7
-    prism('stone-lamp-base', 'Marble', lx, 30.5, 0.36, 0, 0.4, sides=6)
-    cylinder('stone-lamp-shaft', 'Marble', lx, 30.5, 0.14, 0.4, 1.4, sides=12)
-    prism('stone-lamp-light', 'Marble', lx, 30.5, 0.32, 1.4, 1.9, sides=6, side_mat='Glow')
-    prism('stone-lamp-roof', 'Marble', lx, 30.5, 0.46, 1.9, 2.2, sides=6, r_top=0.05)
-    nav_box('colliders', uid('stone-lamp'), sx * 8.4, sx * 9.0, 0, 2.2, 30.2, 30.8)
-    nav_box('cameraBlockers', uid('stone-lamp-cam'), lx - .46, lx + .46, 0, 2.2, 30.04, 30.96)
+    props.place('B1', sx * 6.5, 0.8, 33.5, 2.2, mirror=sx > 0, name='lion')
+    for lz in (30.5, 34.9):
+        props.place('B2', sx * 8.7, 0, lz, 2.4, name='stone-lamp')
+        box('stone-lamp-light', 'Glow', sx * 8.7 - .12, sx * 8.7 + .12, 1.58, 1.82, lz - .12, lz + .12, pierce=True)
 balustrade('terrace-rail', 'x', TERRACE[0] + RAIL_T, TERRACE[1] - RAIL_T, TERRACE[3] - RAIL_T, TERRACE[3], 0, mat='Marble', panel='Marble')
 light('terrace', (0, 6, 33), (.75, .82, 1), 300)
 
@@ -303,7 +302,7 @@ def clerestory_face(side, fixed, a0, a1, n_win):
     pitch = (a1 - a0) / n_win; edges = [a0]
     for k in range(n_win):
         m = a0 + pitch * (k + .5)
-        B('window-glow', 'Glow', m - 1.2, m + 1.2, 0, 0.03, *WIN)
+        B('window-glow', 'WindowGlow', m - 1.2, m + 1.2, 0, 0.03, *WIN)
         B('window-lattice', 'Lattice', m - 1.2, m + 1.2, 0.05, 0.08, *WIN, fit={side: (1, 1.5)})
         edges += [m - 1.2, m + 1.2]
     edges.append(a1)
@@ -428,18 +427,57 @@ for z in ALCOVES[UP]: alcove('二层西展厅 · 乙', -1, UP, z)
 for z in ALCOVES[UP]: alcove('二层东展厅 · 乙', 1, UP, z)
 assert len(SLOTS) == 30
 
+# ---------------------------------------------------------------- Lux3D furnishings: hall censers, curio cabinets
+# A pair of bronze censers (B3) on octagonal stone bases flanks the entrance-hall carpet.
+for sx in (-1, 1):
+    prism('censer-base', 'Marble', sx * 5, 21, 0.85, 0, 0.3, sides=8, phase=0)
+    nav_circle('colliders', uid('censer'), sx * 5, 21, 0.85, 0, 1.8)
+    props.place('B3', sx * 5, 0.3, 21, 1.5, nav=('cam',), name='censer')
+
+CURIOS = ['B4', 'B5', 'B6', 'B7', 'B8', 'B9']
+CAB_W, CAB_H, CAB_D, CAB_T = 3.0, 3.4, 0.5, 0.08                 # width along the wall, height, depth, side panel
+def curio_cabinet(sx, y, zc, k):
+    """Duobao curio cabinet against a side wall (x = sx·22), standing on the pilaster faces: a plinth,
+    side panels, a back, two shelves with staggered dividers (three rows, two bays each) and a gilt top.
+    Lux3D curios (B4–B9, rotated per cabinet) stand in the bays facing the hall."""
+    inw = -sx; X = lambda d: sx * HX + inw * d
+    front = '+x' if inw > 0 else '-x'; back = '-x' if inw > 0 else '+x'
+    d0, d1 = DRESS, DRESS + CAB_D; z0, z1 = zc - CAB_W / 2, zc + CAB_W / 2
+    def B(nm, m, da, db, ya, yb, za, zb, **kw): return box(nm, m, X(da), X(db), ya, yb, za, zb, **kw)
+    B('cabinet-plinth', 'Lacquer', d0, d1, y, y + 0.15, z0, z1, skip=(back,))
+    for za, zb in ((z0, z0 + CAB_T), (z1 - CAB_T, z1)): B('cabinet-side', 'Lacquer', d0, d1, y + 0.15, y + CAB_H - 0.15, za, zb, skip=(back,))
+    B('cabinet-top', 'Lacquer', d0, d1 + 0.04, y + CAB_H - 0.15, y + CAB_H, z0 - 0.04, z1 + 0.04, skip=(back,), **gilt(front, CAB_W, 0.15))
+    B('cabinet-back', 'Relief', d0, d0 + 0.04, y + 0.15, y + CAB_H - 0.15, z0 + CAB_T, z1 - CAB_T, skip=(back,))
+    rows = [(y + 0.15, y + 1.15), (y + 1.2, y + 2.2), (y + 2.25, y + CAB_H - 0.15)]
+    for (_, top), (bottom, _) in zip(rows, rows[1:]): B('cabinet-shelf', 'Lacquer', d0 + 0.04, d1, top, bottom, z0 + CAB_T, z1 - CAB_T)
+    inner = (z0 + CAB_T, z1 - CAB_T); span = inner[1] - inner[0]
+    for r, ((ya, yb), split) in enumerate(zip(rows, (0.42, 0.6, 0.34))):
+        zd = inner[0] + span * split
+        B('cabinet-divider', 'Lacquer', d0 + 0.04, d1, ya, yb, zd - 0.025, zd + 0.025)
+        for b, (za, zb) in enumerate(((inner[0], zd - 0.025), (zd + 0.025, inner[1]))):
+            pid = CURIOS[(k + 2 * r + b) % len(CURIOS)]
+            w, h, dp = props.size(pid, 1.0)
+            hgt = min(0.72, (zb - za - 0.12) / w, (CAB_D - 0.08) / dp)           # fit the bay: wall-wise width, depth, height
+            props.place(pid, X((d0 + 0.04 + d1) / 2), ya, (za + zb) / 2, hgt, yaw=inw * math.pi / 2, nav=(), name='curio')
+    nav_box('colliders', uid('cabinet'), X(d0), X(d1 + 0.04), y, y + CAB_H, z0 - 0.04, z1 + 0.04)
+    nav_box('cameraBlockers', uid('cabinet-cam'), X(d0), X(d1 + 0.04), y, y + CAB_H, z0 - 0.04, z1 + 0.04)
+k = 0
+for sx in (-1, 1):
+    for z in (-5.5, 1.5, 8.5, 15.5): curio_cabinet(sx, 0, z, k); k += 1         # ground floor: between the alcoves
+    for z in (-20, -8, 4, 16): curio_cabinet(sx, UP, z, k); k += 1             # upper floor: between the alcoves
+
 # ---------------------------------------------------------------- palace lanterns (render + camera blockers + light markers)
-def lantern(role, x, z, y_bottom, size, height, hang_to, power):
+def lantern(role, x, z, y_bottom, size, height, hang_to, power, paper='LanternPaperSmall'):
     r = size / 2; h = height
     prism('lantern-foot', 'Gold', x, z, r * .6, y_bottom, y_bottom + .15 * h, r_top=r * 1.12)
-    prism('lantern', 'Gold', x, z, r, y_bottom + .15 * h, y_bottom + .85 * h, side_mat='LanternPaper', fit_sides=True)
+    prism('lantern', 'Gold', x, z, r, y_bottom + .15 * h, y_bottom + .85 * h, side_mat=paper, fit_sides=True)
     prism('lantern-hat', 'Gold', x, z, r * 1.12, y_bottom + .85 * h, y_bottom + h, r_top=r * .45)
     box('lantern-tassel', 'LanternRed', x - .04, x + .04, y_bottom - .35 * h, y_bottom, z - .04, z + .04)
     box('lantern-rod', 'Gold', x - 0.04, x + 0.04, y_bottom + h, hang_to, z - 0.04, z + 0.04, nav=('cam',))
     nav_box('cameraBlockers', uid('lantern'), x - r * 1.12, x + r * 1.12, y_bottom - .35 * h, y_bottom + h, z - r * 1.12, z + r * 1.12)
     light(role, (x, y_bottom + h / 2, z), (1, .62, .28), power)
 for sx in (-1, 1):
-    for z in (-10.5, 14.5): lantern('atrium', sx * 9.8, z, 13.8, 1.6, 2.4, EAVE_Y1 - 0.2, 900)
+    for z in (-10.5, 14.5): lantern('atrium', sx * 9.8, z, 13.8, 1.6, 2.4, EAVE_Y1 - 0.2, 900, paper='LanternPaper')
     for z in (-5.5, 1.5, 8.5, 15.5): lantern('hall', sx * 19.25, z, 5.6, 0.8, 1.2, UP - SLAB, 160)
     for z in (-22.5, -8.5, 5.5, 19.5): lantern('upper', sx * 19.25, z, 14.6, 0.8, 1.2, CEIL, 160)
     lantern('entry', sx * 3, 25, 5.6, 0.8, 1.2, UP - SLAB, 160)
@@ -469,6 +507,7 @@ for material, (vs, fs, uvs, sm) in MESH.items():
         bm.to_mesh(me); bm.free()
     me.materials.append(MAT[material]); me.update()
     ob = bpy.data.objects.new(f'T16_{material}', me); col.objects.link(ob); objs.append(ob)
+objs += props.objects(col)
 # Nav debug collection (not exported): surfaces as thin sheets, so the contract can be eyeballed in Blender.
 navc = bpy.data.collections.new('T16_Nav_Debug'); scene.collection.children.link(navc)
 dv, df = [], []
@@ -486,14 +525,16 @@ bpy.ops.export_scene.gltf(filepath=str(glb), export_format='GLB', use_selection=
                           export_cameras=False, export_extras=False, export_image_format='JPEG', export_jpeg_quality=85, export_image_quality=85)
 bpy.ops.wm.save_as_mainfile(filepath=str(OUT / 'pavilion-t16.blend'))
 
-src = b''.join(p.read_bytes() for p in (Path(__file__), Path(kit.__file__), Path(mats.__file__)))
+src = b''.join(p.read_bytes() for p in (Path(__file__), Path(kit.__file__), Path(mats.__file__), Path(props.__file__), props.ROOT / 'assets/t16/props/props-manifest.json'))
 layout = {
-    'version': 't16-d2', 'scene': NAME, 'source': 'scripts/blender/build_t16.py',
+    'version': 't16-d3', 'scene': NAME, 'source': 'scripts/blender/build_t16.py',
     'sourceSHA256': hashlib.sha256(src).hexdigest(),
     'coordinates': 'Web metres, Y up, north = -Z; Blender (x,-z,y)',
     'upperY': UP, 'floorY': 0, 'entry': {'x': 0, 'y': 0, 'z': 24}, 'entryYaw': 0,
     'exhibitSlots': SLOTS, **NAV, 'lights': LIGHTS,
-    'stats': {'glbBytes': glb.stat().st_size, 'triangles': sum(sum(len(f) - 2 for f in fs) for _, fs, _, _ in MESH.values()),
+    'oculus': {'x': 0, 'z': 2, 'r': r4(HR), 'y': 27.4},   # the open skylight: the web light shaft starts here
+    'stats': {'glbBytes': glb.stat().st_size, 'triangles': sum(sum(len(f) - 2 for f in fs) for _, fs, _, _ in MESH.values()) + props.triangles(),
+              'props': len(props.PLACED),
               'materials': len([m for m, (v, *_) in MESH.items() if v]), 'renderParts': len(PARTS),
               'surfaces': len(NAV['surfaces']), 'colliders': len(NAV['colliders']), 'airColliders': len(NAV['airColliders']),
               'cameraBlockers': len(NAV['cameraBlockers']), 'overlaps': OVERLAPS, 'coplanar': COPLANAR},

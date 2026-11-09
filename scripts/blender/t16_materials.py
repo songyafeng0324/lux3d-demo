@@ -86,13 +86,15 @@ def build_specs():
     spec('Slab', tex=ph_maps('dark_wooden_planks', (.85, .66, .55), .9), tile=2.0, normal=.7)
     spec('Ceiling', tex=ph_maps('dark_wooden_planks', (.55, .40, .32), 1.0), tile=2.0, normal=.7)
     spec('Floor', tex=ph_maps('granite_tile', (.50, .50, .56), .42), tile=2.3, normal=.6)
-    spec('Marble', tex=ph_maps('marble_01', (1, 1, 1), .75), tile=1.5, normal=.5)
-    spec('Stone', tex=ph_maps('marble_01', (.95, .88, .78), .85), tile=1.5, normal=.6)
+    # Marble a shade under pure white, so stairs and terraces sit in the dim hall instead of glaring.
+    spec('Marble', tex=ph_maps('marble_01', (.8, .78, .74), .75), tile=1.5, normal=.5)
+    spec('Stone', tex=ph_maps('marble_01', (.78, .72, .64), .85), tile=1.5, normal=.6)
     spec('RoofTile', tex=ph_maps('grey_roof_tiles', (.55, .58, .62), 1.0), tile=3.0, normal=1.0)
     spec('Gold', color=(.92, .62, .26), metal=1.0, rough=.36)
     spec('LanternRed', color=(.55, .04, .03), rough=.75)
     # Emissive panels: near-black base so nearby lantern lights cannot wash them out; the colour is all emission.
-    spec('Glow', color=(.04, .02, .01), emit=(1.0, .5, .18), strength=0.65)
+    spec('Glow', color=(.04, .02, .01), emit=(1.0, .5, .18), strength=0.65)            # small lamp cores (alcove, newel, stone lamps)
+    spec('WindowGlow', color=(.03, .015, .008), emit=(1.0, .56, .26), strength=0.3)     # dim amber behind the clerestory lattice
     a1 = _load(USER / 'A1-cloud-relief.png')
     a1c = a1.copy(); a1c[..., :3] = np.clip(a1c[..., :3] * np.array((.85, .70, .62), np.float32), 0, 1)
     spec('Relief', tex={'color': _save(a1c, 'A1-relief-col'), 'normal': _save(normal_from_height(a1, 6.0), 'A1-relief-nor')}, rough=.62, tile=2.4, normal=1.0)
@@ -111,8 +113,12 @@ def build_specs():
     spec('Caisson', tex={'color': _save(_load(USER / 'A3-caisson.png'), 'A3-caisson')}, rough=.7)
     spec('Banner1', tex={'color': _save(_load(USER / 'A7-banner-1.png'), 'A7-banner-1')}, rough=.85, double=True)
     spec('Banner2', tex={'color': _save(_load(USER / 'A7-banner-2.png'), 'A7-banner-2')}, rough=.85, double=True)
+    # Lantern paper glows warm orange (candle behind cream paper, as in the style reference), not white.
     a9 = _load(USER / 'A9-lantern-paper.png', 512); a9d = a9.copy(); a9d[..., :3] *= .3
-    spec('LanternPaper', tex={'color': _save(a9d, 'A9-paper-base'), 'emit': _save(a9, 'A9-paper')}, rough=.8, strength=0.9)
+    a9w = a9.copy(); a9w[..., :3] *= np.array((1.0, .66, .38), np.float32)
+    paper = {'color': _save(a9d, 'A9-paper-base'), 'emit': _save(a9w, 'A9-paper')}
+    spec('LanternPaper', tex=paper, rough=.8, strength=1.0)          # the four great atrium lanterns
+    spec('LanternPaperSmall', tex=paper, rough=.8, strength=0.5)     # hall, gallery and entry lanterns
     spec('Portal', tex={'color': _save(_load(USER / 'A10-moon-gate-view.png'), 'A10-portal')}, rough=.9, emit_tex=True, strength=1.0)
     for n, s in SPECS.items():
         if 'tile' in s: kit.TILE[n] = s['tile']

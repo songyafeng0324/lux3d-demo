@@ -1,14 +1,14 @@
 {
   "base": "http://localhost:5173",
   "browser": "157.0.8103.38",
-  "started": "2026-11-09T15:30:02.080Z",
+  "started": "2026-11-09T17:42:10.662Z",
   "cameraProbe": {
-    "views": 28920,
-    "shortened": 8976,
+    "views": 28200,
+    "shortened": 8724,
     "hits": []
   },
   "exhibitDetail": {
-    "slot": "T02",
+    "slot": "T03",
     "opened": true
   },
   "characters": [
@@ -30,7 +30,7 @@
     {
       "label": "红衣小丸子",
       "id": "maruko-tpose",
-      "height": 1.5
+      "height": 1.501
     },
     {
       "label": "蜡笔小新",
@@ -64,18 +64,18 @@
     "note": "headless Chrome; M5 real-device numbers are the acceptance basis"
   },
   "renderInfo": {
-    "calls": 26,
-    "triangles": 279396
+    "calls": 100,
+    "triangles": 1332555
   },
   "roomSpeed": {
-    "walk": 5.1,
-    "shift": 8.79
+    "walk": 5.09,
+    "shift": 8.83
   },
   "room": {
     "indoorCamera": [
       0,
       2.410741858544196,
-      -0.17010695090803019
+      -0.17010695090802752
     ],
     "indoorBoom": 3.2,
     "sharedCharacter": "pink-shorts-girl",

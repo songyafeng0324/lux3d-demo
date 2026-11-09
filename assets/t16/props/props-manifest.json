@@ -1,0 +1,143 @@
+{
+ "source": "scripts/blender/prep_t16_props.py",
+ "lux3d": {
+  "region": "cn",
+  "operation": "image-to-3d",
+  "version": "G1-Turbo",
+  "outputFormat": [
+   "glb"
+  ],
+  "enablePbr": true,
+  "aiPredictSize": false,
+  "quoteId": "quote_89be1a1ce23f4f30af56aca91c238a77",
+  "references": "docs/design/t16/props/<stem>.png"
+ },
+ "props": {
+  "B1": {
+   "file": "assets/t16/props/B1-stone-lion.glb",
+   "taskId": "5159092",
+   "rawSHA256": "a2604ab0e245428495d8879241d7156ae2bb575898cd4ec9c19cba5c2efa8997",
+   "rawTriangles": 36624,
+   "triangles": 14000,
+   "mapSize": 1024,
+   "bytes": 783124,
+   "size": [
+    0.5539,
+    1.007,
+    0.6933
+   ]
+  },
+  "B2": {
+   "file": "assets/t16/props/B2-stone-lamp.glb",
+   "taskId": "5159129",
+   "rawSHA256": "a0da25ae35a77a0202283cd1c950380ce51417d08258057313c0a33669afecb5",
+   "rawTriangles": 38514,
+   "triangles": 10000,
+   "mapSize": 1024,
+   "bytes": 735888,
+   "size": [
+    0.568,
+    1.0059,
+    0.5992
+   ]
+  },
+  "B3": {
+   "file": "assets/t16/props/B3-incense-burner.glb",
+   "taskId": "5159207",
+   "rawSHA256": "c361e47d8cc978b44ec309d95340bce18b8f4c457f6522121ad7d82cbc82a870",
+   "rawTriangles": 35296,
+   "triangles": 12000,
+   "mapSize": 1024,
+   "bytes": 815680,
+   "size": [
+    0.9126,
+    1.0069,
+    0.8602
+   ]
+  },
+  "B4": {
+   "file": "assets/t16/props/B4-vase.glb",
+   "taskId": "5159230",
+   "rawSHA256": "f818faabed332acfb9bccf5131dde1dd1b01ed6d2ea4d66a85f2c9630604a07e",
+   "rawTriangles": 18126,
+   "triangles": 3999,
+   "mapSize": 512,
+   "bytes": 220200,
+   "size": [
+    0.5918,
+    1.0046,
+    0.5982
+   ]
+  },
+  "B5": {
+   "file": "assets/t16/props/B5-jade-bi.glb",
+   "taskId": "5159258",
+   "rawSHA256": "7f443775197b43bd5f1ced20a7775edab5c6339cacab7b610146db0ff8c8c8bd",
+   "rawTriangles": 18544,
+   "triangles": 4000,
+   "mapSize": 512,
+   "bytes": 231972,
+   "size": [
+    0.7176,
+    1.0031,
+    0.2681
+   ]
+  },
+  "B6": {
+   "file": "assets/t16/props/B6-bronze-jue.glb",
+   "taskId": "5162296",
+   "rawSHA256": "c3e4b17c68b85aa54adef834b99309bac3edcb1898c26371a96a4695ea21fdd8",
+   "rawTriangles": 18064,
+   "triangles": 3998,
+   "mapSize": 512,
+   "bytes": 261288,
+   "size": [
+    1.0051,
+    1.0092,
+    0.6913
+   ]
+  },
+  "B7": {
+   "file": "assets/t16/props/B7-ruyi.glb",
+   "taskId": "5162645",
+   "rawSHA256": "a8d8ddc0eff67700d442b0303e6ca24d63f2928cfd5d7f3cc5997663839a254d",
+   "rawTriangles": 26848,
+   "triangles": 4000,
+   "mapSize": 512,
+   "bytes": 296596,
+   "size": [
+    1.0112,
+    0.4846,
+    0.369
+   ]
+  },
+  "B8": {
+   "file": "assets/t16/props/B8-book-box.glb",
+   "taskId": "5163559",
+   "rawSHA256": "9ccb4d215ced543b5fd9c75f8f6f57b1bea78e856109cdef2df41c6d88483c79",
+   "rawTriangles": 19214,
+   "triangles": 4000,
+   "mapSize": 512,
+   "bytes": 233176,
+   "size": [
+    0.7183,
+    1.0053,
+    0.4115
+   ]
+  },
+  "B9": {
+   "file": "assets/t16/props/B9-jade-mountain.glb",
+   "taskId": "5163582",
+   "rawSHA256": "d5a8bb3a4ad13b48f7f6cceb044ef2dcd77f32abba1a1f4db0312f290b2e8005",
+   "rawTriangles": 21936,
+   "triangles": 4000,
+   "mapSize": 512,
+   "bytes": 277436,
+   "size": [
+    0.943,
+    1.0243,
+    0.9514
+   ]
+  }
+ }
+}

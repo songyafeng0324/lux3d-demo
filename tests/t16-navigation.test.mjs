@@ -168,3 +168,23 @@ test('jumping under a side flight stops the head at the treads and lands back on
   assert.equal(player.y, 0);
   assert.equal(player.velocityY, null);
 });
+
+// 2026-11-10 user report: holding W and jumping up the central flight sometimes dropped the player inside
+// the stair mass (the riser in front was not solid in the air). Every frame the feet must stay on or above
+// the stepped surface under them, and the climb must still reach the landing.
+const centralTop = (x, z) => (Math.abs(x) <= 2.8 && z <= ZSTAIR && z >= ZLAND)
+  ? Math.min(24, Math.ceil((ZSTAIR - z) / 0.32 - 1e-9)) * 0.18 : null;
+for (const dt of [1 / 60, 1 / 30, .25]) for (const run of [false, true]) for (const hop of ['once', 'every landing']) {
+  test(`jumping up the central flight never sinks into the steps (dt=${dt.toFixed(3)}, ${run ? 'run' : 'walk'}, jump ${hop})`, () => {
+    let p = { x: 0.4, y: 0, z: -13, velocityY: null }, first = true;
+    for (let t = 0; t < 6 && p.z > ZLAND - 0.5; t += dt) {
+      const jump = first || (hop === 'every landing' && p.velocityY === null);
+      first = false;
+      p = stepFirstPerson(world, p, { forward: 1, right: 0, run }, 0, dt, jump);
+      const top = centralTop(p.x, p.z);
+      if (top !== null) assert.ok(p.y >= top - 1e-6, `feet ${p.y.toFixed(3)} below the step top ${top.toFixed(2)} at z=${p.z.toFixed(2)}`);
+    }
+    for (let t = 0; t < 2 && p.velocityY !== null; t += dt) p = stepFirstPerson(world, p, still, 0, dt, false);   // let the last hop land
+    assert.ok(Math.abs(p.y - YLAND) < 1e-6 && p.z < ZLAND && p.velocityY === null, `ended at ${JSON.stringify(p)}`);
+  });
+}
