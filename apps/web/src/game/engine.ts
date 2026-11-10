@@ -10,7 +10,7 @@ import { ShaderPass } from 'three/addons/postprocessing/ShaderPass.js';
 import pavilionUrl from '../../../../assets/t16/pavilion-t16.glb?url';
 import layout from '../../../../assets/t16/pavilion-layout.json';
 import lightmaps from '../../../../assets/t16/pavilion-lightmaps.json';
-import { buildNavWorld, pavilionCamera, stepFirstPerson, supportAt, targetSlot, floorOf, BODY, MOVE_KEYS, type ExhibitSlot, type FirstPerson, type NavWorld, type PavilionLayout } from './navigation.js';
+import { buildNavWorld, pavilionCamera, stepFirstPerson, supportAt, targetSlot, floorOf, exhibitCollider, freePlayer, EXHIBIT_COLLIDER, BODY, MOVE_KEYS, type ExhibitSlot, type FirstPerson, type NavWorld, type PavilionLayout } from './navigation.js';
 import { AvatarRig } from './avatar.js';
 import type { AvatarPrefs, ViewMode } from './avatar-prefs.js';
 import { boomLength, clampFollowPitch, easeBoom, FOLLOW, viewDirection, type Vec3 } from './follow-camera.js';
@@ -172,8 +172,10 @@ export class PavilionEngine {
     // A dim fill: the hall should read in pools of lantern light, not evenly lit (D3 user feedback).
     this.scene.add(new T.HemisphereLight(0x9db2d6, 0x3a2414, 0.5));
     const sky = new T.DirectionalLight(0xd6e4ff, 2.0);
-    sky.position.set(7, 60, 12);
-    sky.target.position.set(0, 0, 2);
+    // Straight down through the oculus (x 0, z 2): its pool of starlight lands on the Treasure's dais,
+    // inside the drawn light shaft, instead of a slanted second patch on the floor beside it.
+    sky.position.set(LAYOUT.oculus.x, 60, LAYOUT.oculus.z);
+    sky.target.position.set(LAYOUT.oculus.x, 0, LAYOUT.oculus.z);
     sky.castShadow = true;
     sky.shadow.mapSize.set(4096, 4096);
     Object.assign(sky.shadow.camera, { left: -38, right: 38, top: 40, bottom: -40, near: 1, far: 120 });
@@ -501,7 +503,7 @@ export class PavilionEngine {
     const p = this.view === 'third' ? new T.Vector3(...this.pivot()) : this.camera.position;
     return {
       floor: floorOf(this.player.y),
-      target: this.enabled ? targetSlot(this.world, [p.x, p.y, p.z], [d.x, d.y, d.z]) : null,
+      target: this.enabled ? targetSlot(this.world, [p.x, p.y, p.z], [d.x, d.y, d.z], 3, this.player.y) : null,
       fps: this.fps,
       calls: this.renderer.info.render.calls,
     };
@@ -523,6 +525,7 @@ export class PavilionEngine {
     const queue = slots.filter(s => s.exhibit && byMarker.has(slotMarker(s.slotNo)));
     const shown: ExhibitSlot[] = [];
     this.atmosphere.setHalos(shown);
+    this.clearExhibitColliders();
     let loaded = 0, failed = 0;
     const loadOne = async (slot: GallerySlot) => {
       const model = slot.exhibit!.model, marker = byMarker.get(slotMarker(slot.slotNo))!;
@@ -545,6 +548,7 @@ export class PavilionEngine {
         this.exhibits.add(holder);
         this.renderer.shadowMap.needsUpdate = true;
         shown.push(marker); this.atmosphere.setHalos(shown);
+        this.addExhibitCollider(holder);
         loaded++;
       } catch { if (token === this.exhibitToken) failed++; }
     };
@@ -562,6 +566,26 @@ export class PavilionEngine {
     return normalized;
   }
   exhibitCount() { return this.exhibits.children.length; }
+
+  /**
+   * Exhibits are solid: each loaded model's world box (conservative: the AABB of the turned model; it
+   * floats a little above its plinth and may overhang it) joins the walking colliders, which the follow
+   * camera also respects. Cleared when a new published version starts loading, so no stale box outlives
+   * its model. A visitor standing where a box appears (e.g. on the plinth top) is moved clear.
+   */
+  private clearExhibitColliders() {
+    const cs = this.world.colliders;
+    for (let i = cs.length - 1; i >= 0; i--) if (cs[i].id.startsWith(EXHIBIT_COLLIDER)) cs.splice(i, 1);
+  }
+  private addExhibitCollider(holder: T.Object3D) {
+    holder.updateMatrixWorld(true);
+    const box = new T.Box3().setFromObject(holder);
+    const c = exhibitCollider(holder.userData.slotNo as number, box.min.toArray(), box.max.toArray());
+    if (!c) return;
+    this.world.colliders.push(c);
+    const freed = freePlayer(this.world, this.player);
+    if (freed !== this.player) { this.player = freed; this.viewY = freed.y; this.placeCamera(0); }
+  }
 
   /** Read-only state for local checks (scripts/t10-game-browser.mjs). */
   debugState() {

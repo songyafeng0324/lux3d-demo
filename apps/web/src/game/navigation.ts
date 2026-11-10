@@ -47,7 +47,8 @@ export const UPPER_Y = 9;
 
 export function buildNavWorld(layout: PavilionLayout): NavWorld {
   return {
-    surfaces: layout.surfaces, colliders: layout.colliders, airColliders: layout.airColliders,
+    // colliders is a fresh array: the engine adds and removes the loaded exhibits' boxes at run time.
+    surfaces: layout.surfaces, colliders: [...layout.colliders], airColliders: layout.airColliders,
     cameraBlockers: layout.cameraBlockers, slots: layout.exhibitSlots,
     entry: { ...layout.entry }, entryYaw: layout.entryYaw, floorY: layout.floorY,
   };
@@ -229,8 +230,94 @@ export function floorOf(y: number): 'ground' | 'stairs' | 'upper' {
   return y < 0.2 ? 'ground' : y > UPPER_Y - 0.2 ? 'upper' : 'stairs';
 }
 
-/** Nearest exhibit plinth hit by a ray within maxDist (slab test on the plinth box). */
-export function targetSlot(world: NavWorld, origin: [number, number, number], dir: [number, number, number], maxDist = 3): ExhibitSlot | null {
+/** Horizontal reach and half-angle of the facing fallback in targetSlot. */
+export const TARGET_FACING = { reach: 2.5, halfAngle: Math.PI * 40 / 180 } as const;
+
+/**
+ * The plinth the visitor is aiming at: first the nearest plinth box hit by the view ray within maxDist;
+ * if the ray misses (looking level or up past a low plinth, common in third person), the nearest plinth
+ * on the same floor within TARGET_FACING.reach whose centre lies within TARGET_FACING.halfAngle of the
+ * horizontal view direction. Pitch alone never hides the E prompt (2026-11-10 user feedback).
+ */
+export function targetSlot(world: NavWorld, origin: [number, number, number], dir: [number, number, number], maxDist = 3, feetY = origin[1] - BODY.eye): ExhibitSlot | null {
+  return rayTarget(world, origin, dir, maxDist) ?? facingTarget(world, origin, dir, feetY);
+}
+
+/** Does the horizontal segment a→b cross a collider that blocks a body standing at feetY (walls, pillars)? */
+function segmentBlocked(world: WalkingWorld, [ax, az]: [number, number], [bx, bz]: [number, number], feetY: number): boolean {
+  const dx = bx - ax, dz = bz - az, len2 = dx * dx + dz * dz;
+  for (const c of world.colliders) {
+    if (c.id.startsWith(EXHIBIT_COLLIDER) || !activeAt(c, feetY)) continue;
+    if (c.kind === 'circle') {
+      const t = len2 ? Math.min(1, Math.max(0, ((c.x - ax) * dx + (c.z - az) * dz) / len2)) : 0;
+      if (Math.hypot(ax + dx * t - c.x, az + dz * t - c.z) < c.r) return true;
+      continue;
+    }
+    let t0 = 0, t1 = 1;
+    for (const [o, d, lo, hi] of [[ax, dx, c.x0, c.x1], [az, dz, c.z0, c.z1]] as const) {
+      if (Math.abs(d) < 1e-12) { if (o < lo || o > hi) { t0 = 2; break; } continue; }
+      let ta = (lo - o) / d, tb = (hi - o) / d;
+      if (ta > tb) [ta, tb] = [tb, ta];
+      t0 = Math.max(t0, ta); t1 = Math.min(t1, tb);
+    }
+    if (t0 <= t1) return true;
+  }
+  return false;
+}
+
+function facingTarget(world: NavWorld, [ox, , oz]: [number, number, number], [dx, , dz]: [number, number, number], feetY: number): ExhibitSlot | null {
+  const h = Math.hypot(dx, dz);
+  if (h < 1e-6) return null;
+  let best: ExhibitSlot | null = null, bestD: number = TARGET_FACING.reach;
+  for (const s of world.slots) {
+    const [x, y, z] = s.position, hx = s.footprint[0] / 2, hz = s.footprint[1] / 2;
+    if (Math.abs(feetY - y) > BODY.stepUp) continue;                         // same floor as the visitor's feet (not mid-stairs)
+    const nx = Math.min(x + hx, Math.max(x - hx, ox)), nz = Math.min(z + hz, Math.max(z - hz, oz));
+    const d = Math.hypot(nx - ox, nz - oz);
+    if (d > bestD) continue;
+    const cx = x - ox, cz = z - oz, cl = Math.hypot(cx, cz);
+    if (cl > 1e-6 && (cx * dx + cz * dz) / (cl * h) < Math.cos(TARGET_FACING.halfAngle)) continue;
+    // Not through a wall: the line to the plinth edge (stopping just short of it) must be clear.
+    const k = d > 0.15 ? (d - 0.15) / d : 0;
+    if (k > 0 && segmentBlocked(world, [ox, oz], [ox + (nx - ox) * k, oz + (nz - oz) * k], feetY)) continue;
+    best = s; bestD = d;
+  }
+  return best;
+}
+
+/** Run-time exhibit boxes (engine.setExhibits) carry this id prefix; layout colliders never do. */
+export const EXHIBIT_COLLIDER = 'exhibit-';
+
+/**
+ * A loaded exhibit's world box as a walking collider (conservative: the AABB of the turned model), or
+ * null if the box is empty or not finite (a broken model must never poison the walker with NaN).
+ */
+export function exhibitCollider(slotNo: number, min: readonly number[], max: readonly number[]): BoxCollider | null {
+  if (![...min, ...max].every(Number.isFinite) || min.some((v, i) => v >= max[i])) return null;
+  return { id: `${EXHIBIT_COLLIDER}${slotNo}`, kind: 'box', x0: min[0], x1: max[0], y0: min[1], y1: max[1], z0: min[2], z1: max[2] };
+}
+
+/**
+ * If the player overlaps a collider (an exhibit that just loaded where they stand, e.g. on its plinth
+ * top), move them to the nearest free standing spot nearby; push-out in tryMove deliberately refuses
+ * long jumps, so without this they could not move at all. Falls back to the entry.
+ */
+export function freePlayer(world: NavWorld, p: FirstPerson): FirstPerson {
+  if (!playerOverlaps(world.colliders, p)) return p;
+  for (const r of [0.4, 0.8, 1.2, 1.6, 2.2, 3, 4, 5, 6.5, 8]) {
+    let best: FirstPerson | null = null;
+    for (let k = 0; k < 24; k++) {
+      const a = k * Math.PI / 12, x = p.x + r * Math.cos(a), z = p.z + r * Math.sin(a);
+      const y = supportAt(world, x, z, p.y);
+      if (y === null || playerOverlaps(world.colliders, { x, y, z })) continue;
+      if (!best || Math.abs(y - p.y) < Math.abs(best.y - p.y)) best = { x, y, z, velocityY: null };
+    }
+    if (best) return best;
+  }
+  return { ...world.entry, velocityY: null };
+}
+
+function rayTarget(world: NavWorld, origin: [number, number, number], dir: [number, number, number], maxDist: number): ExhibitSlot | null {
   let best: ExhibitSlot | null = null, bestT = maxDist;
   for (const s of world.slots) {
     const [x, y, z] = s.position, hx = s.footprint[0] / 2, hz = s.footprint[1] / 2;

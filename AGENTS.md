@@ -113,4 +113,4 @@
 - 实现入口 `apps/api/src/curation.ts`、`apps/web/src/admin/`、首页 `game/Game.tsx`/`engine.ts`；合同第10节，验证见 `docs/validation/后台展陈验证.md`。
 - 会话复核用户行锁为FOR NO KEY UPDATE，同一行一个事务只UPDATE一次，避免外键KEY SHARE引发死锁；意外错误按requestId写服务端日志。
 - 加引用（保存房间、审核、发布展位）必须先锁asset；风险删除锁asset→房间→gallery并推进版本。过期草稿含已删模型返回409，展陈grant详情/文件只看该展品是否ready。
-- 展陈槽n=布局标记T0n，展品用 `exhibitFit` 自动居中落台；不加手动高度/旋转/缩放。浏览器回归 `npm run test:t08` 只用临时库。
+- 展陈槽n=布局标记T0n，展品用 `exhibitFit` 自动居中落台；不加手动高度/旋转/缩放。展品加载后以世界包围盒加入行走碰撞（`exhibitCollider`，人若被包住由 `freePlayer` 移到附近空位）；E 目标射线没命中时，按脚下同层、2.5 m 以内、40° 朝向且不隔墙选取（`TARGET_FACING`）。浏览器回归 `npm run test:t08` 只用临时库。

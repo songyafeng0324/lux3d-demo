@@ -4,7 +4,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import { buildNavWorld, step, stepFirstPerson, supportAt, floorOf, targetSlot, playerOverlaps, BODY, UPPER_Y } from '../apps/web/src/game/navigation.ts';
+import { buildNavWorld, step, stepFirstPerson, supportAt, floorOf, targetSlot, playerOverlaps, exhibitCollider, freePlayer, EXHIBIT_COLLIDER, BODY, UPPER_Y } from '../apps/web/src/game/navigation.ts';
 
 const layout = JSON.parse(readFileSync(new URL('../assets/t16/pavilion-layout.json', import.meta.url)));
 const world = buildNavWorld(layout);
@@ -219,4 +219,73 @@ test('standing on a plinth top (a collider, not a walk surface) still walks acro
   assert.ok(Math.abs(p.x - start.x) > 0.3 && p.y === 0.8, `moved across the top: ${JSON.stringify(p)}`);
   for (let t = 0; t < 1.5; t += 1 / 60) p = stepFirstPerson(world, p, { forward: 1, right: 0, run: false }, Math.PI / 2, 1 / 60, false);
   assert.ok(p.y === 0 && p.velocityY === null && p.x < -12.5, `stepped off onto the floor: ${JSON.stringify(p)}`);
+});
+
+test('E prompt does not depend on pitch: level or upward views beside a plinth still target it', () => {
+  // 2026-11-10 user report: looking level or up near an exhibit hid the E prompt (the ray passed over the plinth).
+  for (const [id, y] of [['T03', 0], ['T23', UPPER_Y], ['T02', YLAND]]) {
+    const s = world.slots.find(v => v.id === id);
+    const yaw = s.yaw ?? 0, out = [Math.sin(yaw), 0, Math.cos(yaw)];          // the plinth faces the visitor along +yaw
+    const reach = Math.max(...s.footprint) / 2 + 1.0;
+    const eye = [s.position[0] + out[0] * reach, y + 1.3, s.position[2] + out[2] * reach];
+    for (const pitch of [0, 0.35, 0.8]) {
+      const dir = [-out[0] * Math.cos(pitch), Math.sin(pitch), -out[2] * Math.cos(pitch)];
+      assert.equal(targetSlot(world, eye, dir, 3, y)?.id, id, `${id} at pitch ${pitch}`);
+    }
+    // Turned away (90°) or far: nothing.
+    assert.equal(targetSlot(world, eye, [out[2], 0, -out[0]], 3, y), null, `${id} turned away`);
+    const far = [s.position[0] + out[0] * (reach + 2.5), y + 1.3, s.position[2] + out[2] * (reach + 2.5)];
+    assert.equal(targetSlot(world, far, [-out[0], 0.3, -out[2]], 3, y), null, `${id} too far`);
+  }
+});
+
+test('E facing fallback: not mid-stairs, not through a wall, not when looking straight up', () => {
+  const s = world.slots.find(v => v.id === 'T03');
+  const eye = [s.position[0] + 2.2, 1.75, s.position[2]], level = [-1, 0, 0];
+  assert.equal(targetSlot(world, eye, level, 3, 0)?.id, 'T03');
+  assert.equal(targetSlot(world, eye, level, 3, 1.0), null, 'feet mid-stairs are not on the plinth floor');
+  assert.equal(targetSlot(world, eye, [0, 1, 0], 3, 0), null, 'straight up has no facing');
+  const alcove = world.slots.find(v => v.id === 'T11');                       // west wall, ground floor
+  const outside = [-22.6 - 0.9, 1.75, alcove.position[2]];                    // beyond the wall, facing it
+  assert.equal(targetSlot(world, outside, [1, 0, 0], 3, 0), null, 'never through the wall');
+});
+
+test('exhibit colliders: finite boxes only, and a visitor caught inside one is moved clear', () => {
+  assert.equal(exhibitCollider(3, [NaN, 0, 0], [1, 1, 1]), null);
+  assert.equal(exhibitCollider(3, [0, 0, 0], [0, 1, 1]), null);
+  const lw = buildNavWorld(layout);                                           // private copy: colliders are mutated
+  const s = lw.slots.find(v => v.id === 'T03');
+  const c = exhibitCollider(3, [s.position[0] - 0.8, 0.95, s.position[2] - 1.1], [s.position[0] + 0.8, 3.45, s.position[2] + 1.1]);
+  assert.ok(c && c.id === `${EXHIBIT_COLLIDER}3`);
+  lw.colliders.push(c);
+  assert.ok(!world.colliders.some(v => v.id === c.id), 'the shared layout is untouched');
+  // Standing on the lotus top (0.8) when the exhibit appears: the body now overlaps it.
+  const caught = { x: s.position[0], y: 0.8, z: s.position[2], velocityY: null };
+  assert.ok(playerOverlaps(lw.colliders, caught));
+  const freed = freePlayer(lw, caught);
+  assert.ok(!playerOverlaps(lw.colliders, freed) && supportAt(lw, freed.x, freed.z, freed.y) === freed.y, JSON.stringify(freed));
+  assert.ok(Math.hypot(freed.x - caught.x, freed.z - caught.z) < 3, 'moved to a spot close by');
+  // And it can walk away from there.
+  const away = Math.max(...[0, Math.PI / 2, Math.PI, -Math.PI / 2].map(yaw => {
+    const m = stepFirstPerson(lw, freed, { forward: 1, right: 0, run: false }, yaw, 0.2, false);
+    return Math.hypot(m.x - freed.x, m.z - freed.z);
+  }));
+  assert.ok(away > 0.8, `can walk away (${away.toFixed(2)} m in 0.2 s)`);
+  // A free visitor is left where they are.
+  const free = { x: 0, y: 0, z: 20, velocityY: null };
+  assert.equal(freePlayer(lw, free), free);
+  // Clearing by prefix leaves the layout colliders exactly as exported.
+  const kept = lw.colliders.filter(v => !v.id.startsWith(EXHIBIT_COLLIDER));
+  assert.equal(kept.length, layout.colliders.length);
+});
+
+test('the follow camera is pulled in by a loaded exhibit (it shares the walking colliders)', async () => {
+  const { boomLength, FOLLOW } = await import('../apps/web/src/game/follow-camera.ts');
+  const { pavilionCamera } = await import('../apps/web/src/game/navigation.ts');
+  const lw = buildNavWorld(layout), cam = pavilionCamera(lw);
+  const pivot = [-7.5, 1.75, -8.5], back = [-1, 0, 0];                       // a 3.2 m boom reaches x -10.7, past the exhibit face at -10.2
+  const before = boomLength(cam.world, pivot, back, FOLLOW.distance, cam.blockers);
+  lw.colliders.push(exhibitCollider(3, [-11.8, 0.95, -9.6], [-10.2, 3.45, -7.4]));
+  const after = boomLength(cam.world, pivot, back, FOLLOW.distance, cam.blockers);
+  assert.ok(after < before && after < 2.75, `boom ${before.toFixed(2)} → ${after.toFixed(2)}`);
 });
