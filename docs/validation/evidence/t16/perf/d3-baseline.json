@@ -1,0 +1,144 @@
+{
+ "date": "2026-11-10T04:48:29.810Z",
+ "gpu": "ANGLE (Apple, ANGLE Metal Renderer: Apple M5, Unspecified Version)",
+ "dpr": 2,
+ "viewport": [
+  1512,
+  945
+ ],
+ "loadMs": 1323,
+ "memory": {
+  "geometries": 63,
+  "textures": 123,
+  "programs": 36
+ },
+ "errors": [],
+ "views": [
+  {
+   "name": "entry",
+   "bloom": {
+    "median": 17.6,
+    "p95": 34.3,
+    "fps": 57,
+    "frames": 168,
+    "calls": 114,
+    "triangles": 1529075,
+    "pixelRatio": 1.5
+   },
+   "noBloom": {
+    "median": 17.3,
+    "p95": 34.3,
+    "fps": 58,
+    "frames": 182,
+    "calls": 62,
+    "triangles": 765826,
+    "pixelRatio": 1.5
+   }
+  },
+  {
+   "name": "atrium-up",
+   "bloom": {
+    "median": 18,
+    "p95": 35.5,
+    "fps": 56,
+    "frames": 160,
+    "calls": 95,
+    "triangles": 1176967,
+    "pixelRatio": 1.5
+   },
+   "noBloom": {
+    "median": 16.6,
+    "p95": 33.7,
+    "fps": 60,
+    "frames": 190,
+    "calls": 50,
+    "triangles": 589674,
+    "pixelRatio": 1.5
+   }
+  },
+  {
+   "name": "upper-east",
+   "bloom": {
+    "median": 16.8,
+    "p95": 36.4,
+    "fps": 60,
+    "frames": 158,
+    "calls": 104,
+    "triangles": 1393019,
+    "pixelRatio": 1.5
+   },
+   "noBloom": {
+    "median": 15.6,
+    "p95": 33.4,
+    "fps": 64,
+    "frames": 198,
+    "calls": 55,
+    "triangles": 697794,
+    "pixelRatio": 1.5
+   }
+  },
+  {
+   "name": "grand-stair",
+   "bloom": {
+    "median": 13.6,
+    "p95": 31.1,
+    "fps": 74,
+    "frames": 272,
+    "calls": 84,
+    "triangles": 1055743,
+    "pixelRatio": 1.5
+   },
+   "noBloom": {
+    "median": 14.5,
+    "p95": 30.6,
+    "fps": 69,
+    "frames": 217,
+    "calls": 43,
+    "triangles": 529012,
+    "pixelRatio": 1.5
+   }
+  },
+  {
+   "name": "side-hall",
+   "bloom": {
+    "median": 16.8,
+    "p95": 33.9,
+    "fps": 60,
+    "frames": 156,
+    "calls": 100,
+    "triangles": 1276879,
+    "pixelRatio": 1.5
+   },
+   "noBloom": {
+    "median": 15.3,
+    "p95": 33.5,
+    "fps": 65,
+    "frames": 203,
+    "calls": 54,
+    "triangles": 639726,
+    "pixelRatio": 1.5
+   }
+  },
+  {
+   "name": "exterior",
+   "bloom": {
+    "median": 14.5,
+    "p95": 32.4,
+    "fps": 69,
+    "frames": 199,
+    "calls": 89,
+    "triangles": 1143199,
+    "pixelRatio": 1.5
+   },
+   "noBloom": {
+    "median": 13.1,
+    "p95": 16.7,
+    "fps": 76,
+    "frames": 241,
+    "calls": 48,
+    "triangles": 572714,
+    "pixelRatio": 1.5
+   }
+  }
+ ]
+}

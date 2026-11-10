@@ -1,0 +1,218 @@
+{
+ "date": "2026-11-10T05:25:57.609Z",
+ "gpu": "ANGLE (Apple, ANGLE Metal Renderer: Apple M5, Unspecified Version)",
+ "dpr": 2,
+ "viewport": [
+  1512,
+  945
+ ],
+ "loadMs": 3583,
+ "memory": {
+  "geometries": 63,
+  "textures": 122,
+  "programs": 40
+ },
+ "errors": [],
+ "views": [
+  {
+   "name": "entry",
+   "bloom": {
+    "median": 19.4,
+    "p95": 34.5,
+    "fps": 52,
+    "gpu": 19,
+    "gpuP95": 26.6,
+    "frames": 152,
+    "calls": 114,
+    "triangles": 1529075,
+    "pixelRatio": 1.5
+   },
+   "noBloom": {
+    "median": 18.8,
+    "p95": 33.9,
+    "fps": 53,
+    "gpu": 18.5,
+    "gpuP95": 24.6,
+    "frames": 167,
+    "calls": 62,
+    "triangles": 765826,
+    "pixelRatio": 1.5
+   }
+  },
+  {
+   "name": "atrium-up",
+   "bloom": {
+    "median": 20.4,
+    "p95": 35,
+    "fps": 49,
+    "gpu": 19.9,
+    "gpuP95": 36.1,
+    "frames": 146,
+    "calls": 95,
+    "triangles": 1176967,
+    "pixelRatio": 1.5
+   },
+   "noBloom": {
+    "median": 18.3,
+    "p95": 34.3,
+    "fps": 55,
+    "gpu": 18.4,
+    "gpuP95": 24.6,
+    "frames": 174,
+    "calls": 50,
+    "triangles": 589674,
+    "pixelRatio": 1.5
+   }
+  },
+  {
+   "name": "upper-east",
+   "bloom": {
+    "median": 20.2,
+    "p95": 39.8,
+    "fps": 50,
+    "gpu": 18.7,
+    "gpuP95": 40.2,
+    "frames": 135,
+    "calls": 104,
+    "triangles": 1393019,
+    "pixelRatio": 1.5
+   },
+   "noBloom": {
+    "median": 17.3,
+    "p95": 34.5,
+    "fps": 58,
+    "gpu": 17.2,
+    "gpuP95": 23.3,
+    "frames": 184,
+    "calls": 55,
+    "triangles": 697794,
+    "pixelRatio": 1.5
+   }
+  },
+  {
+   "name": "grand-stair",
+   "bloom": {
+    "median": 17.3,
+    "p95": 34.3,
+    "fps": 58,
+    "gpu": 16.6,
+    "gpuP95": 31.3,
+    "frames": 164,
+    "calls": 84,
+    "triangles": 1055743,
+    "pixelRatio": 1.5
+   },
+   "noBloom": {
+    "median": 15.8,
+    "p95": 33.5,
+    "fps": 63,
+    "gpu": 16.1,
+    "gpuP95": 22.9,
+    "frames": 200,
+    "calls": 43,
+    "triangles": 529012,
+    "pixelRatio": 1.5
+   }
+  },
+  {
+   "name": "side-hall",
+   "bloom": {
+    "median": 19.6,
+    "p95": 49.9,
+    "fps": 51,
+    "gpu": 18.7,
+    "gpuP95": 36.4,
+    "frames": 134,
+    "calls": 100,
+    "triangles": 1276879,
+    "pixelRatio": 1.5
+   },
+   "noBloom": {
+    "median": 16.5,
+    "p95": 33.5,
+    "fps": 61,
+    "gpu": 16.5,
+    "gpuP95": 23.3,
+    "frames": 189,
+    "calls": 54,
+    "triangles": 639726,
+    "pixelRatio": 1.5
+   }
+  },
+  {
+   "name": "exterior",
+   "bloom": {
+    "median": 15.6,
+    "p95": 33.4,
+    "fps": 64,
+    "gpu": 15.6,
+    "gpuP95": 30.9,
+    "frames": 179,
+    "calls": 89,
+    "triangles": 1143199,
+    "pixelRatio": 1.5
+   },
+   "noBloom": {
+    "median": 14.3,
+    "p95": 31.8,
+    "fps": 70,
+    "gpu": 14.2,
+    "gpuP95": 19.7,
+    "frames": 217,
+    "calls": 48,
+    "triangles": 572714,
+    "pixelRatio": 1.5
+   }
+  }
+ ],
+ "adaptiveEntry": {
+  "fpsMedian": 60,
+  "fpsMin": 52,
+  "pixelRatios": [
+   1.5,
+   1.375
+  ],
+  "ticks": [
+   {
+    "fps": 64,
+    "pixelRatio": 1.5
+   },
+   {
+    "fps": 55,
+    "pixelRatio": 1.5
+   },
+   {
+    "fps": 52,
+    "pixelRatio": 1.5
+   },
+   {
+    "fps": 53,
+    "pixelRatio": 1.375
+   },
+   {
+    "fps": 110,
+    "pixelRatio": 1.375
+   },
+   {
+    "fps": 58,
+    "pixelRatio": 1.375
+   },
+   {
+    "fps": 60,
+    "pixelRatio": 1.375
+   },
+   {
+    "fps": 60,
+    "pixelRatio": 1.375
+   },
+   {
+    "fps": 60,
+    "pixelRatio": 1.375
+   },
+   {
+    "fps": 59,
+    "pixelRatio": 1.5
+   }
+  ]
+ }
+}

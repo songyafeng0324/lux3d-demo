@@ -1,0 +1,239 @@
+{
+ "source": "scripts/compress-t16.mjs",
+ "inputs": {
+  "glbSHA256": "1e82e3deb71b9992da04eaa38d8f1a193a34f0dc9eff6918a6031637ca8364a6",
+  "lightmapManifestSHA256": "7fc527da710533a6bf0c047f56af223a36023c909292e196303b3bf31a80e387",
+  "scriptSHA256": "4166118674041f88f26557089ba9ba9aba240bc0d832abfa6834f3f01f028249"
+ },
+ "glb": {
+  "file": "pavilion-t16.glb",
+  "sha256": "0451a176fce0736b9f76ab44f4bb4af343afd2a046fc57d760e17018f0599c66",
+  "bytes": 14563692,
+  "sourceBytes": 16457848
+ },
+ "codecs": {
+  "etc1s": {
+   "isUASTC": false,
+   "qualityLevel": 255,
+   "compressionLevel": 2
+  },
+  "uastc": {
+   "isUASTC": true,
+   "uastcLDRQualityLevel": 2,
+   "enableRDO": true,
+   "rdoQualityLevel": 1,
+   "needSupercompression": true
+  },
+  "quantize": {
+   "position": 16,
+   "normal": 12,
+   "texcoord": 14
+  }
+ },
+ "lightmaps": {
+  "Banner1-ao.jpg": {
+   "file": "Banner1-ao.ktx2",
+   "sourceSHA256": "fe263374551dc2b26cfa3a45a6b7c0eb2aa39031df58add789b2efe8bd23db7f",
+   "sha256": "a19d4fb151941b4a9523a9067a0c2c26eee9654e329a099407688c0d1a26b9eb",
+   "bytes": 2626
+  },
+  "Banner1-gi.jpg": {
+   "file": "Banner1-gi.ktx2",
+   "sourceSHA256": "99201cd762b86926c69738cc268a6dc9a29f7de1832ab555d5c9fdf59f52a4a5",
+   "sha256": "dd8be9a367af328bd643d1946f22d56b4c9950855727a9ee40a23b616514bf82",
+   "bytes": 19866
+  },
+  "Banner2-ao.jpg": {
+   "file": "Banner2-ao.ktx2",
+   "sourceSHA256": "899a67d5e13dfcf69121a6d84f6d3619f184b520d22cbb96a1e8dd0e90097547",
+   "sha256": "39671a5ba663aec96e7df8dc5c99672a15b8a8f8588fa77a68e146a9ac585b51",
+   "bytes": 2602
+  },
+  "Banner2-gi.jpg": {
+   "file": "Banner2-gi.ktx2",
+   "sourceSHA256": "99f2d6e1476d4d13701405762b7ec5d15977375ab4dfc8a10d2ef68db1b43415",
+   "sha256": "0574af21f9a6b6ea9d139ee7ca679a6b27209cdc074e31875fe773f1bb23b8a3",
+   "bytes": 20098
+  },
+  "Caisson-ao.jpg": {
+   "file": "Caisson-ao.ktx2",
+   "sourceSHA256": "23a779e0397cb37240328aecc262ea26572e4557c5ad169abe37444ca3123de7",
+   "sha256": "79a8fcb178fbd12c6413f6d67a3b62cc47ba40db8ef69ff556c46fd6a00ceede",
+   "bytes": 39745
+  },
+  "Caisson-gi.jpg": {
+   "file": "Caisson-gi.ktx2",
+   "sourceSHA256": "954b66868871c20750f381986850a86eeb30549831a1b1dd9c83be56dee2333e",
+   "sha256": "3f0af4d6b1a41df25c4f2240de571a608e7f3ec09cc7ab01ac6c6e73a5a8d3ae",
+   "bytes": 67732
+  },
+  "Carpet-ao.jpg": {
+   "file": "Carpet-ao.ktx2",
+   "sourceSHA256": "ccb0b5280d7f6fa52d24f07701ee99c6a5ea4bfa4f903238463aff180e649f1c",
+   "sha256": "a46cab3ec04e2f7a4930d17d035d56532d74048e055476a9c27a11faa180d44e",
+   "bytes": 6955
+  },
+  "Carpet-gi.jpg": {
+   "file": "Carpet-gi.ktx2",
+   "sourceSHA256": "6028117703b0961c104c98f7175466b4e41b78e7a8c64d746d1e90b75bde361c",
+   "sha256": "456fd659183e52e53c32ed420019e0811757b42dc58e1b057f7e98ff29bac187",
+   "bytes": 50459
+  },
+  "Ceiling-ao.jpg": {
+   "file": "Ceiling-ao.ktx2",
+   "sourceSHA256": "4164f7579cccba96b84b67cb0717911b099c2c278eda24490df2ccd715d30b78",
+   "sha256": "855bc29edd79774d006529f6d2a4061faeea46e450ecdb7e612114c253cb21c5",
+   "bytes": 175496
+  },
+  "Ceiling-gi.jpg": {
+   "file": "Ceiling-gi.ktx2",
+   "sourceSHA256": "d12d66eff23590904b7b6efcd62f0dbcfbbaa0f0def89e12e52f3b9122daaa31",
+   "sha256": "c86f999879e4872b36ff3ee9c08bd9317475508d219c807dc3d244b4a342546b",
+   "bytes": 207012
+  },
+  "Door-ao.jpg": {
+   "file": "Door-ao.ktx2",
+   "sourceSHA256": "e694c56f5299ffa417d5ea5be1fd25f144a5f8989b1e2122338f7abc66b43e21",
+   "sha256": "0dbf23be6d7620f20154445f31c3ba56d8cc6b3ea4cd2ee85bd5964ea032eb2f",
+   "bytes": 11774
+  },
+  "Door-gi.jpg": {
+   "file": "Door-gi.ktx2",
+   "sourceSHA256": "f876a72f2ffd9234b6a05b34c262381ac149c0fbe37ad2623bd3557111caefd7",
+   "sha256": "c81e2bf3f4dea731533e395d18ef3720bff469767716a63f35515f17455dd72b",
+   "bytes": 10821
+  },
+  "Floor-ao.jpg": {
+   "file": "Floor-ao.ktx2",
+   "sourceSHA256": "b6a92bb93b5442e6b1612a729277e3c5bd47644d79faca2571f589cfa97b38de",
+   "sha256": "f8e4b89d74bfa0325ef48af8f331da647967c66b7a29b57b54aee65ebc7c534d",
+   "bytes": 108887
+  },
+  "Floor-gi.jpg": {
+   "file": "Floor-gi.ktx2",
+   "sourceSHA256": "e7bf6b2b360a2b88b3e32f147283b121313c060a6422596ba4177b183298106b",
+   "sha256": "3d2ef0dcb48a87b967684ee6d447dfffc3916376d88ddcd596a99993bd62c138",
+   "bytes": 194785
+  },
+  "Gold-ao.jpg": {
+   "file": "Gold-ao.ktx2",
+   "sourceSHA256": "ab8b1634af0cc3d74c82f83ca0c73173ecabac192950fa66ca8ac04135b6248c",
+   "sha256": "e40a8d36be503160bf557cf507b1d89ee7de8d63eae743534ad5be9bda36802e",
+   "bytes": 203360
+  },
+  "Gold-gi.jpg": {
+   "file": "Gold-gi.ktx2",
+   "sourceSHA256": "57eb3bf3c755cad403cad30450849f40c92828b0fbd9beb4c89bfcfd5a76e346",
+   "sha256": "a044741275c1581e7c2c31965ab72544c2099369eb92bb8de04ac7d5a19317aa",
+   "bytes": 1268
+  },
+  "GoldBand-ao.jpg": {
+   "file": "GoldBand-ao.ktx2",
+   "sourceSHA256": "afbe08f5c195cde19f1da9b4737d6c8ab5039069532a61903d8ea3cde07fb23a",
+   "sha256": "409b5a7dab9648e0e0bf6fcd210ee48b2885608cbf8228cd6e893c5b36ede0eb",
+   "bytes": 38328
+  },
+  "GoldBand-gi.jpg": {
+   "file": "GoldBand-gi.ktx2",
+   "sourceSHA256": "6d01989022a2a3834b86e187ac6d8f2ea40c84e02f711072cce2f9cae72cf763",
+   "sha256": "25e6c307ea1c8c0154805a59cbb2daee3b48dab6809b2ab41de052d799071204",
+   "bytes": 63436
+  },
+  "Lacquer-ao.jpg": {
+   "file": "Lacquer-ao.ktx2",
+   "sourceSHA256": "ad9a9a076bfd10810f28f525812d1d41e596531095a0d25c937a3593757c0c10",
+   "sha256": "8105aa2b066122bdcf241277e1452e3a20de4a14d826797d756a7e79ab56f825",
+   "bytes": 669484
+  },
+  "Lacquer-gi.jpg": {
+   "file": "Lacquer-gi.ktx2",
+   "sourceSHA256": "e8c6a202c07bc5ee791a0be2371f52f8c6233c2b42a1a5973269250dc21d93ba",
+   "sha256": "6d1ed6b37bb70ebd7da558e8cbefbacb66027774b4c08d84bf1e94a2bd27adf1",
+   "bytes": 802566
+  },
+  "Marble-ao.jpg": {
+   "file": "Marble-ao.ktx2",
+   "sourceSHA256": "dfd558c2584cbd17db8b6ea54a58b89d41f6da0861c848d45ac8fe594dc20ec9",
+   "sha256": "e21dec8949aac1f656fdc80372bb09f8211359005e7561edc8686ede8edcc5ef",
+   "bytes": 182820
+  },
+  "Marble-gi.jpg": {
+   "file": "Marble-gi.ktx2",
+   "sourceSHA256": "dea97a18c19b58413241e4ea04e96ed918dd7250fe586b54defb174a63f26e55",
+   "sha256": "a58e7e30d37c5c7b8b0ec09a75bfec150846c1935e8c034e0bc8192bdb29e9fc",
+   "bytes": 232079
+  },
+  "Plaque-ao.jpg": {
+   "file": "Plaque-ao.ktx2",
+   "sourceSHA256": "86ae8e0955be7774e752be569d9ab58cc524fc9c35ccc358a36201c85e26d9c9",
+   "sha256": "431661c655f1120c9f2fcb5fdec704e15e23a1999a7b13e68a9071ed376c01ac",
+   "bytes": 1856
+  },
+  "Plaque-gi.jpg": {
+   "file": "Plaque-gi.ktx2",
+   "sourceSHA256": "d5b486229ae7f69ddfdda100fe39664235fde332e8927eead66ba2196792ad4a",
+   "sha256": "d27ab75ff5a2e1153af34eaa41c01d27fe1459ac8c82a58b90d45c5cdeeac9c3",
+   "bytes": 13856
+  },
+  "Relief-ao.jpg": {
+   "file": "Relief-ao.ktx2",
+   "sourceSHA256": "19ae3db14962b1893bc64179e11b219f1e04386bd59358f5c1a19f7564fab65d",
+   "sha256": "0fd4f9d8082c3b0d70507911d8c7779bb457eae2f3a3e036eb7a6552f286202a",
+   "bytes": 201928
+  },
+  "Relief-gi.jpg": {
+   "file": "Relief-gi.ktx2",
+   "sourceSHA256": "1677094ae6fcd94e50e4b2e6bd645eae158bf482de7526781d571e58450ce4a8",
+   "sha256": "eca12090fbedace0883fa187a37a31aba3bf540c149d384d06055c75fb4ef079",
+   "bytes": 244212
+  },
+  "RoofTile-ao.jpg": {
+   "file": "RoofTile-ao.ktx2",
+   "sourceSHA256": "c92aefe2af468270ff93a9018131d9da2e283a1bee528cfb85340f6db5811a77",
+   "sha256": "0c850ffce466548b73e459ec6855029ecfa61e267dcd15ee2d35e9089c2a935c",
+   "bytes": 55725
+  },
+  "RoofTile-gi.jpg": {
+   "file": "RoofTile-gi.ktx2",
+   "sourceSHA256": "69eae46b39f4b75d8c96a3bbe10ec69e8be71ca450fca0a8ccbaef60e6854b4d",
+   "sha256": "a049e59ac70b1cf995181b8e51c476d9e77d162a88e89a86ca98e2538402ac27",
+   "bytes": 54292
+  },
+  "Slab-ao.jpg": {
+   "file": "Slab-ao.ktx2",
+   "sourceSHA256": "dddafdceead5a6b13f08e6ef9ceb8e150596364be1b5225fc77bab92f88148fd",
+   "sha256": "b04843187ab102a05571a5479e4289381ca0b4dff4f0cbff55b704cd56c61f24",
+   "bytes": 76562
+  },
+  "Slab-gi.jpg": {
+   "file": "Slab-gi.ktx2",
+   "sourceSHA256": "d913b0d41f659ea482d129950f39ec4434c72b35528d4ac79805e8f206f3e904",
+   "sha256": "d8f1fb40f281d93c0c2277aae30930228d68aca61c0ecfbb89b66336b2cae281",
+   "bytes": 129649
+  },
+  "Stone-ao.jpg": {
+   "file": "Stone-ao.ktx2",
+   "sourceSHA256": "7bab447c2c66a540e19d421a417c0c7c469d547f16ed94fa09d44cfb2a3e32aa",
+   "sha256": "d46f72b37ac1d9790f5e0cfb094d2c3ac67bb0e8b9fdb98c177a7950c055cfc9",
+   "bytes": 110256
+  },
+  "Stone-gi.jpg": {
+   "file": "Stone-gi.ktx2",
+   "sourceSHA256": "04f62cb13f3f6a4b70f66d2c8b752118d8119ce45fc5bac26ca927d6981d5b36",
+   "sha256": "e01f5ee6315a1ebad7d7b31aef81787c60e21fc45ef428a936a91f26ed9709a9",
+   "bytes": 85894
+  },
+  "WallWood-ao.jpg": {
+   "file": "WallWood-ao.ktx2",
+   "sourceSHA256": "314ae23b33d6196eb701a3ac48cc20ce929c80a2e634376283f74f5e3b7babdb",
+   "sha256": "8a6d58f734d5753550d06ca367cfd22af4502251a71c5ec04e0ba7396527a8ad",
+   "bytes": 127249
+  },
+  "WallWood-gi.jpg": {
+   "file": "WallWood-gi.ktx2",
+   "sourceSHA256": "2124d192d7e2f5bc8dbbdcc73e527a0ecc56d99f34213ae47f6cd359035aa5d7",
+   "sha256": "69b31d15bb94abe4e8104a18ed8104e2c7f8bb5c5bed200f3cb5cff988daf56d",
+   "bytes": 189438
+  }
+ }
+}

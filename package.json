@@ -39,10 +39,15 @@
     "test:t15": "node scripts/t15-third-person-browser.mjs"
   },
   "devDependencies": {
+    "@gltf-transform/core": "4.5.1",
+    "@gltf-transform/extensions": "4.5.1",
+    "@gltf-transform/functions": "4.5.1",
     "@playwright/test": "1.64.1",
     "@types/node": "26.6.6",
     "@types/pg": "8.23.1",
     "esbuild": "0.28.2",
+    "ktx2-encoder": "0.6.0",
+    "meshoptimizer": "1.1.1",
     "tsx": "4.23.15",
     "typescript": "7.0.2"
   },

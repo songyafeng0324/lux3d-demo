@@ -2,7 +2,7 @@
  "version": "t16-d3",
  "scene": "T16_Pavilion_D3",
  "source": "scripts/blender/build_t16.py",
- "sourceSHA256": "9ca125ed701c91881706d07d0c3ae02f4abcaf20443e7b62d27ae2955481d802",
+ "sourceSHA256": "70a5bc5fd54a782b52ab94023fd2390d926850bc8cf6acd8e1992fdfec7d1251",
  "coordinates": "Web metres, Y up, north = -Z; Blender (x,-z,y)",
  "upperY": 9.0,
  "floorY": 0,

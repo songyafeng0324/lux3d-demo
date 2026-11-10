@@ -210,6 +210,35 @@ test('baked lightmaps belong to the current GLB and every map file exists', asyn
   for (const m of Object.values(manifest.maps)) for (const f of [m.ao, m.gi]) assert.ok(existsSync(new URL(f, dir)), f);
 });
 
+test('the runtime pavilion (scripts/compress-t16.mjs) was built from the current GLB and lightmaps', async () => {
+  const { createHash } = await import('node:crypto');
+  const sha = b => createHash('sha256').update(b).digest('hex');
+  const read = p => readFileSync(new URL(`../assets/t16/${p}`, import.meta.url));
+  const rt = JSON.parse(read('runtime/manifest.json'));
+  const stale = 'runtime copy is stale: rerun node scripts/compress-t16.mjs';
+  assert.equal(rt.inputs.glbSHA256, sha(read('pavilion-t16.glb')), stale);
+  assert.equal(rt.inputs.lightmapManifestSHA256, sha(read('pavilion-lightmaps.json')), stale);
+  assert.equal(rt.inputs.scriptSHA256, sha(readFileSync(new URL('../scripts/compress-t16.mjs', import.meta.url))), stale);
+  assert.equal(rt.glb.sha256, sha(read(`runtime/${rt.glb.file}`)), 'runtime GLB edited by hand');
+  const baked = JSON.parse(read('pavilion-lightmaps.json'));
+  for (const m of Object.values(baked.maps)) for (const f of [m.ao, m.gi]) {
+    const entry = rt.lightmaps[f];
+    assert.ok(entry, `no runtime copy of ${f}`);
+    assert.equal(entry.sourceSHA256, sha(read(`lightmaps/${f}`)), `${f}: ${stale}`);
+    assert.equal(entry.sha256, sha(read(`runtime/lightmaps/${entry.file}`)), entry.file);
+  }
+  // The runtime GLB must keep what the web relies on: the lightmap UV set, GPU instances, KTX2, meshopt.
+  const glb = read(`runtime/${rt.glb.file}`), json = JSON.parse(glb.subarray(20, 20 + glb.readUInt32LE(12)));
+  for (const ext of ['EXT_meshopt_compression', 'KHR_texture_basisu', 'EXT_mesh_gpu_instancing', 'KHR_mesh_quantization']) assert.ok(json.extensionsUsed.includes(ext), ext);
+  // Every lightmapped material still has its lightmap UVs on every primitive that draws it.
+  for (const name of Object.keys(baked.maps)) {
+    const mi = json.materials.findIndex(m => m.name === name);
+    const prims = json.meshes.flatMap(m => m.primitives).filter(p => p.material === mi);
+    assert.ok(mi >= 0 && prims.length && prims.every(p => 'TEXCOORD_1' in p.attributes), `${name}: TEXCOORD_1 (lightmap UVs) on every primitive`);
+  }
+  assert.ok(json.images.every(i => i.mimeType === 'image/ktx2'), 'every texture is KTX2');
+});
+
 test('standing on a plinth top (a collider, not a walk surface) still walks across it and steps off', () => {
   // Lotus guard of T03: circle r 1.2 at (-11, -8.5), top 0.8. Cross-model review 2026-11-10: landing on a
   // riser hands the frame to ground walking only after a real lift, never while merely on a collider top.

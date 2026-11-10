@@ -48,9 +48,11 @@ MAT = mats.make_materials()                         # also sets kit.TILE, needed
 
 # ---------------------------------------------------------------- building helpers
 def carpet_uv(axis, c0, width):
-    """Runner top: u across the runner (0..1), v along it, one A5 repeat per 6 m (A5 is 2:3)."""
-    if axis == 'z': return lambda p: ((p[0] - c0) / width, -p[2] / 6)
-    return lambda p: ((p[2] - c0) / width, p[0] / 6)
+    """Runner top: u across the runner (0..1), v along it. A5 is 2:3, so one repeat runs 1.5 widths
+    (6 m on the 4 m ground-floor runner, 3.6 m on the 2.4 m galleries: a fixed 6 m stretched those 1.7x)."""
+    repeat = width * 1.5
+    if axis == 'z': return lambda p: ((p[0] - c0) / width, -p[2] / repeat)
+    return lambda p: ((p[2] - c0) / width, p[0] / repeat)
 
 
 def gilt(side, length, height=1.0):

@@ -3,7 +3,7 @@
 import { chromium } from 'playwright';
 import fs from 'node:fs/promises';
 const BASE = process.env.T10_BASE || 'http://localhost:5173';
-const OUT = new URL('../docs/validation/evidence/t16/', import.meta.url);
+const OUT = process.env.T16_SHOTS_OUT ? new URL(`file://${process.env.T16_SHOTS_OUT.replace(/\/?$/, '/')}`) : new URL('../docs/validation/evidence/t16/', import.meta.url);
 await fs.mkdir(OUT, { recursive: true });
 const browser = await chromium.launch({ headless: true, channel: process.env.CHROME_CHANNEL ?? 'chrome', args: ['--disable-background-timer-throttling', '--disable-renderer-backgrounding', '--use-angle=metal', '--enable-gpu'] });
 const page = await browser.newPage({ viewport: { width: 1440, height: 900 }, deviceScaleFactor: 1 });

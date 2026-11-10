@@ -1,12 +1,12 @@
 {
  "source": "scripts/blender/bake_t16.py",
- "glbSHA256": "915bbbf6818a06f5a1bf80589b2d79f03378d0daea950a28594cb2b7b2f08023",
+ "glbSHA256": "1e82e3deb71b9992da04eaa38d8f1a193a34f0dc9eff6918a6031637ca8364a6",
  "encoding": {
   "ao": "linear",
   "gi": "sRGB (encoded before saving)"
  },
  "uv": "TEXCOORD_1 (UVLight)",
- "giScale": 0.08644220978021622,
+ "giScale": 0.08638113409280775,
  "aoDistance": 1.6,
  "samples": {
   "ao": 96,

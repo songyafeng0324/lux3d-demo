@@ -1,5 +1,7 @@
 import * as T from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+import { KTX2Loader } from 'three/addons/loaders/KTX2Loader.js';
+import { MeshoptDecoder } from 'three/addons/libs/meshopt_decoder.module.js';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
 import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
@@ -7,7 +9,9 @@ import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
 import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
 import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
 import { ShaderPass } from 'three/addons/postprocessing/ShaderPass.js';
-import pavilionUrl from '../../../../assets/t16/pavilion-t16.glb?url';
+// The runtime copy (scripts/compress-t16.mjs): instanced props, meshopt geometry, KTX2 textures.
+import pavilionUrl from '../../../../assets/t16/runtime/pavilion-t16.glb?url';
+import runtime from '../../../../assets/t16/runtime/manifest.json';
 import layout from '../../../../assets/t16/pavilion-layout.json';
 import lightmaps from '../../../../assets/t16/pavilion-lightmaps.json';
 import { buildNavWorld, pavilionCamera, stepFirstPerson, supportAt, targetSlot, floorOf, exhibitCollider, freePlayer, EXHIBIT_COLLIDER, BODY, MOVE_KEYS, type ExhibitSlot, type FirstPerson, type NavWorld, type PavilionLayout } from './navigation.js';
@@ -51,12 +55,35 @@ const BLACK = new T.Color(0);
  * Baked AO and bounce light (scripts/blender/bake_t16.py) on the shell's second UV set. Direct light stays
  * real time (the lantern tiers); the GI map adds only what those lanterns and the sky would bounce.
  */
-const LIGHTMAP_URLS = import.meta.glob('../../../../assets/t16/lightmaps/*.jpg', { query: '?url', import: 'default', eager: true }) as Record<string, string>;
+const LIGHTMAP_URLS = import.meta.glob('../../../../assets/t16/runtime/lightmaps/*.ktx2', { query: '?url', import: 'default', eager: true }) as Record<string, string>;
 const LIGHTMAPS = lightmaps as { giScale: number; maps: Record<string, { ao: string; gi: string }> };
+const RUNTIME_MAPS = (runtime as { lightmaps: Record<string, { file: string }> }).lightmaps;
+/** Served by the Vite plugin in apps/web/vite.config.ts from the installed three, so it never drifts from it. */
+const BASIS_TRANSCODER = `${import.meta.env.BASE_URL}three-basis/`;
 const GI_INTENSITY = 0.9, AO_INTENSITY = 1.0;
+/**
+ * Adaptive resolution (D4): the hall is fill-bound (16 lantern lights per pixel, 4× MSAA), so when frames
+ * run long the renderer gives up pixel density, from the 1.5 cap down to 1.0, never lights or geometry.
+ * After a while at full speed it tries one step back up; a step that drops frames again waits twice as long
+ * (at most a minute). Known limit: a display or power-saving mode that caps rAF at 30 Hz reads as load and
+ * settles at 1.0; it loses sharpness there, never function.
+ */
+const RES = { max: 1.5, min: 1, step: 0.125, slowMs: 1000 / 52, window: 60, probeMs: 6000, maxProbeMs: 60000 } as const;
 /** Where the one-off reflection probe looks from: the middle of the atrium, at chest height. */
 const PROBE_AT = new T.Vector3(0, 2.2, 6);
 
+
+/** A copy of `source` whose attributes are plain float arrays (meshopt/quantised GLBs store normalised ints). */
+function floatGeometry(source: T.BufferGeometry) {
+  const geometry = source.clone();
+  for (const [name, a] of Object.entries(geometry.attributes)) {
+    if (a.array instanceof Float32Array && !a.normalized && !(a as T.InterleavedBufferAttribute).isInterleavedBufferAttribute) continue;
+    const out = new Float32Array(a.count * a.itemSize);
+    for (let i = 0; i < a.count; i++) for (let k = 0; k < a.itemSize; k++) out[i * a.itemSize + k] = a.getComponent(i, k);
+    geometry.setAttribute(name, new T.BufferAttribute(out, a.itemSize));
+  }
+  return geometry;
+}
 
 /** Full-viewport first-person pavilion. React owns the HUD; this owns WebGL, input and walking. */
 export class PavilionEngine {
@@ -99,10 +126,17 @@ export class PavilionEngine {
   private elapsed = 0;
   private lightmapped = 0;
   private envTarget: T.WebGLRenderTarget | null = null;
+  private ktx2: KTX2Loader;
+  private intervals: number[] = [];
+  private lastFrame = 0;
+  private resChanged = 0;
+  private probeMs: number = RES.probeMs;
+  private probing = false;
+  private pinnedDpr: number | null = null;
 
   constructor(private host: HTMLElement, private hooks: EngineHooks) {
     this.renderer = new T.WebGLRenderer({ antialias: true, powerPreference: 'high-performance' });
-    this.renderer.setPixelRatio(Math.min(devicePixelRatio, 1.5));
+    this.renderer.setPixelRatio(Math.min(devicePixelRatio, RES.max));
     this.renderer.outputColorSpace = T.SRGBColorSpace;
     this.renderer.toneMapping = T.ACESFilmicToneMapping;
     this.renderer.toneMappingExposure = 1.0;
@@ -115,6 +149,7 @@ export class PavilionEngine {
     canvas.tabIndex = 0;
     canvas.setAttribute('aria-label', '藏宝阁三维场景');
     host.append(canvas);
+    this.ktx2 = new KTX2Loader().setTranscoderPath(BASIS_TRANSCODER).detectSupport(this.renderer);
     // Until the shell has loaded, a dim neutral room probe; once it has, captureReflections() replaces it
     // with the hall itself (lanterns, columns, sky in the oculus) for the polished floor and the gilt.
     const pmrem = new T.PMREMGenerator(this.renderer), room = new RoomEnvironment();
@@ -216,7 +251,7 @@ export class PavilionEngine {
       const bytes = new Uint8Array(received);
       let offset = 0;
       for (const c of chunks) { bytes.set(c, offset); offset += c.length; }
-      const [gltf, maps] = await Promise.all([new GLTFLoader().parseAsync(bytes.buffer, ''), this.loadLightmaps()]);
+      const [gltf, maps] = await Promise.all([new GLTFLoader().setKTX2Loader(this.ktx2).setMeshoptDecoder(MeshoptDecoder).parseAsync(bytes.buffer, ''), this.loadLightmaps()]);
       if (this.closed) { maps.forEach(m => { m.ao.dispose(); m.gi.dispose(); }); return; }
       this.mergeByMaterial(gltf.scene, maps);
       this.captureReflections();
@@ -229,11 +264,11 @@ export class PavilionEngine {
   }
 
   private async loadLightmaps() {
-    const loader = new T.TextureLoader(), out = new Map<string, { ao: T.Texture; gi: T.Texture }>();
+    const out = new Map<string, { ao: T.Texture; gi: T.Texture }>();
     const tex = async (file: string, srgb: boolean) => {
-      const url = LIGHTMAP_URLS[`../../../../assets/t16/lightmaps/${file}`];
+      const url = LIGHTMAP_URLS[`../../../../assets/t16/runtime/lightmaps/${RUNTIME_MAPS[file]?.file}`];
       if (!url) throw new Error(`缺少光照贴图 ${file}`);
-      const t = await loader.loadAsync(url);
+      const t = await this.ktx2.loadAsync(url);
       t.flipY = false; t.channel = 1; t.colorSpace = srgb ? T.SRGBColorSpace : T.NoColorSpace;
       return t;
     };
@@ -274,25 +309,33 @@ export class PavilionEngine {
     return this.scene.children.filter(o => o !== this.building && o !== this.exhibits && o !== this.sky.group && o !== this.atmosphere.group && !(o instanceof T.Light));
   }
 
-  /** Merging the static shell by material cuts draw calls to roughly one per material. */
+  /**
+   * Merging the static shell by material cuts draw calls to roughly one per material. Props the runtime
+   * GLB stores as GPU instances (curios, lamps, censers) stay instanced: one draw each, one copy of the mesh.
+   */
   private mergeByMaterial(root: T.Object3D, maps: Map<string, { ao: T.Texture; gi: T.Texture }>) {
     root.updateMatrixWorld(true);
     const groups = new Map<string, { material: T.Material; geometries: T.BufferGeometry[] }>();
+    const instanced: T.InstancedMesh[] = [];
     root.traverse(o => {
       const mesh = o as T.Mesh;
       if (!mesh.isMesh) return;
+      if ((mesh as T.InstancedMesh).isInstancedMesh) { instanced.push(mesh as T.InstancedMesh); return; }
       const material = mesh.material as T.Material;
-      const geometry = mesh.geometry.clone().applyMatrix4(mesh.matrixWorld);
+      // Quantised attributes (normalised ints) cannot hold world coordinates: widen to float first.
+      const geometry = floatGeometry(mesh.geometry).applyMatrix4(mesh.matrixWorld);
       const key = `${material.uuid}|${Object.keys(geometry.attributes).sort().join(',')}|${geometry.index ? 'i' : 'n'}`;
       const g = groups.get(key) ?? { material, geometries: [] };
       g.geometries.push(geometry);
       groups.set(key, g);
       mesh.geometry.dispose();
     });
-    for (const { material, geometries } of groups.values()) {
-      const merged = mergeGeometries(geometries, false);
-      geometries.forEach(g => g.dispose());
-      if (!merged) throw new Error('建筑网格合并失败');
+    const prepared = new Set<T.Material>(), lit = new Set<T.Material>();
+    // Instanced props carry no lightmap UVs: a material they share must never take a lightmap.
+    const onInstances = new Set(instanced.map(m => m.material as T.Material));
+    const prepare = (material: T.Material) => {
+      if (prepared.has(material)) return;
+      prepared.add(material);
       // Grazing views across the long floor and carpets need anisotropic filtering.
       const aniso = Math.min(8, this.renderer.capabilities.getMaxAnisotropy());
       for (const v of Object.values(material)) if (v instanceof T.Texture) v.anisotropy = aniso;
@@ -300,17 +343,73 @@ export class PavilionEngine {
       if (material.alphaTest > 0) material.alphaToCoverage = true;
       const boost = EMISSIVE_BOOST[material.name];
       if (boost && material instanceof T.MeshStandardMaterial) material.emissiveIntensity *= boost;
-      const baked = maps.get(material.name);
-      if (baked && material instanceof T.MeshStandardMaterial && merged.getAttribute('uv1')) {
-        Object.assign(material, { aoMap: baked.ao, aoMapIntensity: AO_INTENSITY, lightMap: baked.gi, lightMapIntensity: GI_INTENSITY });
-        material.needsUpdate = true;
-        this.lightmapped++;
-      } else if (baked) { baked.ao.dispose(); baked.gi.dispose(); }
+    };
+    const built: T.Mesh[] = [];
+    for (const { material, geometries } of groups.values()) {
+      const merged = mergeGeometries(geometries, false);
+      geometries.forEach(g => g.dispose());
+      if (!merged) throw new Error('建筑网格合并失败');
+      prepare(material);
       const mesh = new T.Mesh(merged, material);
+      mesh.castShadow = mesh.receiveShadow = true;
+      mesh.name = material.name;
+      built.push(mesh);
+      this.building.add(mesh);
+    }
+    // A lightmap goes on a material only if every mesh drawing it has the second UV set (and no instanced
+    // prop shares it); otherwise the meshes without uv1 would sample the map at its corner.
+    for (const material of new Set(built.map(b => b.material as T.Material))) {
+      const baked = maps.get(material.name);
+      if (!baked || onInstances.has(material) || !(material instanceof T.MeshStandardMaterial)) continue;
+      if (!built.every(b => b.material !== material || b.geometry.getAttribute('uv1'))) continue;
+      Object.assign(material, { aoMap: baked.ao, aoMapIntensity: AO_INTENSITY, lightMap: baked.gi, lightMapIntensity: GI_INTENSITY });
+      material.needsUpdate = true;
+      lit.add(material);
+      this.lightmapped++;
+    }
+    // Lightmaps no merged mesh could take (no second UV set) are released here.
+    for (const [name, baked] of maps) if (![...lit].some(m => m.name === name)) { baked.ao.dispose(); baked.gi.dispose(); }
+    const m = new T.Matrix4();
+    for (const mesh of instanced) {
+      // Bake the node's world transform into every instance, so the mesh sits at the origin of the building.
+      for (let i = 0; i < mesh.count; i++) { mesh.getMatrixAt(i, m); mesh.setMatrixAt(i, m.premultiply(mesh.matrixWorld)); }
+      mesh.instanceMatrix.needsUpdate = true;
+      mesh.removeFromParent();
+      mesh.position.set(0, 0, 0); mesh.quaternion.identity(); mesh.scale.set(1, 1, 1); mesh.updateMatrix();
+      mesh.computeBoundingBox(); mesh.computeBoundingSphere();
+      const material = mesh.material as T.Material;
+      prepare(material);
       mesh.castShadow = mesh.receiveShadow = true;
       mesh.name = material.name;
       this.building.add(mesh);
     }
+  }
+
+  /** One adaptive-resolution decision per `RES.window` frames (see RES). */
+  private adaptResolution(now: number) {
+    if (this.pinnedDpr !== null) return;
+    const gap = now - this.lastFrame;
+    this.lastFrame = now;
+    if (gap > 250) { this.intervals.length = 0; return; }   // tab switch, load hitch: not a measure of load
+    this.intervals.push(gap);
+    if (this.intervals.length < RES.window) return;
+    const median = this.intervals.sort((a, b) => a - b)[this.intervals.length >> 1];
+    this.intervals.length = 0;
+    const dpr = this.renderer.getPixelRatio(), top = Math.min(devicePixelRatio, RES.max);
+    let next = dpr;
+    if (median > RES.slowMs) {
+      if (dpr > RES.min) next = Math.max(RES.min, dpr - RES.step);
+      if (this.probing) this.probeMs = Math.min(this.probeMs * 2, RES.maxProbeMs);   // the step up did not hold
+    } else {
+      // A step up that held for 2 s resets the wait, so one passing hitch cannot pin the low tier for good.
+      if (this.probing && now - this.resChanged > 2000) { this.probing = false; this.probeMs = RES.probeMs; }
+      if (dpr < top && now - this.resChanged > this.probeMs) next = Math.min(top, dpr + RES.step);
+    }
+    if (next === dpr) return;
+    this.probing = next > dpr;
+    this.resChanged = now;
+    this.renderer.setPixelRatio(next);
+    this.fit();
   }
 
   private fit() {
@@ -444,6 +543,7 @@ export class PavilionEngine {
     this.renderBloom(dt);
     this.composer.render(dt);
     this.frames.push(now);
+    this.adaptResolution(now);
     while (this.frames.length && now - this.frames[0] > 1000) this.frames.shift();
     if (now - this.lastHud > 120) {
       this.lastHud = now;
@@ -599,6 +699,13 @@ export class PavilionEngine {
       viewport: [this.host.clientWidth, this.host.clientHeight], pixelRatio: this.renderer.getPixelRatio(),
     };
   }
+  /** Benchmarks only (scripts/t16-perf.mjs): hold a pixel ratio, or `null` to hand it back to RES. */
+  debugResolution(dpr: number | null) {
+    this.pinnedDpr = dpr;
+    this.intervals.length = 0;
+    this.renderer.setPixelRatio(dpr ?? Math.min(devicePixelRatio, RES.max));
+    this.fit();
+  }
   /** Screenshot framing only (never used by the walking check): place the camera on a valid surface. */
   debugPlace(x: number, z: number, y: number, yaw: number, pitch: number) {
     this.player = { x, y, z, velocityY: null };
@@ -642,6 +749,7 @@ export class PavilionEngine {
     this.avatar.dispose();
     disposeResources([...this.exhibits.children]);
     this.exhibits.clear();
+    this.building.traverse(o => { if ((o as T.InstancedMesh).isInstancedMesh) (o as T.InstancedMesh).dispose(); });   // instance buffers
     disposeResources([this.building]);   // the textured shell: geometries, materials and their maps
     this.building.clear();
     this.scene.environment?.dispose();
@@ -651,6 +759,7 @@ export class PavilionEngine {
     this.bloomComposer.dispose();
     this.composer.dispose();
     this.dark.forEach(m => m.dispose());
+    this.ktx2.dispose();
     this.envTarget?.dispose(); this.envTarget = null;
     this.scene.traverse(o => {
       const mesh = o as T.Mesh;

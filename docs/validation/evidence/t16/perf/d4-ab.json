@@ -1,0 +1,89 @@
+{
+ "note": "gpu = bloom + main render to gl.finish(), ms, DPR 1.5, 1512x945, M5 headless Chrome; 3 alternating rounds, best of each",
+ "views": {
+  "entry": {
+   "old": 19.9,
+   "new": 19.2,
+   "oldAll": [
+    19.9,
+    20,
+    20.2
+   ],
+   "newAll": [
+    19.2,
+    19.5,
+    19.8
+   ]
+  },
+  "atrium-up": {
+   "old": 19.7,
+   "new": 18.7,
+   "oldAll": [
+    20.2,
+    19.7,
+    19.7
+   ],
+   "newAll": [
+    18.9,
+    18.7,
+    20
+   ]
+  },
+  "upper-east": {
+   "old": 19.5,
+   "new": 17.8,
+   "oldAll": [
+    19.5,
+    20,
+    20
+   ],
+   "newAll": [
+    18.8,
+    17.8,
+    20
+   ]
+  },
+  "grand-stair": {
+   "old": 17.5,
+   "new": 16.4,
+   "oldAll": [
+    17.6,
+    18,
+    17.5
+   ],
+   "newAll": [
+    17.5,
+    16.5,
+    16.4
+   ]
+  },
+  "side-hall": {
+   "old": 18.3,
+   "new": 16.8,
+   "oldAll": [
+    18.9,
+    18.3,
+    18.3
+   ],
+   "newAll": [
+    17.8,
+    16.8,
+    17.7
+   ]
+  },
+  "exterior": {
+   "old": 15.7,
+   "new": 15.5,
+   "oldAll": [
+    16.2,
+    16.5,
+    15.7
+   ],
+   "newAll": [
+    16,
+    15.5,
+    15.6
+   ]
+  }
+ }
+}
