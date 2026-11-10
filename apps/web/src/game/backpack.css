@@ -47,3 +47,12 @@
 .bag-side-preview .bag-preview{height:min(54vh,480px)}
 @media(max-width:840px){.bag-side-preview{right:16px;left:16px;width:auto;z-index:1}}
 .bag-generation .bag-image-guidance{color:var(--muted);margin:0 0 14px}
+.bag-drawer .bag-card-trash{color:#d9a184}
+.bag-drawer .bag-card-trash:hover{color:#f0c3a4;border-color:#a46a49}
+.bag-card-delete{display:flex;flex-direction:column;gap:6px;width:100%;padding:9px;border:1px solid #a46a49;border-radius:5px;background:rgba(142,44,34,.16)}
+.bag-card-delete p{color:#f0c3a4;overflow-wrap:anywhere}
+.bag-card-delete small{color:var(--muted);font-size:10.5px;line-height:1.6}
+.bag-card-delete div{display:flex;flex-wrap:wrap;gap:5px}
+.bag-card-delete div button{padding:4px 8px}
+.bag-drawer .bag-danger{border-color:#a46a49;color:#f6e0d0;background:rgba(142,44,34,.55)}
+.bag-drawer .bag-danger:hover{background:#8e2c22;border-color:#e08b6b}

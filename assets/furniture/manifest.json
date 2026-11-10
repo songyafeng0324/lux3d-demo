@@ -1,28 +1,16 @@
 {
-  "version": 1,
-  "source": "apps/web/src/scene/assets.ts#furniture",
-  "normalization": "longest edge 1m, bottom-centre pivot",
+  "version": 2,
+  "source": "scripts/build-furniture.mjs",
+  "normalization": "longest edge 1m, bottom-centre pivot (applied by the import worker)",
   "items": [
     {
-      "key": "table",
-      "name": "明式长案",
-      "file": "table.glb",
-      "sha256": "48a1ee66dda050986e584af20e8192fcc43d21f243d29de0a8b660f95f6ff1c8",
-      "byteSize": 7324
-    },
-    {
-      "key": "chair",
-      "name": "靠背木椅",
-      "file": "chair.glb",
-      "sha256": "20b9097bfa339f10aff20522639c270e2bbbde5fcdad39ab0cd568791e7d1177",
-      "byteSize": 9912
-    },
-    {
-      "key": "cabinet",
-      "name": "双门陈列柜",
-      "file": "cabinet.glb",
-      "sha256": "53cf5c482c4ffb51a1d1097302a3618de3d1c8fe62804e3b4cc82894fa50aa84",
-      "byteSize": 14508
+      "key": "garden-bed",
+      "name": "花草丛",
+      "description": "原小屋庭院里的花草，可以直接穿行，可重复摆放与缩放。",
+      "walkThrough": true,
+      "file": "garden-bed.glb",
+      "sha256": "0fc50a376d1fe7bbe4d6c0beb0a7fa7e016388c38df46bb4dfc6e16450e66bcc",
+      "byteSize": 160192
     }
   ]
 }

@@ -9,6 +9,8 @@ export interface ExhibitDetail extends PublicDetails {candidateId:string;slotNo:
 export interface CollectedAsset extends RoomModel {collectionId:string;name:string;authorNickname:string}
 export type ExhibitCollectionStatus = 'available' | 'collected' | 'owned' | 'unavailable';
 export interface CollectionRemoval {previousVersion:number;roomVersion:number;placementsRemoved:number}
+/** Owner deleting a generated asset: everyone's rooms, collections, submissions and the gallery are cleaned; `ownRoom` is the owner's room change. */
+export interface AssetDeletion {deleted:true;roomsUpdated:number;placementsRemoved:number;submissionsClosed:number;candidateRemoved:boolean;slotNo:number|null;galleryVersion:number|null;ownRoom:CollectionRemoval}
 export const GALLERY_SLOT_COUNT=30;
 /** Slot n in the database is plinth `T0n` in assets/t10/pavilion-layout.json. */
 export const slotMarker=(slotNo:number)=>`T${String(slotNo).padStart(2,'0')}`;

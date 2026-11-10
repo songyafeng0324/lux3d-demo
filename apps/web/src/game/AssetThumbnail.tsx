@@ -5,6 +5,8 @@ import { fileUrl, type Asset } from './backpack-api.js';
 import { configurePreview, framePreview, previewScene, readPreviewModel } from './model-preview-scene.js';
 
 type ImageSource = Pick<Asset, 'modelFileId'> & Partial<Pick<Asset, 'originalImageId'>>;
+/** Share of the thumbnail the model's outline spans along its binding axis. */
+export const THUMBNAIL_FILL = .88;
 export type ThumbnailCache = Map<string, Promise<string>>;
 let queue: Promise<unknown> = Promise.resolve();
 
@@ -21,7 +23,7 @@ function modelImage(fileId: string, cache: ThumbnailCache) {
       configurePreview(renderer);
       const scene = previewScene();
       const camera = new T.PerspectiveCamera(35, 192 / 144);
-      framePreview(model, camera);
+      framePreview(model, camera, THUMBNAIL_FILL);
       scene.add(model);
       renderer.render(scene, camera);
       return renderer.domElement.toDataURL('image/webp', .85);

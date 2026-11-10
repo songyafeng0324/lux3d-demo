@@ -18,3 +18,7 @@ __pycache__/
 
 # T16 raw Lux3D prop downloads (~85 MB; prepared copies in assets/t16/props/ are committed)
 assets/t16/props/source/
+
+# T17 raw Lux3D downloads for the new official items (~270 MB; local processing source only)
+assets/furniture/references/t17-models/
+assets/furniture/references/t17-01-comparison/

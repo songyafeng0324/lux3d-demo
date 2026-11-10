@@ -1,8 +1,13 @@
 import {ROOM_BOUNDS,SCENE_VERSION,transformedBoundsCorners,type Bounds,type Vec3} from './scene.js';
-export const ROOM_COURTYARD_BOUNDS: Bounds = { min: [-11, -.4, -9], max: [11, ROOM_BOUNDS.max[1], 9] };
 export const ROOM_PLATFORM_HALF = { x: ROOM_BOUNDS.max[0] + .4, z: ROOM_BOUNDS.max[2] + .4 };
+/** T17: the house platform is the centre cell of a 3×3 grid; the fence runs just outside this edge. */
+export const ROOM_COURTYARD_BOUNDS: Bounds = {
+ min: [-3 * ROOM_PLATFORM_HALF.x, -.4, -3 * ROOM_PLATFORM_HALF.z],
+ max: [3 * ROOM_PLATFORM_HALF.x, ROOM_BOUNDS.max[1], 3 * ROOM_PLATFORM_HALF.z],
+};
 export interface RoomPlacement {id:string;assetId:string;position:Vec3;rotation:Vec3;scale:number}
-export interface RoomModel {id:string;modelFileId:string;normalization:{scale:number;translation:Vec3};bounds:Bounds}
+/** walkThrough: official ground cover such as grass that people walk through (T17). */
+export interface RoomModel {id:string;modelFileId:string;normalization:{scale:number;translation:Vec3};bounds:Bounds;walkThrough?:boolean}
 export interface PersonalRoom {id:string;name:string;version:number;sceneVersion:typeof SCENE_VERSION;placements:RoomPlacement[];shareEnabled:boolean;shareUrl:string|null;assets:RoomModel[]}
 export interface RoomGrant {id:string;token:string;expiresAt:string}
 export interface SharedRoom {name:string;ownerNickname:string;version:number;sceneVersion:typeof SCENE_VERSION;placements:RoomPlacement[];assets:RoomModel[];grant:RoomGrant}

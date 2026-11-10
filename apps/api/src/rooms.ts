@@ -14,7 +14,7 @@ const validId=(v:unknown):v is string=>typeof v==='string'&&/^[a-f0-9]{8}-(?:[a-
 const placementIds=(value:unknown)=>Array.isArray(value)?[...new Set(value.map(v=>v?.assetId).filter(validId))].sort():[];
 function cipherToken(token:string,roomId:string,key:string){const nonce=randomBytes(12),cipher=createCipheriv('aes-256-gcm',Buffer.from(key,'hex'),nonce);cipher.setAAD(Buffer.from(roomId));const bytes=Buffer.concat([cipher.update(token,'utf8'),cipher.final()]);return ['v1',nonce.toString('base64url'),cipher.getAuthTag().toString('base64url'),bytes.toString('base64url')].join('.');}
 function decipherToken(value:string,roomId:string,key:string){const [version,iv,tag,data]=value.split('.');if(version!=='v1'||!iv||!tag||!data)throw Error('SHARE_CIPHERTEXT_INVALID');const decipher=createDecipheriv('aes-256-gcm',Buffer.from(key,'hex'),Buffer.from(iv,'base64url'));decipher.setAAD(Buffer.from(roomId));decipher.setAuthTag(Buffer.from(tag,'base64url'));return Buffer.concat([decipher.update(Buffer.from(data,'base64url')),decipher.final()]).toString('utf8');}
-const modelFields="jsonb_build_object('id',a.id,'modelFileId',a.model_file_id,'normalization',a.normalization,'bounds',a.bounds)";
+const modelFields="jsonb_build_object('id',a.id,'modelFileId',a.model_file_id,'normalization',a.normalization,'bounds',a.bounds,'walkThrough',a.walk_through)";
 // A collection can authorize only room versions created after that collection.
 // Recollecting the same model cannot restore access through an old share grant.
 const roomAssetAllowed = `(a.source_type='furniture' OR (a.source_type='personal' AND a.owner_id=r.owner_id)

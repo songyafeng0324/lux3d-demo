@@ -29,19 +29,19 @@ try{
  // Official public candidates: real GLB upload → real import worker (Chrome render validation) → candidate.
  for(const [file,name,era,material] of [['table.glb','明式长案','明代','黄花梨'],['cabinet.glb','双门陈列柜','清代','紫檀']]){
   const fd=new FormData();for(const [k,v] of Object.entries({sourceType:'official_candidate',name,description:`${name}，馆藏木作样本。`,era,material,ownershipType:'museum',holderName:'示例博物院',location:'北京',officialUrl:'https://example.org/collection'}))fd.set(k,v);
-  fd.set('file',new Blob([await fs.readFile('assets/furniture/'+file)]),file);
+  fd.set('file',new Blob([await fs.readFile('tests/fixtures/models/'+file)]),file);
   const {data}=await call('/admin/assets','POST',fd,{cookie:admin.cookie,'x-csrf-token':admin['x-csrf-token']});
   for(let i=0;i<20;i++){await worker.tick(data.id);const s=(await call('/admin/imports/'+data.id,'GET',undefined,{cookie:admin.cookie})).data;if(s.status==='succeeded')break;assert.notEqual(s.status,'failed','import '+name);}
  }
  const furnitureForm=new FormData();
  furnitureForm.set('sourceType','furniture');furnitureForm.set('name','验收木椅');
- furnitureForm.set('file',new Blob([await fs.readFile('assets/furniture/chair.glb')]),'chair.glb');
+ furnitureForm.set('file',new Blob([await fs.readFile('tests/fixtures/models/chair.glb')]),'chair.glb');
  const {data:furnitureImport}=await call('/admin/assets','POST',furnitureForm,{cookie:admin.cookie,'x-csrf-token':admin['x-csrf-token']});
  assert.equal(await worker.tick(furnitureImport.id),true);
  assert.equal((await call('/admin/imports/'+furnitureImport.id,'GET',undefined,{cookie:admin.cookie})).data.status,'succeeded');
  assert.ok((await call('/furniture','GET',undefined,{cookie:collector.cookie})).data.items.some(item=>item.name==='验收木椅'));
  // One already-delivered personal model (real GLB, real Chrome validation for its bounds). Generation itself is T06.
- const glb=await fs.readFile('assets/furniture/chair.glb'),verified=await validateModel(glb),png=await sharp({create:{width:96,height:96,channels:3,background:'#8e2c22'}}).png().toBuffer();
+ const glb=await fs.readFile('tests/fixtures/models/chair.glb'),verified=await validateModel(glb),png=await sharp({create:{width:96,height:96,channels:3,background:'#8e2c22'}}).png().toBuffer();
  const modelId=randomUUID(),imageId=randomUUID(),taskId=randomUUID(),assetId=randomUUID();
  await store.commit(await store.putStaged(glb),modelId,sha256(glb));await store.commit(await store.putStaged(png),imageId,sha256(png));
  const c=await pool.connect();try{await c.query('BEGIN');
@@ -206,7 +206,7 @@ try{
  });
  await step('risk delete clears room placement, candidate and slot; open page keeps loaded scene, refresh shows the result',async()=>{
   await call('/rooms/me/layout','PUT',{baseVersion:0,editSequence:1,name:'藏友小屋',placements:[{id:'p1',assetId,position:[0,0,0],rotation:[0,0,0],scale:1}]},{cookie:collector.cookie,'x-csrf-token':collector['x-csrf-token']});
-  await ap.getByRole('button',{name:'资产与上传'}).click();await ap.getByLabel('GLB 模型').waitFor();assert.deepEqual(await ap.locator('input[type=file]').evaluateAll(inputs=>inputs.map(input=>input.accept)),['.glb,model/gltf-binary']);await ap.locator('.adm-row',{hasText:'私藏靠背椅'}).click();await ap.getByRole('button',{name:'风险删除…'}).click();await ap.screenshot({path:path.join(out,'08-admin-delete-confirm.png')});
+  await ap.getByRole('button',{name:'资产与上传'}).click();await ap.getByLabel('GLB 模型').waitFor();assert.deepEqual(await ap.locator('input[type=file]').evaluateAll(inputs=>inputs.map(input=>input.accept)),['.glb,model/gltf-binary']);await ap.locator('.adm-row',{hasText:'私藏靠背椅'}).click();await ap.getByRole('button',{name:'删除…'}).click();await ap.screenshot({path:path.join(out,'08-admin-delete-confirm.png')});
   await ap.getByRole('button',{name:'确认删除'}).click();await ap.getByText(/已删除。清理 1 间小屋中的 1 处摆放，移出候选库，展位 1 已清空/).waitFor();
   assert.equal((await ui(vp)).exhibits,oldVisitorExhibits,'already-open page keeps its loaded exhibits');
   await enter(vp);await vp.waitForFunction(()=>window.__t10.ui().exhibits===2,null,{timeout:90000});await faceSlot(vp,0,7.5,0);await vp.waitForFunction(()=>window.__t10.engine.debugState().target?.id==='T01');await vp.keyboard.press('KeyE');await vp.getByText('虚位以待').waitFor();

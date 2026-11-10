@@ -225,7 +225,8 @@ test('T08 real PostgreSQL/API: submissions, review races, 30-slot publishing, ga
   const galleryBefore=(await call('GET','/api/v1/gallery')).json().data;const ogh={authorization:'Bearer '+galleryBefore.grant.token,'x-snapshot-grant':galleryBefore.grant.id};
   room=(await call('GET','/api/v1/rooms/me',undefined,alice.headers)).json().data;const staleBase=room.version,staleKey=randomUUID(),staleBody={baseVersion:staleBase,editSequence:9,name:'藏品小屋',placements:[...room.placements,placement(a1.id,'x3',[2,0,2])]};
   assert.equal((await call('DELETE',`/api/v1/admin/assets/${a1.id}`,undefined,alice.headers)).statusCode,403);
-  const del=await call('DELETE',`/api/v1/admin/assets/${a1.id}`,undefined,admin.headers);assert.equal(del.statusCode,200,del.body);
+  const delKey=randomUUID(),del=await call('DELETE',`/api/v1/admin/assets/${a1.id}`,undefined,{...admin.headers,'idempotency-key':delKey});assert.equal(del.statusCode,200,del.body);
+  assert.deepEqual((await call('DELETE',`/api/v1/admin/assets/${a1.id}`,undefined,{...admin.headers,'idempotency-key':delKey})).json().data,del.json().data,'a lost-response retry replays the receipt');
   assert.deepEqual({...del.json().data,galleryVersion:undefined},{deleted:true,roomsUpdated:2,placementsRemoved:4,submissionsClosed:1,candidateRemoved:true,slotNo:1,galleryVersion:undefined});
   assert.equal((await collectionList(bob)).some(item=>item.id===a1.id),false);
   assert.deepEqual((await call('GET',`/api/v1/shared-rooms/${bobShare}`)).json().data.placements.map(p=>p.id),['own']);
@@ -288,5 +289,40 @@ test('T08 real PostgreSQL/API: submissions, review races, 30-slot publishing, ga
   assert.equal((await call('PUT','/api/v1/admin/gallery',{baseVersion:gv,slots:arrange({7:c3.id.toUpperCase()})},admin.headers)).statusCode,200);
   assert.equal((await call('GET','/api/v1/gallery')).json().data.slots[6].exhibit.candidateId,c3.id);
   assert.equal((await pool.query("SELECT count(*)::int n FROM exhibit_slots e JOIN candidates c ON c.id=e.candidate_id JOIN assets a ON a.id=c.asset_id WHERE a.state<>'ready'")).rows[0].n,0);
+  // ---- T18 owner deletes their own generated asset: same cascade as the administrator delete ----
+  {
+   const own=await personal(alice.user.id);
+   const s=(await call('POST',`/api/v1/assets/${own.id}/submissions`,publicFields({name:'自删瓷碗'}),alice.headers)).json().data;
+   assert.equal((await call('POST',`/api/v1/admin/submissions/${s.id}/review`,{decision:'approve'},admin.headers)).statusCode,200);
+   const cand=(await call('GET','/api/v1/admin/candidates',undefined,admin.headers)).json().data.items.find(c=>c.assetId===own.id);
+   const gv=(await call('GET','/api/v1/admin/gallery',undefined,admin.headers)).json().data.version;
+   assert.equal((await call('PUT','/api/v1/admin/gallery',{baseVersion:gv,slots:arrange({7:c3.id,9:cand.id})},admin.headers)).statusCode,200);
+   const gl=(await call('GET','/api/v1/gallery')).json().data,glh={authorization:'Bearer '+gl.grant.token,'x-snapshot-grant':gl.grant.id};
+   assert.equal(gl.slots[8].exhibit.candidateId,cand.id);
+   assert.equal((await call('POST',collectionPath(cand.id),undefined,{...bob.headers,...glh})).json().data.status,'collected');
+   for(const [actor,id] of [[alice,'mine'],[bob,'theirs']]){const r=(await call('GET','/api/v1/rooms/me',undefined,actor.headers)).json().data;
+    assert.equal((await call('PUT','/api/v1/rooms/me/layout',{baseVersion:r.version,editSequence:90,name:r.name,placements:[...r.placements,placement(own.id,id,[3,0,3])]},actor.headers)).statusCode,200);}
+   const aliceBefore=(await call('GET','/api/v1/rooms/me',undefined,alice.headers)).json().data;
+   // Only the owner can delete it through the personal route (others, even the administrator, get 404).
+   for(const actor of [bob,admin])assert.equal((await call('DELETE',`/api/v1/assets/${own.id}`,undefined,actor.headers)).statusCode,404);
+   assert.equal((await call('DELETE',`/api/v1/assets/${own.id}`,undefined,{cookie:alice.headers.cookie})).statusCode,403,'needs the CSRF token');
+   const key=randomUUID(),del=await call('DELETE',`/api/v1/assets/${own.id}`,undefined,{...alice.headers,'idempotency-key':key});assert.equal(del.statusCode,200,del.body);
+   const d=del.json().data;
+   assert.deepEqual({...d,galleryVersion:undefined},{deleted:true,roomsUpdated:2,placementsRemoved:2,submissionsClosed:1,candidateRemoved:true,slotNo:9,galleryVersion:undefined,
+    ownRoom:{previousVersion:aliceBefore.version,roomVersion:aliceBefore.version+1,placementsRemoved:1}});
+   assert.deepEqual((await call('DELETE',`/api/v1/assets/${own.id}`,undefined,{...alice.headers,'idempotency-key':key})).json().data,d,'same key replays the receipt');
+   assert.equal((await call('DELETE',`/api/v1/assets/${own.id}`,undefined,alice.headers)).statusCode,404,'second delete');
+   assert.equal((await call('GET',`/api/v1/assets/${own.id}`,undefined,alice.headers)).statusCode,404);
+   assert.ok(!(await call('GET','/api/v1/assets',undefined,alice.headers)).json().data.items.some(a=>a.id===own.id));
+   const task=(await call('GET','/api/v1/generation-tasks',undefined,alice.headers)).json().data.items.find(t=>t.assetDeleted);
+   assert.ok(task&&task.assetId===null,'the generation task no longer links to the deleted asset');
+   assert.equal((await collectionList(bob)).some(item=>item.id===own.id),false);
+   for(const actor of [alice,bob])assert.ok(!(await call('GET','/api/v1/rooms/me',undefined,actor.headers)).json().data.placements.some(p=>p.assetId===own.id));
+   const after=(await call('GET','/api/v1/gallery')).json().data;assert.equal(after.version,d.galleryVersion);assert.equal(after.slots[8].exhibit,null);assert.ok(after.slots[6].exhibit);
+   assert.equal((await pool.query('SELECT count(*)::int n FROM candidates WHERE asset_id=$1',[own.id])).rows[0].n,0);
+   assert.equal((await call('GET',`/api/v1/files/${own.model}/content`,undefined,glh)).statusCode,404,'an open gallery grant cannot fetch it');
+   for(const f of [own.model,own.original])assert.equal((await call('GET',`/api/v1/files/${f}/content`,undefined,alice.headers)).statusCode,404);
+   assert.ok(!(await call('GET','/api/v1/admin/assets',undefined,admin.headers)).json().data.items.some(a=>a.id===own.id));
+  }
  }finally{await app?.close();await pool.end();await bootstrap.query(`DROP DATABASE ${db} WITH (FORCE)`);await bootstrap.end();await fs.rm(root,{recursive:true,force:true});}
 });

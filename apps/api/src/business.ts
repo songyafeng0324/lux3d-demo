@@ -1,6 +1,6 @@
 import multipart from '@fastify/multipart';
 import {registerRoomRoutes,hasSnapshotAuthorization,snapshotFile} from './rooms.js';
-import {registerCurationRoutes} from './curation.js';
+import {registerCurationRoutes,riskDelete} from './curation.js';
 import {AsyncLocalStorage} from 'node:async_hooks';
 import {randomBytes,randomUUID,createHash} from 'node:crypto';
 import type {FastifyInstance,FastifyRequest,FastifyReply} from 'fastify';
@@ -13,6 +13,8 @@ const fail=(status:number,code:string,message:string):never=>{throw new Business
 const uuid=(value:unknown)=>typeof value==='string'&&/^[a-f0-9]{8}-(?:[a-f0-9]{4}-){3}[a-f0-9]{12}$/i.test(value)?value:fail(404,'NOT_FOUND','未找到该资源');
 const ok=(request:FastifyRequest,data:unknown)=>({data,requestId:request.id});
 const personalAssetFields="assets.*, EXISTS (SELECT 1 FROM candidates c WHERE c.asset_id=assets.id AND c.source='user') AS submission_approved";
+// A generation task whose asset the owner deleted no longer links to it.
+const taskFields="generation_tasks.*, EXISTS (SELECT 1 FROM assets a WHERE a.id=generation_tasks.result_asset_id AND a.state='deleted') AS asset_deleted";
 const personalAssetDto=(row:Record<string,any>)=>({...assetDto(row),submissionApproved:row.submission_approved as boolean});
 export async function registerBusinessRoutes(app:FastifyInstance,{pool,store,config}:{pool:pg.Pool;store:LocalFileStore;config:Config}){
   await app.register(multipart,{limits:{files:1,fields:16,parts:17,fileSize:100*1024*1024}});
@@ -89,8 +91,8 @@ export async function registerBusinessRoutes(app:FastifyInstance,{pool,store,con
   }));});
   function pagination(request:FastifyRequest){const cursor=(request.query as Record<string,unknown>).cursor;if(cursor===undefined)return null;if(typeof cursor!=='string'||cursor.length>300)fail(422,'INVALID_CURSOR','分页标识不正确');try{const [at,id]=JSON.parse(Buffer.from(cursor as string,'base64url').toString());if(typeof at!=='string'||!/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{6}Z$/.test(at))throw new Error();return {at,id:uuid(id)};}catch{ return fail(422,'INVALID_CURSOR','分页标识不正确');}}
   async function list(request:FastifyRequest,table:'generation_tasks'|'assets',where:string,args:unknown[],dto:(r:Record<string,any>)=>unknown,fields='*'){const cursor=pagination(request);let clause=where;if(cursor){args.push(cursor.at,cursor.id);clause+=` AND (created_at,id)<($${args.length-1}::timestamptz,$${args.length}::uuid)`;}const rows=(await pool.query(`SELECT ${fields},to_char(created_at AT TIME ZONE 'UTC','YYYY-MM-DD"T"HH24:MI:SS.US"Z"') AS cursor_at${table==='generation_tasks'?',submitted_day::text':''} FROM ${table} WHERE ${clause} ORDER BY created_at DESC,id DESC LIMIT 31`,args)).rows;const items=rows.slice(0,30);const last=items.at(-1);return ok(request,{items:items.map(dto),nextCursor:rows.length>30?Buffer.from(JSON.stringify([last!.cursor_at,last!.id])).toString('base64url'):null});}
-  app.get('/api/v1/generation-tasks',async request=>{const s=await session(request);return list(request,'generation_tasks','user_id=$1',[s.user.id],taskDto);});
-  app.get('/api/v1/generation-tasks/:id',async request=>{const s=await session(request);const id=uuid((request.params as {id:string}).id);const row=(await pool.query('SELECT *,submitted_day::text FROM generation_tasks WHERE id=$1 AND user_id=$2',[id,s.user.id])).rows[0];if(!row)fail(404,'NOT_FOUND','未找到该任务');return ok(request,taskDto(row));});
+  app.get('/api/v1/generation-tasks',async request=>{const s=await session(request);return list(request,'generation_tasks','user_id=$1',[s.user.id],taskDto,taskFields);});
+  app.get('/api/v1/generation-tasks/:id',async request=>{const s=await session(request);const id=uuid((request.params as {id:string}).id);const row=(await pool.query(`SELECT ${taskFields},submitted_day::text FROM generation_tasks WHERE id=$1 AND user_id=$2`,[id,s.user.id])).rows[0];if(!row)fail(404,'NOT_FOUND','未找到该任务');return ok(request,taskDto(row));});
   app.get('/api/v1/assets',async request=>{const s=await session(request);return list(request,'assets',"owner_id=$1 AND source_type='personal' AND state='ready'",[s.user.id],personalAssetDto,personalAssetFields);});
   app.get('/api/v1/assets/:id',async request=>{const s=await session(request);const row=(await pool.query(`SELECT ${personalAssetFields} FROM assets WHERE id=$1 AND owner_id=$2 AND state='ready'`,[uuid((request.params as {id:string}).id),s.user.id])).rows[0];if(!row)fail(404,'NOT_FOUND','未找到该藏品');return ok(request,personalAssetDto(row));});
   app.patch('/api/v1/assets/:id',async(request,reply)=>{
@@ -101,6 +103,22 @@ export async function registerBusinessRoutes(app:FastifyInstance,{pool,store,con
       if(!(await c.query("SELECT id FROM assets WHERE id=$1 AND owner_id=$2 AND source_type='personal' AND state='ready' FOR UPDATE",[id,s.user.id])).rowCount)fail(404,'NOT_FOUND','未找到该藏品');
     };
     return sendWrite(reply,request,await write(request,s,b,async c=>({status:200,data:assetDto((await c.query('UPDATE assets SET name=$2,description=coalesce($3,description) WHERE id=$1 RETURNING *',[id,name,description])).rows[0])}),false,check));
+  });
+  // The owner deletes their own generated asset: the same cascade as the administrator delete (gallery slot,
+  // curated candidate, pending submission, everyone's collections and room placements, files). Lock order:
+  // request key → owner's user row → asset → rooms → gallery, as for the administrator.
+  app.delete('/api/v1/assets/:id',async(request,reply)=>{
+    const s=await session(request,true),id=uuid((request.params as {id:string}).id);if(request.body!==undefined&&request.body!==null)exactFields(inputObject(request.body),[]);
+    // The ownership check runs after the receipt lookup, so a retry of a delete whose response was lost replays its receipt.
+    return sendWrite(reply,request,await write(request,s,{},async c=>{
+      if(!(await c.query("SELECT id FROM assets WHERE id=$1 AND owner_id=$2 AND source_type='personal' AND state='ready' FOR UPDATE",[id,s.user.id])).rowCount)fail(404,'NOT_FOUND','未找到该藏品，可能已删除');
+      const {status,data,roomChanges}=await riskDelete(c,id);
+      // The owner's open room page rebases its draft on this change (same shape as an uncollect).
+      let room=roomChanges.find(r=>r.ownerId===s.user.id);
+      if(!room){const v=Number((await c.query('SELECT layout_version FROM rooms WHERE owner_id=$1',[s.user.id])).rows[0]?.layout_version??0);room={ownerId:s.user.id,previousVersion:v,roomVersion:v,placementsRemoved:0};}
+      const {ownerId:_,...ownRoom}=room;
+      return {status,data:{...data,ownRoom}};
+    }));
   });
   app.get('/api/v1/furniture',async request=>{await session(request);return list(request,'assets',"source_type='furniture' AND state='ready'",[],assetDto);});
   app.get('/api/v1/files/:id/content',async(request,reply)=>{
@@ -113,7 +131,7 @@ export async function registerBusinessRoutes(app:FastifyInstance,{pool,store,con
     if(!row)fail(404,'NOT_FOUND','未找到该文件');reply.header('Cache-Control','private, no-store');reply.header('Content-Type',row.mime);reply.header('Content-Length',row.byte_size);reply.header('Content-Disposition','inline');return reply.send(await store.openRead(row.object_key));
   });
   app.post('/api/v1/admin/assets',async(request,reply)=>{
-    const s=await session(request,true);if(s.user.role!=='admin')fail(403,'FORBIDDEN','没有管理权限');const {fields,file,filename}=await multipartBody(request);exactFields(fields,['sourceType','source_type','name','description','era','material','ownershipType','holderName','location','officialUrl']);const source=fields.sourceType??fields.source_type;if(!['furniture','official_candidate'].includes(source))fail(422,'INVALID_INPUT','请选择家具或官方藏品');if(!/\.glb$/i.test(filename)||file.length>100*1024*1024)fail(422,'INVALID_MODEL','仅支持100MiB以内的GLB模型');
+    const s=await session(request,true);if(s.user.role!=='admin')fail(403,'FORBIDDEN','没有管理权限');const {fields,file,filename}=await multipartBody(request);exactFields(fields,['sourceType','source_type','name','description','era','material','ownershipType','holderName','location','officialUrl']);const source=fields.sourceType??fields.source_type;if(!['furniture','official_candidate'].includes(source))fail(422,'INVALID_INPUT','请选择官方物品或官方藏品');if(!/\.glb$/i.test(filename)||file.length>100*1024*1024)fail(422,'INVALID_MODEL','仅支持100MiB以内的GLB模型');
     const metadata:Record<string,string>={name:textField(fields.name,'名称',1,80),description:textField(fields.description??'','简介',source==='official_candidate'?1:0,2000)};
     if(source==='official_candidate')Object.assign(metadata,publicFieldsInput(fields),{sourceNickname:'官方馆藏'});
     const hash=createHash('sha256').update(file).digest('hex');return sendWrite(reply,request,await write(request,s,{sourceType:source,metadata,sha256:hash},async c=>{const input=await upload(c,s.user.id,file,'model/gltf-binary','model');const id=randomUUID();await c.query("INSERT INTO asset_imports(id,admin_id,input_file_id,source_type,metadata_snapshot,policy_version) VALUES($1,$2,$3,$4,$5,'t06-v1')",[id,s.user.id,input,source,JSON.stringify(metadata)]);await c.query("INSERT INTO jobs(kind,ref_id) VALUES('import',$1)",[id]);return {status:202,data:{id,status:'processing',assetId:null}};},true));

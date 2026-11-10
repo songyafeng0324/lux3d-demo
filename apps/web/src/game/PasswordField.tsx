@@ -15,6 +15,13 @@ export function credentialError(username: string, password: string) {
   return '';
 }
 
+export function passwordChangeError(oldPassword: string, newPassword: string, confirmPassword: string) {
+  if (!oldPassword) return '请输入原密码。';
+  if (newPassword.length < 12 || newPassword.length > 128) return '新密码长度须为 12～128 个字符。';
+  if (newPassword !== confirmPassword) return '两次新密码不一致。';
+  return '';
+}
+
 export default function PasswordField({ label = '密码', name = 'password', autoComplete, disabled, active = true, placeholder }: Props) {
   const id = useId();
   const [visible, setVisible] = useState(false);

@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { validateRoomLayout, type CollectedAsset, type CollectionRemoval, type PersonalRoom, type RoomModel, type RoomPlacement, type SharedRoom } from '@aholo/contracts';
+import { validateRoomLayout, type AssetDeletion, type CollectedAsset, type CollectionRemoval, type PersonalRoom, type RoomModel, type RoomPlacement, type SharedRoom } from '@aholo/contracts';
 import { api, ApiError, type Me, type Page } from '../game/backpack-api.js';
 import Backpack from '../game/Backpack.js';
 import AssetThumbnail, { type ThumbnailCache } from '../game/AssetThumbnail.js';
@@ -12,7 +12,7 @@ import RoomLike from './RoomLike.js';
 import { PersonalRoomSave, type RoomSaveState } from './save.js';
 import '../scene/scene.css';
 import './room.css';
-const catalogGroups = { personal: '我生成的', collected: '我收藏的', furniture: '官方家具' } as const;
+const catalogGroups = { personal: '我生成的', collected: '我收藏的', furniture: '官方物品' } as const;
 type CatalogGroup = keyof typeof catalogGroups;
 interface CatalogAsset extends RoomModel { name: string; originalImageId?: string | null; collectionId?: string }
 const labels = { loading: '正在读取布置', loadFailed: '读取失败', saved: '已自动保存', dirty: '有修改待保存', saving: '正在保存…', failed: '保存未确认', rejected: '布置未通过校验', conflict: '房间版本冲突' };
@@ -21,7 +21,7 @@ async function allAssets(path: string): Promise<CatalogAsset[]> {
   do { const page: Page<CatalogAsset> = await api<Page<CatalogAsset>>(path + (cursor ? '?cursor=' + encodeURIComponent(cursor) : '')); items.push(...page.items); cursor = page.nextCursor; if (cursor && seen.has(cursor)) throw new Error('物品分页读取失败，请重试。'); if (cursor) seen.add(cursor); } while (cursor);
   return items;
 }
-const modelOf = (asset: CatalogAsset): RoomModel => ({ id: asset.id, modelFileId: asset.modelFileId, normalization: asset.normalization, bounds: asset.bounds });
+const modelOf = (asset: CatalogAsset): RoomModel => ({ id: asset.id, modelFileId: asset.modelFileId, normalization: asset.normalization, bounds: asset.bounds, walkThrough: Boolean(asset.walkThrough) });
 declare global { interface Window { __room?: { engine: RoomEngine; save: PersonalRoomSave | null; edit: (name: string, placements: RoomPlacement[]) => void; add: (id: string) => Promise<void>; replace: (placements: RoomPlacement[]) => void; snapshot: () => PersonalRoom | SharedRoom | null } } }
 export default function Room({ shareToken }: { shareToken?: string }) {
   const visitor = Boolean(shareToken);
@@ -124,6 +124,13 @@ export default function Room({ shareToken }: { shareToken?: string }) {
     catalogSequence.current++;
     setCatalog(rows => rows.filter(row => row.collectionId !== item.collectionId));
     saver.current?.removeCollectedAsset(item.id, result);
+  }
+
+  /** The owner deleted a generated asset: drop it from the catalog and rebase the draft on the server's room change. */
+  function assetDeleted(assetId: string, result: AssetDeletion) {
+    catalogSequence.current++;
+    setCatalog(rows => rows.filter(row => row.id !== assetId));
+    saver.current?.removeCollectedAsset(assetId, result.ownRoom);
   }
 
   function openCatalog() {
@@ -358,7 +365,7 @@ export default function Room({ shareToken }: { shareToken?: string }) {
         {mode !== 'edit' && <><div className="visit-actions"><button type="button" onClick={() => engine.current?.home()}>↶ 回到入口</button><span>{WALK_HINT}</span></div><span className="crosshair" aria-hidden="true">＋</span></>}
         {visitor && room && <RoomLike room={room as SharedRoom} />}
         {mode === 'edit' && active && <div className="selection-card"><AssetThumbnail asset={catalogById.get(active.assetId)} cache={thumbnailCache} /><div><strong>{nameOf(active.assetId)}</strong><small>移动、旋转或等比缩放</small></div><button type="button" onClick={() => engine.current?.focus(active.id)}>定位</button><button type="button" aria-label="移除选中摆放" disabled={!canEdit} onClick={() => edit(room!.name, room!.placements.filter(p => p.id !== active.id))}>移除</button></div>}
-        {mode === 'edit' && !active && room?.placements.length === 0 && <div className="empty-room"><span>从一件物品开始</span><p>从左侧添加模型或家具<br />通过三轴控件布置小屋</p></div>}
+        {mode === 'edit' && !active && room?.placements.length === 0 && <div className="empty-room"><span>从一件物品开始</span><p>从左侧添加模型或官方物品<br />通过三轴控件布置小屋</p></div>}
         {notice && <div className="scene-notice" role="alert">{notice}<button type="button" aria-label="收起提示" onClick={() => setNotice('')}>×</button></div>}
         <div className="stage-footer"><span>{mode === 'edit' ? '拖动三轴控件 · 滚轮缩放视角 · 鼠标拖动环绕' : '参观不改变布局'}</span><span>共 {room?.placements.length ?? 0} 件摆放</span></div>
       </section>
@@ -379,7 +386,7 @@ export default function Room({ shareToken }: { shareToken?: string }) {
       </div>}
       <Backpack kind="account" open={overlay === 'account'} close={closeOverlay} onAccountChange={accountChanged}
         beforeSessionEnd={allowSessionEnd} beforeLogin={allowLogin} />
-      <Backpack key={owner?.user.id ?? 'guest'} open={overlay === 'backpack'} close={closeOverlay} onAccountChange={accountChanged} beforeLogin={allowLogin} thumbnailCache={thumbnailCache} onCollectionRemoved={collectionRemoved} />
+      <Backpack key={owner?.user.id ?? 'guest'} open={overlay === 'backpack'} close={closeOverlay} onAccountChange={accountChanged} beforeLogin={allowLogin} thumbnailCache={thumbnailCache} onCollectionRemoved={collectionRemoved} onAssetDeleted={assetDeleted} />
       {overlay === 'discover' && <RoomDirectory close={closeOverlay} />}
     </>}
   </div>;

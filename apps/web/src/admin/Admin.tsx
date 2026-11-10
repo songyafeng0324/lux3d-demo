@@ -16,7 +16,7 @@ interface AdminUser { id: string; username: string; nickname: string; role: stri
 interface UserDetail { user: AdminUser; quota: { day: string; total: number; used: number; available: number; adjusted: boolean }; counts: { tasks: number; succeeded: number; assets: number }; tasks: Array<{ id: string; status: string; submittedDay: string; createdAt: string; assetId: string | null; errorCode: string | null }>; assets: Array<{ id: string; name: string; createdAt: string }> }
 type Pending = { path: string; method: string; body: Record<string, unknown> | FormData; key: string; label: string; done: (data: any) => void | Promise<void> };
 
-const SOURCE = { personal: '用户个人', furniture: '官方家具', official_candidate: '公共藏品（官方）' } as const;
+const SOURCE = { personal: '用户个人', furniture: '官方物品', official_candidate: '公共藏品（官方）' } as const;
 const STATUS: Record<string, string> = { pending: '待审核', approved: '已通过', rejected: '已驳回', withdrawn: '已撤回', deleted: '模型已删除' };
 const OWNERSHIP = { museum: '博物馆', personal_collection: '个人收藏' } as const;
 const PUBLIC_KEYS = ['name', 'description', 'era', 'material', 'ownershipType', 'holderName', 'location', 'officialUrl'] as const;
@@ -149,7 +149,7 @@ function ReviewTab({ write, locked, revision, refresh, setMessage }: TabProps) {
         <strong>{i.publicSnapshot?.name ?? '（已删除，资料已清除）'}</strong><span>{STATUS[i.status]} · {i.applicant.username}</span><small>{time(i.submittedAt)}</small></button>)}
     </div>
     <div className="adm-detail">
-      {!item ? <p className="adm-muted">选择左侧申请查看本次模型、原图和提交资料。</p> : !item.publicSnapshot ? <p className="adm-muted">该模型已按风险规则删除，申请资料已清除。</p> : <>
+      {!item ? <p className="adm-muted">选择左侧申请查看本次模型、原图和提交资料。</p> : !item.publicSnapshot ? <p className="adm-muted">该模型已删除，申请资料已清除。</p> : <>
         <div className="adm-detail-head"><div><h2>{item.publicSnapshot.name}</h2><p className="adm-muted">申请人 {item.applicant.username}（提交时昵称：{item.publicSnapshot.sourceNickname}；当前：{item.applicant.currentNickname}）· 提交于 {time(item.submittedAt)}</p></div><span className="adm-pill">{STATUS[item.status]}</span></div>
         <div className="adm-media">
           {item.model ? <ModelPreview fileId={item.model.modelFileId} name={item.publicSnapshot.name} /> : <p className="adm-muted">模型已删除。</p>}
@@ -223,6 +223,11 @@ function AssetsTab({ write, locked, revision, refresh, setMessage }: TabProps) {
   const asset = items.find(a => a.id === selected) ?? null;
   useEffect(() => { setMode('view'); }, [selected]);
   const [uploadKind, setUploadKind] = useState<'furniture' | 'official_candidate'>('furniture');
+  // The chosen GLB previews on the right before it is uploaded (local only; the server still validates and renders it).
+  const [uploadFile, setUploadFile] = useState<File | null>(null);
+  // Same cap as the API's multipart fileSize; larger files are refused there, so skip parsing them here.
+  const MAX_UPLOAD_BYTES = 100 * 1024 * 1024;
+  const pickFile = (file: File | null) => { setUploadFile(file && /\.glb$/i.test(file.name) ? file : null); if (file) setSelected(null); };
   const [imports, setImports] = useState<Array<{ id: string; name: string; status: string; errorCode?: string | null }>>([]);
   useEffect(() => {
     if (!imports.some(i => i.status === 'processing')) return;
@@ -235,23 +240,24 @@ function AssetsTab({ write, locked, revision, refresh, setMessage }: TabProps) {
     const body = new FormData(); body.set('sourceType', uploadKind);
     for (const k of uploadKind === 'furniture' ? ['name', 'description'] : PUBLIC_KEYS) body.set(k, String(d.get(k) ?? ''));
     body.set('file', file);
-    write('/admin/assets', 'POST', body, '确认上次上传', (r: { id: string }) => { setImports(list => [{ id: r.id, name: String(d.get('name')), status: 'processing' }, ...list]); setMessage('已受理，正在校验与渲染检查；通过后才会作为可用资产出现。'); form.reset(); });
+    write('/admin/assets', 'POST', body, '确认上次上传', (r: { id: string }) => { setImports(list => [{ id: r.id, name: String(d.get('name')), status: 'processing' }, ...list]); setMessage('已受理，正在校验与渲染检查；通过后才会作为可用资产出现。'); form.reset(); setUploadFile(null); });
   }
   async function more() { if (!cursor) return; const params = new URLSearchParams({ ...(source ? { source } : {}), ...(query ? { q: query } : {}), cursor }); const next = await api<Page<AdminAsset>>(`/admin/assets?${params}`); setExtra(x => [...x, ...next.items]); setCursor(next.nextCursor); }
   return <section className="adm-split">
     <div className="adm-list">
       <form className="bag-form adm-upload" onSubmit={upload}>
         <h2>上传现成模型</h2>
-        <div className="adm-seg" role="radiogroup" aria-label="用途">{(['furniture', 'official_candidate'] as const).map(k => <button type="button" key={k} role="radio" aria-checked={uploadKind === k} onClick={() => setUploadKind(k)} disabled={locked}>{k === 'furniture' ? '官方家具' : '公共藏品'}</button>)}</div>
-        <label>GLB 模型<input name="file" type="file" accept=".glb,model/gltf-binary" required disabled={locked} /></label>
+        <div className="adm-seg" role="radiogroup" aria-label="用途">{(['furniture', 'official_candidate'] as const).map(k => <button type="button" key={k} role="radio" aria-checked={uploadKind === k} onClick={() => setUploadKind(k)} disabled={locked}>{k === 'furniture' ? '官方物品' : '公共藏品'}</button>)}</div>
+        <label>GLB 模型<input name="file" type="file" accept=".glb,model/gltf-binary" required disabled={locked} onChange={e => pickFile(e.target.files?.[0] ?? null)} /></label>
+        {uploadFile && selected && <button type="button" className="adm-link" onClick={() => setSelected(null)}>在右侧查看待上传模型</button>}
         {uploadKind === 'furniture' ? <><label>名称<input name="name" required maxLength={80} disabled={locked} /></label><label>简介（选填）<textarea name="description" maxLength={2000} rows={2} disabled={locked} /></label></> : <PublicInputs locked={locked} key="official" />}
         <button type="submit" className="bag-primary" disabled={locked}>上传</button>
-        <small className="adm-muted">{uploadKind === 'furniture' ? '家具成功后供所有用户布置，不需要文物资料。' : '公共藏品成功后直接进入候选库，署名“官方馆藏”，不自动展出、不进入家具。'}后台只接收现成模型，没有图片生成入口。</small>
+        <small className="adm-muted">{uploadKind === 'furniture' ? '官方物品成功后供所有用户布置，不需要文物资料。' : '公共藏品成功后直接进入候选库，署名“官方馆藏”，不自动展出、不进入官方物品。'}后台只接收现成模型，没有图片生成入口。</small>
         {imports.map(i => <p key={i.id} className={i.status === 'failed' ? 'adm-error' : 'adm-muted'}>「{i.name}」{i.status === 'processing' ? '校验中…' : i.status === 'succeeded' ? '已可用' : `未通过校验（${i.errorCode ?? '未知'}），不会成为可用资产`}</p>)}
       </form>
       <div className="adm-list-head"><h2>全部资产</h2></div>
       <form className="adm-filter" onSubmit={e => { e.preventDefault(); setQuery(q.trim()); }}>
-        <select aria-label="来源" value={source} onChange={e => setSource(e.target.value)}><option value="">全部来源</option><option value="personal">用户个人</option><option value="furniture">官方家具</option><option value="official_candidate">公共藏品</option></select>
+        <select aria-label="来源" value={source} onChange={e => setSource(e.target.value)}><option value="">全部来源</option><option value="personal">用户个人</option><option value="furniture">官方物品</option><option value="official_candidate">公共藏品</option></select>
         <input aria-label="搜索" value={q} onChange={e => setQ(e.target.value)} placeholder="名称 / 用户名 / 昵称" /><button type="submit">搜索</button>
       </form>
       {error && <p className="adm-error">{error}</p>}
@@ -260,7 +266,11 @@ function AssetsTab({ write, locked, revision, refresh, setMessage }: TabProps) {
       {cursor && <button type="button" onClick={() => void more()}>加载更多</button>}
     </div>
     <div className="adm-detail">
-      {!asset ? <p className="adm-muted">选择资产查看预览、维护自录资料，或执行风险删除。</p> : <>
+      {!asset && uploadFile ? <>
+        <div className="adm-detail-head"><div><h2>待上传：{uploadFile.name}</h2><p className="adm-muted">{(uploadFile.size / 1024 / 1024).toFixed(2)} MiB · 本机预览，尚未上传</p></div></div>
+        {uploadFile.size > MAX_UPLOAD_BYTES ? <p className="adm-error">文件超过 100 MiB，服务端不会接收，请先压缩或减面。</p> : <ModelPreview file={uploadFile} name={uploadFile.name} />}
+        <small className="adm-muted">这里只在浏览器里读取文件；点「上传」后服务器还会校验格式、资源预算并做渲染检查，通过后才会成为可用资产。</small>
+      </> : !asset ? <p className="adm-muted">选择资产查看预览、维护自录资料，或删除资产。</p> : <>
         <div className="adm-detail-head"><div><h2>{asset.name}</h2><p className="adm-muted">{SOURCE[asset.sourceType]}{asset.owner ? ` · 归属 ${asset.owner.username}（${asset.owner.nickname}）` : ''} · {time(asset.createdAt)}</p></div></div>
         <ModelPreview fileId={asset.modelFileId} name={asset.name} />
         {mode === 'view' && <>
@@ -268,7 +278,7 @@ function AssetsTab({ write, locked, revision, refresh, setMessage }: TabProps) {
           {asset.publicSnapshot && <Facts s={asset.publicSnapshot} />}
           <div className="adm-actions-inline">
             {asset.editable ? <button type="button" disabled={locked} onClick={() => setMode('edit')}>编辑文字资料</button> : <small className="adm-muted">用户个人资产的名称、简介由本人维护，后台不代改。</small>}
-            <button type="button" className="adm-danger" disabled={locked} onClick={() => setMode('delete')}>风险删除…</button>
+            <button type="button" className="adm-danger" disabled={locked} onClick={() => setMode('delete')}>删除…</button>
           </div>
         </>}
         {mode === 'edit' && <form className="bag-form" onSubmit={e => { e.preventDefault(); const body = asset.sourceType === 'official_candidate' ? formObject(e.currentTarget, PUBLIC_KEYS) : formObject(e.currentTarget, ['name', 'description']);
@@ -278,7 +288,7 @@ function AssetsTab({ write, locked, revision, refresh, setMessage }: TabProps) {
           <div className="adm-actions-inline"><button type="submit" className="bag-primary" disabled={locked}>保存</button><button type="button" onClick={() => setMode('view')}>取消</button></div>
         </form>}
         {mode === 'delete' && <div className="adm-confirm" role="alert">
-          <h3>确认按风险规则删除「{asset.name}」？</h3>
+          <h3>确认删除「{asset.name}」？</h3>
           <p>将同时清理：个人背包中的该模型、所有小屋里的对应摆放、待审申请与候选、所在公共展位。其他模型与布局保留。删除后没有占位，也不能恢复。已打开的分享页/藏宝阁保留已载入画面，新进入或刷新按删除后状态显示。</p>
           <div className="adm-actions-inline"><button type="button" className="adm-danger" disabled={locked} onClick={() => write(`/admin/assets/${asset.id}`, 'DELETE', {}, '确认上次删除', (r: { roomsUpdated: number; placementsRemoved: number; slotNo: number | null; candidateRemoved: boolean }) => {
             setMessage(`已删除。清理 ${r.roomsUpdated} 间小屋中的 ${r.placementsRemoved} 处摆放${r.candidateRemoved ? '，移出候选库' : ''}${r.slotNo ? `，展位 ${r.slotNo} 已清空并发布新展陈` : ''}。`); setSelected(null); refresh(); })}>确认删除</button><button type="button" onClick={() => setMode('view')}>取消</button></div>

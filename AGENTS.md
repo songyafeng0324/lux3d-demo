@@ -111,10 +111,11 @@
 - 布局保存必须CAS/immutable版本/同键回执原子提交，锁序user→排序旧新assets→room。丢响应保留原key/body，旧ACK不得回弹当前拖动或误认后续草稿已保存。会话过期暂停写入，同账号重新登录后可继续确认原请求。
 - 分享稳定token加密、grant256bit摘要/原版/epoch隔离，文件有grant头就不能回退cookie扩大权限；关闭/重开不复活旧grant。源删除后的完整布局/展陈清理由T08负责。
 - T14 目录纳入全部开启分享的小屋，登录后可浏览。点赞按房间和访客账号唯一且不可撤销，使用会话及当前分享凭证，关分享后下榜并拒绝旧凭证写入。契约见数据契约第 13 节。
-- 基础家具源与manifest在assets/furniture，构建/幂等导入用scripts/build-furniture.mjs和seed-furniture.mjs；系统来源记录不能登录，不替代正常管理员种子。
+- 官方物品（界面名，接口与 source_type 仍为 furniture）源与 manifest 在 assets/furniture，构建/幂等导入用 scripts/build-furniture.mjs 和 seed-furniture.mjs；清单不再列出的系统物品会被风险删除并移出所有布局。系统来源记录不能登录，不替代正常管理员种子。
+- T17 小屋：九宫格草地（台基为中格）加外圈木栅栏；建筑、庭院、行走和编辑器防穿模共用 `apps/web/src/room/layout.ts`，改几何先改这里；贴图复用 T16 的 CC0 集（`room/textures.ts`）。可穿行物品由资产 `walk_through` 决定。截图核对用 `node scripts/t17-room-shots.mjs`（临时库）。
 
 ## T08 投稿、后台与展陈
 - 实现入口 `apps/api/src/curation.ts`、`apps/web/src/admin/`、首页 `game/Game.tsx`/`engine.ts`；合同第10节，验证见 `docs/validation/后台展陈验证.md`。
 - 会话复核用户行锁为FOR NO KEY UPDATE，同一行一个事务只UPDATE一次，避免外键KEY SHARE引发死锁；意外错误按requestId写服务端日志。
-- 加引用（保存房间、审核、发布展位）必须先锁asset；风险删除锁asset→房间→gallery并推进版本。过期草稿含已删模型返回409，展陈grant详情/文件只看该展品是否ready。
+- 加引用（保存房间、审核、发布展位）必须先锁asset；删除（后台与 T18 本人删除共用 `riskDelete`）锁asset→房间→gallery并推进版本。会被本次写入改变的存在性检查放在写入体内（回执查找之后），不放 `authorize`，否则同键重放会变 404。过期草稿含已删模型返回409，展陈grant详情/文件只看该展品是否ready。
 - 展陈槽n=布局标记T0n，展品用 `exhibitFit` 自动居中落台；不加手动高度/旋转/缩放。展品加载后以世界包围盒加入行走碰撞（`exhibitCollider`，人若被包住由 `freePlayer` 移到附近空位）；E 目标射线没命中时，按脚下同层、2.5 m 以内、40° 朝向且不隔墙选取（`TARGET_FACING`）。浏览器回归 `npm run test:t08` 只用临时库。

@@ -41,6 +41,8 @@ export default function Game() {
   avatarRef.current = avatar;
   const grant = useRef<GalleryView['grant'] | null>(null);
   const returnToExhibit = useRef(false);
+  /** Reloads the published gallery (used after the visitor deleted one of their own exhibits). */
+  const reloadGallery = useRef<() => void>(() => {});
   const state = useRef({ phase, overlay, detail, gallery, detailState });
   state.current = { phase, overlay, detail, gallery, detailState };
   const exhibitAt = useCallback((slot: ExhibitSlot | null): GalleryExhibit | null => slot ? state.current.gallery?.slots.find(s => s.slotNo === slotNoOf(slot))?.exhibit ?? null : null, []);
@@ -66,17 +68,20 @@ export default function Game() {
     }
     engine.current = instance;
     window.__t10 = { engine: instance, ui: () => ({ avatar: avatarRef.current, phase: state.current.phase, overlay: state.current.overlay, detail: state.current.detail?.id ?? null, galleryVersion: state.current.gallery?.version ?? null, exhibits: instance.exhibitCount(), detailName: state.current.detailState?.status === 'ready' ? state.current.detailState.data.name : null }) };
-    let renewal: ReturnType<typeof setTimeout> | undefined, stopped = false, renewKey: string | null = null;
+    let renewal: ReturnType<typeof setTimeout> | undefined, stopped = false, renewKey: string | null = null, gallerySeq = 0;
+    reloadGallery.current = () => { if (!stopped) void loadGallery(instance); };
     /** Each entry or refresh reads the latest published version; an open page keeps its version (AC42). */
     async function loadGallery(target: PavilionEngine) {
+      // A later reload (e.g. after the owner deletes an exhibit) supersedes a slower earlier one.
+      const seq = ++gallerySeq;
       try {
         const view = await api<GalleryView>('/gallery', { cache: 'no-store', credentials: 'omit' });
-        if (stopped) return;
+        if (stopped || seq !== gallerySeq) return;
         grant.current = view.grant; setGallery(view);
         const result = await target.setExhibits(view.slots, grantHeaders(view.grant));
         if (!stopped && result.failed) setGalleryNotice(`${result.failed} 件展品暂时无法载入，刷新后重试。`);
         scheduleRenew();
-      } catch { if (!stopped) setGalleryNotice('展陈暂时无法读取，展位显示为空；刷新后重试。'); }
+      } catch { if (!stopped && seq === gallerySeq) setGalleryNotice('展陈暂时无法读取，展位显示为空；刷新后重试。'); }
     }
     function scheduleRenew() {
       clearTimeout(renewal); const g = grant.current; if (!g || stopped) return;
@@ -261,7 +266,7 @@ export default function Game() {
       <Backpack kind="account" open={overlay === 'account'} close={closeAccount} onAccountChange={profile => {
         if (profile && returnToExhibit.current) closeAccount();
       }} />
-      <Backpack open={overlay === 'backpack'} close={close} />
+      <Backpack open={overlay === 'backpack'} close={close} onAssetDeleted={(_, result) => { if (result.galleryVersion !== null) reloadGallery.current(); }} />
       {overlay === 'character' && <CharacterPicker prefs={avatar} pick={pickCharacter} close={close} />}
 
       {overlay === 'detail' && detail && <div className="t10-modal-backdrop" onClick={close}>

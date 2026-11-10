@@ -1,55 +1,170 @@
 import * as T from 'three';
-import { ROOM_COURTYARD_BOUNDS } from '@aholo/contracts';
-import { box, material } from '../scene/assets.js';
-import { PORCH_STEP } from './navigation.js';
+import { FENCE, GROUND_Y, PATH } from './layout.js';
+import { slab, textured } from './textures.js';
 
 export const horizonColor = 0x85b2d4;
-const [edgeX, courtyardLevel, edgeZ] = ROOM_COURTYARD_BOUNDS.min;
+const courtyardLevel = GROUND_Y;
+
+/** Lawn texture: fine blades over mottled greens. */
+function lawnTexture() {
+  const size = 256, canvas = document.createElement('canvas');
+  canvas.width = canvas.height = size;
+  const context = canvas.getContext('2d')!;
+  context.fillStyle = '#6f8a52';
+  context.fillRect(0, 0, size, size);
+  let seed = 3169;
+  const random = () => { seed = (Math.imul(seed, 1664525) + 1013904223) >>> 0; return seed / 2 ** 32; };
+  const tones = ['#5d7a44', '#7f9a5a', '#6a8649', '#8ca763', '#55703f', '#93a86a'];
+  for (let i = 0; i < 5200; i++) {
+    const x = random() * size, y = random() * size, length = 2 + random() * 5, lean = (random() - .5) * 2.2;
+    context.strokeStyle = tones[Math.floor(random() * tones.length)];
+    context.globalAlpha = .45 + random() * .5;
+    context.lineWidth = .7 + random() * .8;
+    // Draw each blade on every wrap offset so the tile has no seams.
+    for (const ox of [-size, 0, size]) for (const oy of [-size, 0, size]) {
+      context.beginPath(); context.moveTo(x + ox, y + oy); context.lineTo(x + ox + lean, y + oy - length); context.stroke();
+    }
+  }
+  const texture = new T.CanvasTexture(canvas);
+  texture.colorSpace = T.SRGBColorSpace;
+  texture.wrapS = texture.wrapT = T.RepeatWrapping;
+  texture.anisotropy = 8;
+  return texture;
+}
+
+/** Smooth value noise for large-scale patches on the lawn (vertex colours). */
+function patches(x: number, z: number) {
+  const hash = (i: number, j: number) => { const h = Math.sin(i * 127.1 + j * 311.7) * 43758.5453; return h - Math.floor(h); };
+  const smooth = (px: number, pz: number) => {
+    const i = Math.floor(px), j = Math.floor(pz), fx = px - i, fz = pz - j;
+    const u = fx * fx * (3 - 2 * fx), v = fz * fz * (3 - 2 * fz);
+    return (hash(i, j) * (1 - u) + hash(i + 1, j) * u) * (1 - v) + (hash(i, j + 1) * (1 - u) + hash(i + 1, j + 1) * u) * v;
+  };
+  return smooth(x / 9, z / 9) * .65 + smooth(x / 3.5 + 7, z / 3.5 + 3) * .35;
+}
 
 export function courtyardGround() {
-  const canvas = document.createElement('canvas');
-  canvas.width = canvas.height = 128;
-  const context = canvas.getContext('2d')!;
-  const pixels = context.createImageData(canvas.width, canvas.height);
-  let seed = 3169;
-  for (let i = 0; i < pixels.data.length; i += 4) {
-    seed = (Math.imul(seed, 1664525) + 1013904223) >>> 0;
-    const grain = 164 + (seed >>> 25 & 63);
-    pixels.data.set([grain, grain, grain, 255], i);
-  }
-  context.putImageData(pixels, 0, 0);
-  const grain = new T.CanvasTexture(canvas);
-  grain.colorSpace = T.SRGBColorSpace;
-  grain.wrapS = grain.wrapT = T.RepeatWrapping;
-  grain.repeat.set(24, 20);
-  const turf = grain.clone();
-  turf.repeat.set(105, 105);
-
   const group = new T.Group();
-  const terrain = [
-    { size: [180, 180], height: courtyardLevel - .012, color: 0x62734f, map: turf, name: 'outer-meadow' },
-    { size: [-2 * edgeX, -2 * edgeZ], height: courtyardLevel, color: 0x98846c, map: grain, name: 'courtyard-gravel' },
-  ];
-  for (const { size, height, color, map, name } of terrain) {
-    const surface = material(color, .98);
-    surface.map = map;
-    const plane = new T.Mesh(new T.PlaneGeometry(size[0], size[1]), surface);
-    plane.name = name;
-    plane.rotation.x = -Math.PI / 2;
-    plane.position.y = height;
-    plane.receiveShadow = true;
-    group.add(plane);
+  group.name = 'courtyard';
+
+  // One lawn from the house out to the horizon; the fence marks where people may go.
+  const size = 320, segments = 160;
+  const lawnGeometry = new T.PlaneGeometry(size, size, segments, segments);
+  lawnGeometry.rotateX(-Math.PI / 2);
+  const position = lawnGeometry.getAttribute('position') as T.BufferAttribute, uv = lawnGeometry.getAttribute('uv') as T.BufferAttribute;
+  const colors = new Float32Array(position.count * 3), light = new T.Color(0xe6f0c8), deep = new T.Color(0x9fb487), color = new T.Color();
+  for (let i = 0; i < position.count; i++) {
+    const x = position.getX(i), z = position.getZ(i);
+    color.copy(deep).lerp(light, patches(x, z)).toArray(colors, i * 3);
+    uv.setXY(i, x / 2.2, z / 2.2);
   }
-  const pathStone = material(0x77756c, .92);
-  const stepHeight = PORCH_STEP.y - courtyardLevel;
-  const porch = box(group, PORCH_STEP.x1 - PORCH_STEP.x0, stepHeight, PORCH_STEP.z1 - PORCH_STEP.z0, 0,
-    courtyardLevel + stepHeight / 2, (PORCH_STEP.z0 + PORCH_STEP.z1) / 2, pathStone);
-  porch.castShadow = true;
-  for (let z = 5.4; z <= 9.4; z += .92) {
-    const stone = box(group, 2.05, .045, .82, 0, courtyardLevel + .016, z, pathStone);
-    stone.castShadow = true;
+  lawnGeometry.setAttribute('color', new T.Float32BufferAttribute(colors, 3));
+  const lawn = new T.Mesh(lawnGeometry, new T.MeshStandardMaterial({ map: lawnTexture(), vertexColors: true, roughness: .97 }));
+  lawn.name = 'lawn';
+  lawn.position.y = courtyardLevel;
+  lawn.receiveShadow = true;
+  group.add(lawn);
+
+  // Stone path: running-bond granite slabs between marble curbs, from the porch to the gate.
+  const paving = textured('granite', { tint: 0xe6dccb, lift: 2.8, roughness: .8 });
+  const curbStone = textured('marble', { tint: 0x9c9a92, roughness: .8 });
+  const { halfWidth, curb, z0, z1 } = PATH;
+  const slabTop = courtyardLevel + .015, slabDepth = .05;
+  let row = 0;
+  for (let z = z0 + .02; z < z1 - .3; row++) {
+    const length = Math.min(.86 + (row % 3) * .08, z1 - z - .02);
+    const split = row % 2 ? [-halfWidth, halfWidth] : [-halfWidth, -.25, halfWidth];
+    for (let i = 0; i < split.length - 1; i++) {
+      const x0 = split[i] + .015, x1 = split[i + 1] - .015;
+      const stone = slab(group, paving, x1 - x0, slabDepth, length, (x0 + x1) / 2, slabTop - slabDepth / 2, z + length / 2);
+      stone.name = 'path-slab';
+    }
+    z += length + .03;
   }
+  for (const side of [-1, 1]) {
+    slab(group, curbStone, curb, .09, z1 - z0, side * (halfWidth + curb / 2 + .01), courtyardLevel + .03 - .045, (z0 + z1) / 2);
+  }
+
+  group.add(fence());
   return group;
+}
+
+/** Low picket fence around the 3×3 grounds, with a closed gate where the path meets it. */
+function fence() {
+  const group = new T.Group();
+  group.name = 'fence';
+  const wood = textured('darkWood', { tint: 0xc9a582, roughness: .75 });
+  const { x: fx, z: fz, height, post, gate } = FENCE;
+  const runs: { from: [number, number]; to: [number, number] }[] = [
+    { from: [-fx, -fz], to: [fx, -fz] }, { from: [fx, -fz], to: [fx, fz] },
+    { from: [-fx, fz], to: [-gate, fz] }, { from: [gate, fz], to: [fx, fz] }, { from: [-fx, -fz], to: [-fx, fz] },
+  ];
+  const posts: [number, number][] = [], rails: { at: [number, number]; length: number; angle: number }[] = [], pickets: [number, number, number][] = [];
+  for (const { from, to } of runs) {
+    const dx = to[0] - from[0], dz = to[1] - from[1], length = Math.hypot(dx, dz), bays = Math.ceil(length / 2.4), angle = Math.atan2(dx, dz);
+    for (let i = 0; i <= bays; i++) posts.push([from[0] + dx * i / bays, from[1] + dz * i / bays]);
+    for (let i = 0; i < bays; i++) {
+      const a = i / bays, b = (i + 1) / bays, bay = length / bays;
+      rails.push({ at: [from[0] + dx * (a + b) / 2, from[1] + dz * (a + b) / 2], length: bay - post, angle });
+      const count = Math.floor((bay - post) / .17);
+      for (let k = 1; k < count; k++) {
+        const t = a + (b - a) * (k / count);
+        pickets.push([from[0] + dx * t, from[1] + dz * t, angle]);
+      }
+    }
+  }
+  const unique = [...new Map(posts.map(p => [p.map(v => v.toFixed(3)).join(','), p])).values()];
+  const pose = new T.Object3D();
+  const postMesh = new T.InstancedMesh(worldPost(post, height), wood, unique.length);
+  unique.forEach(([x, z], i) => { pose.position.set(x, courtyardLevel, z); pose.rotation.set(0, 0, 0); pose.updateMatrix(); postMesh.setMatrixAt(i, pose.matrix); });
+  const railGeometry = new T.BoxGeometry(.05, .08, 1);
+  const railMesh = new T.InstancedMesh(railGeometry, wood, rails.length * 2);
+  rails.forEach(({ at, length, angle }, i) => {
+    for (const [k, y] of [[0, .3], [1, .78]] as const) {
+      pose.position.set(at[0], courtyardLevel + y, at[1]); pose.rotation.set(0, angle, 0); pose.scale.set(1, 1, length); pose.updateMatrix();
+      railMesh.setMatrixAt(i * 2 + k, pose.matrix);
+    }
+  });
+  pose.scale.set(1, 1, 1);
+  const picketShape = new T.Shape();
+  picketShape.moveTo(-.035, 0); picketShape.lineTo(.035, 0); picketShape.lineTo(.035, height - .2); picketShape.lineTo(0, height - .1); picketShape.lineTo(-.035, height - .2); picketShape.closePath();
+  const picketGeometry = new T.ExtrudeGeometry(picketShape, { depth: .022, bevelEnabled: false });
+  picketGeometry.translate(0, 0, .025); // against the rail face
+  picketGeometry.rotateY(Math.PI / 2);
+  const picketMesh = new T.InstancedMesh(picketGeometry, wood, pickets.length);
+  pickets.forEach(([x, z, angle], i) => { pose.position.set(x, courtyardLevel, z); pose.rotation.set(0, angle, 0); pose.updateMatrix(); picketMesh.setMatrixAt(i, pose.matrix); });
+  for (const mesh of [postMesh, railMesh, picketMesh]) { mesh.castShadow = mesh.receiveShadow = true; group.add(mesh); }
+
+  // Gate: two taller posts, a lintel and a pair of closed plank leaves.
+  const gateHeight = 1.75;
+  for (const side of [-1, 1]) {
+    slab(group, wood, .2, gateHeight, .2, side * gate, courtyardLevel + gateHeight / 2, fz);
+    const cap = slab(group, wood, .28, .06, .28, side * gate, courtyardLevel + gateHeight + .03, fz);
+    cap.name = 'gate-cap';
+    const leaf = gate - .1 - .01;
+    slab(group, wood, leaf, height - .05, .05, side * (leaf / 2 + .005), courtyardLevel + .08 + (height - .05) / 2, fz);
+    const brace = slab(group, wood, Math.hypot(leaf - .1, height - .35), .06, .03, side * (leaf / 2 + .005), courtyardLevel + .08 + (height - .05) / 2, fz - .04);
+    brace.rotation.z = side * Math.atan2(height - .35, leaf - .1);
+  }
+  slab(group, wood, 2 * gate + .3, .14, .16, 0, courtyardLevel + gateHeight - .2, fz);
+  return group;
+}
+
+/** Fence post with a pyramid cap, bottom at the origin. */
+function worldPost(size: number, height: number) {
+  const shaft = new T.BoxGeometry(size, height, size).translate(0, height / 2, 0);
+  const cap = new T.ConeGeometry(size * .75, .1, 4).rotateY(Math.PI / 4).translate(0, height + .05, 0);
+  shaft.deleteAttribute('uv'); cap.deleteAttribute('uv');
+  const geometry = new T.BufferGeometry();
+  const merged = [shaft.toNonIndexed(), cap.toNonIndexed()];
+  const positions = merged.flatMap(g => [...(g.getAttribute('position').array as Float32Array)]);
+  geometry.setAttribute('position', new T.Float32BufferAttribute(positions, 3));
+  geometry.computeVertexNormals();
+  const uv = new Float32Array(positions.length / 3 * 2);
+  for (let i = 0; i < positions.length / 3; i++) { uv[i * 2] = positions[i * 3] + positions[i * 3 + 2]; uv[i * 2 + 1] = positions[i * 3 + 1]; }
+  geometry.setAttribute('uv', new T.Float32BufferAttribute(uv, 2));
+  for (const g of [shaft, cap, ...merged]) g.dispose();
+  return geometry;
 }
 
 export function courtyardSky() {
@@ -104,83 +219,4 @@ export function courtyardSky() {
   sky.renderOrder = 10;
   sky.name = 'courtyard-sky';
   return sky;
-}
-
-export function courtyardPlants() {
-  // Beds flank the house and leave the approach in front of the door open.
-  const beds = [
-    [-7.2, 3.9], [-7.6, .6], [-7.0, -2.9], [-5.8, -5.6], [-2.8, -5.9],
-    [2.7, -5.9], [5.8, -5.5], [7.3, -3.0], [7.7, .6], [7.2, 4.0],
-    [-5.2, 6.1], [-3.6, 6.7], [3.8, 6.8], [5.5, 6.1],
-  ];
-  const leavesPerBed = 75;
-  const flowersPerBed = 14;
-  const leaf = new T.BufferGeometry();
-  leaf.setAttribute('position', new T.Float32BufferAttribute([
-    -.042, 0, 0, .042, 0, 0, -.027, .24, .048, .027, .24, .048, 0, .52, .22,
-  ], 3));
-  leaf.setIndex([0, 1, 2, 2, 1, 3, 2, 3, 4]);
-  leaf.computeVertexNormals();
-
-  const leafMaterial = material(0xffffff);
-  leafMaterial.side = T.DoubleSide;
-  const grass = new T.InstancedMesh(leaf, leafMaterial, beds.length * leavesPerBed);
-  const stems = new T.InstancedMesh(new T.CylinderGeometry(.011, .014, 1, 5), material(0x536c3e), beds.length * flowersPerBed);
-  const petals = new T.InstancedMesh(new T.SphereGeometry(1, 6, 4), material(0xffffff), beds.length * flowersPerBed * 5);
-  const centers = new T.InstancedMesh(new T.SphereGeometry(1, 6, 4), material(0xddab53), beds.length * flowersPerBed);
-  const greens = [0x617a4f, 0x496944, 0x7b8b4c, 0x899a5e, 0x597551].map(value => new T.Color(value));
-  const blooms = [0xf0d5d3, 0xf0dfaa, 0xe2b3a8, 0xd9c4e4].map(value => new T.Color(value));
-
-  let seed = 8243;
-  const random = () => { seed = (Math.imul(1664525, seed) + 1013904223) >>> 0; return seed / 2 ** 32; };
-  const pose = new T.Object3D();
-  const scatter = (x: number, z: number, radius: number) => {
-    const angle = random() * Math.PI * 2;
-    const distance = Math.sqrt(random()) * radius;
-    return [x + Math.cos(angle) * distance, z + Math.sin(angle) * distance * .76];
-  };
-  for (const [bedIndex, [x, z]] of beds.entries()) {
-    for (let blade = 0; blade < leavesPerBed; blade++) {
-      const [px, pz] = scatter(x, z, .9);
-      const index = bedIndex * leavesPerBed + blade;
-      pose.position.set(px, courtyardLevel + .01, pz);
-      pose.rotation.set(0, random() * Math.PI * 2, 0);
-      pose.scale.set(.65 + random() * .7, .35 + random() * .8, .55 + random() * .65);
-      pose.updateMatrix();
-      grass.setMatrixAt(index, pose.matrix);
-      grass.setColorAt(index, greens[Math.floor(random() * greens.length)]);
-    }
-    for (let flower = 0; flower < flowersPerBed; flower++) {
-      const index = bedIndex * flowersPerBed + flower;
-      const [px, pz] = scatter(x, z, .77);
-      const height = .23 + random() * .35;
-      const flowerTop = courtyardLevel + height;
-      pose.rotation.set(0, 0, 0);
-      pose.position.set(px, courtyardLevel + height / 2, pz);
-      pose.scale.set(1, height, 1);
-      pose.updateMatrix();
-      stems.setMatrixAt(index, pose.matrix);
-      pose.position.y = flowerTop;
-      pose.scale.set(.04, .026, .04);
-      pose.updateMatrix();
-      centers.setMatrixAt(index, pose.matrix);
-      for (let petal = 0; petal < 5; petal++) {
-        const angle = petal * Math.PI * 2 / 5;
-        pose.position.set(px + Math.sin(angle) * .057, flowerTop - .006, pz + Math.cos(angle) * .057);
-        pose.rotation.y = angle;
-        pose.scale.set(.038, .018, .056);
-        pose.updateMatrix();
-        const petalIndex = index * 5 + petal;
-        petals.setMatrixAt(petalIndex, pose.matrix);
-        petals.setColorAt(petalIndex, blooms[bedIndex % blooms.length]);
-      }
-    }
-  }
-  const garden = new T.Group();
-  garden.name = 'courtyard-flowers-and-grasses';
-  grass.castShadow = true;
-  grass.receiveShadow = true;
-  stems.receiveShadow = petals.receiveShadow = centers.receiveShadow = true;
-  garden.add(grass, stems, petals, centers);
-  return garden;
 }

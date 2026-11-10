@@ -1,5 +1,5 @@
 export interface User { id: string; username: string; nickname: string; role: 'user' | 'admin' }
-export interface GenerationTask { id: string; status: 'processing' | 'succeeded' | 'failed'; submittedDay: string; createdAt: string; assetId: string | null; errorCode: string | null }
+export interface GenerationTask { id: string; status: 'processing' | 'succeeded' | 'failed'; submittedDay: string; createdAt: string; assetId: string | null; assetDeleted?: boolean; errorCode: string | null }
 export interface Asset { id: string; name: string; description: string; modelFileId: string; originalImageId: string | null; createdAt: string; normalization: unknown; bounds: unknown; submissionApproved?: boolean }
 export interface Me { user: User; roomId: string; quota: { day: string; total: number; used: number; available: number }; activeTask: GenerationTask | null; csrfToken: string }
 export interface Page<T> { items: T[]; nextCursor: string | null }

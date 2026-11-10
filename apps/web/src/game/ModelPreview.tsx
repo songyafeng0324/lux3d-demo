@@ -2,10 +2,13 @@ import { useEffect, useRef, useState } from 'react';
 import * as T from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { disposeResources } from '../scene/assets.js';
-import { configurePreview, framePreview, previewScene, readPreviewModel } from './model-preview-scene.js';
+import { configurePreview, framePreview, parsePreviewModel, previewScene, readPreviewModel } from './model-preview-scene.js';
 
-/** `headers` carries a snapshot grant for public exhibits; without it the visitor's own login is used. */
-export default function ModelPreview({ fileId, name, headers, showHint = true }: { fileId: string; name: string; headers?: Record<string, string>; showHint?: boolean }) {
+/**
+ * `headers` carries a snapshot grant for public exhibits; without it the visitor's own login is used.
+ * `file` previews a local GLB instead (the administrator's upload before it is sent).
+ */
+export default function ModelPreview({ fileId, file, name, headers, showHint = true }: { fileId?: string; file?: Blob; name: string; headers?: Record<string, string>; showHint?: boolean }) {
   const headerKey = JSON.stringify(headers ?? null);
   const host = useRef<HTMLDivElement>(null);
   const [status, setStatus] = useState('正在载入模型…');
@@ -44,7 +47,9 @@ export default function ModelPreview({ fileId, name, headers, showHint = true }:
         ? { headers, credentials: 'omit', cache: 'no-store', signal: abort.signal }
         : { signal: abort.signal };
       const message = headers ? '展品模型已不可查看，请刷新藏宝阁。' : '模型读取失败，请刷新背包或重新登录。';
-      void readPreviewModel(fileId, options, message).then(model => {
+      const read = file ? file.arrayBuffer().then(bytes => parsePreviewModel(bytes)).catch(() => { throw new Error('无法在本机预览这个 GLB：文件可能损坏、引用了外部贴图，或使用了预览不支持的压缩格式。'); })
+        : fileId ? readPreviewModel(fileId, options, message) : Promise.reject(new Error('没有可预览的模型。'));
+      void read.then(model => {
         if (stopped) { disposeResources([model]); return; }
         loaded = model;
         const radius = framePreview(loaded, camera);
@@ -74,7 +79,7 @@ export default function ModelPreview({ fileId, name, headers, showHint = true }:
       renderer?.domElement.remove();
     };
   // eslint-disable-next-line react-hooks/exhaustive-deps -- headerKey is the stable form of headers
-  }, [fileId, name, headerKey]);
+  }, [fileId, file, name, headerKey]);
   return <div className="bag-preview-wrap">
     <div className="bag-preview" ref={host} />
     {status && <p className="bag-preview-status" role={failed ? 'alert' : 'status'}>{status}</p>}

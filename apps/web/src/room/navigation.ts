@@ -1,18 +1,44 @@
-import { ROOM_BOUNDS, ROOM_COURTYARD_BOUNDS, ROOM_PLATFORM_HALF, roomPlacementBounds, type Bounds, type RoomPlacement } from '@aholo/contracts';
+import { ROOM_BOUNDS, ROOM_COURTYARD_BOUNDS, roomPlacementBounds, roomPlacementFloor, type Bounds, type RoomPlacement } from '@aholo/contracts';
 import { BODY, playerOverlaps, supportAt, type BoxCollider, type CircleCollider, type Collider, type FirstPerson, type WalkingWorld } from '../game/navigation.js';
+import { BEAM_SOFFIT, FENCE, FLOOR_Y, GROUND_Y, HOUSE, LANTERN, LANTERNS, PLATFORM, POST, POSTS, PORCH_STEP, WALL, WALL_TOP, lanternCentreY } from './layout.js';
 
-const ground = ROOM_COURTYARD_BOUNDS.min[1];
-const indoor = .025; // Top of the indoor tiles.
-const platform = ROOM_PLATFORM_HALF;
-const house = { x: ROOM_BOUNDS.max[0], z: ROOM_BOUNDS.max[2] };
-export const PORCH_STEP = { x0: -1.025, x1: 1.025, z0: platform.z, z1: 5.4, y: -.2 };
+export { PORCH_STEP } from './layout.js';
+const ground = GROUND_Y;
+const indoor = FLOOR_Y;
+const platform = PLATFORM;
+const house = HOUSE;
 export const ROOM_EYE_HEIGHT = 1.625;
 
 const box = (id: string, x0: number, x1: number, z0: number, z1: number, y0: number, y1: number): BoxCollider =>
   ({ id, kind: 'box', x0, x1, z0, z1, y0, y1, solid: true });
 
-export function buildRoomWorld(placements: RoomPlacement[], bounds: ReadonlyMap<string, Bounds>): WalkingWorld {
-  // Keep the whole body on the dirt. Around the house the dirt stops at the foundation.
+/** Fixed parts of the house that people bump into; placements are added on top (navigation) or pushed clear (editor). */
+function houseColliders(): Collider[] {
+  const half = WALL.thickness / 2;
+  return [
+    box('side-wall-west', -house.x - half, -house.x + half, -house.z, house.z, 0, WALL_TOP),
+    box('side-wall-east', house.x - half, house.x + half, -house.z, house.z, 0, WALL_TOP),
+    box('rear-wall-and-lattice', -house.x, house.x, -house.z - half, -house.z + half, 0, BEAM_SOFFIT),
+    ...POSTS.map(([cx, cz], i): CircleCollider => ({ kind: 'circle', id: 'post-' + i, x: cx, z: cz, r: POST.plinthRadius, y0: 0, y1: ROOM_BOUNDS.max[1] })),
+  ];
+}
+
+const fenceColliders = (): Collider[] => {
+  const t = FENCE.post / 2;
+  return [
+    box('fence-west', -FENCE.x - t, -FENCE.x + t, -FENCE.z, FENCE.z, ground, ground + FENCE.height),
+    box('fence-east', FENCE.x - t, FENCE.x + t, -FENCE.z, FENCE.z, ground, ground + FENCE.height),
+    box('fence-north', -FENCE.x, FENCE.x, -FENCE.z - t, -FENCE.z + t, ground, ground + FENCE.height),
+    box('fence-south', -FENCE.x, FENCE.x, FENCE.z - t, FENCE.z + t, ground, ground + FENCE.height),
+  ];
+};
+
+/**
+ * walkThrough holds official ground cover (grass) that people pass through; it still
+ * counts for the editor's push-out but never blocks walking.
+ */
+export function buildRoomWorld(placements: RoomPlacement[], bounds: ReadonlyMap<string, Bounds>, walkThrough: ReadonlySet<string> = new Set()): WalkingWorld {
+  // Keep the whole body inside the fence. Around the house the lawn stops at the foundation.
   const x = ROOM_COURTYARD_BOUNDS.max[0] - BODY.radius, z = ROOM_COURTYARD_BOUNDS.max[2] - BODY.radius;
   const surfaces = [
     { id: 'courtyard-west', x0: -x, x1: -platform.x, z0: -z, z1: z, y: ground },
@@ -22,19 +48,10 @@ export function buildRoomWorld(placements: RoomPlacement[], bounds: ReadonlyMap<
     { id: 'house-platform', x0: -platform.x, x1: platform.x, z0: -platform.z, z1: platform.z, y: indoor },
     { id: 'porch-step', ...PORCH_STEP },
   ];
-  const columns: [number, number][] = [
-    ...[-house.x, house.x].flatMap(cx => [-house.z, -house.z / 2, 0, house.z / 2, house.z].map((cz): [number, number] => [cx, cz])),
-    [-house.x / 2, -house.z], [0, -house.z], [house.x / 2, -house.z],
-  ];
-  const colliders = [
-    box('side-wall-west', -house.x - .08, -house.x + .08, -house.z, house.z, 0, .9),
-    box('side-wall-east', house.x - .08, house.x + .08, -house.z, house.z, 0, .9),
-    box('rear-wall-and-lattice', -house.x, house.x, -house.z - .08, -house.z + .08, 0, 3.7),
-    ...columns.map(([cx, cz], i): CircleCollider => ({ kind: 'circle', id: 'post-' + i, x: cx, z: cz, r: .17, y0: 0, y1: ROOM_BOUNDS.max[1] })),
-  ];
+  const colliders = [...houseColliders(), ...fenceColliders()];
   for (const placement of placements) {
     const asset = bounds.get(placement.assetId);
-    if (!asset) continue;
+    if (!asset || walkThrough.has(placement.assetId)) continue;
     const { min, max } = roomPlacementBounds(placement, asset);
     colliders.push(box(placement.id, min[0], max[0], min[2], max[2], min[1], max[1]));
   }
@@ -69,9 +86,78 @@ export function roomEntrance(world: WalkingWorld): FirstPerson {
   return { ...path, y: ROOM_COURTYARD_BOUNDS.max[1], velocityY: 0 };
 }
 
-/** Camera-only blockers for the third-person boom: the roof with its eaves and the side friezes (scene/assets.ts architecture()). */
+/** Camera-only blockers for the third-person boom: the roof with its eaves, the side friezes and the lanterns (house.ts). */
 const ROOF_TOP = ROOM_BOUNDS.max[1];
 export const ROOM_CAMERA_BLOCKERS: Collider[] = [
   { id: 'roof', kind: 'box', x0: -ROOM_BOUNDS.max[0] - 1.1, x1: ROOM_BOUNDS.max[0] + 1.1, z0: -ROOM_BOUNDS.max[2] - .95, z1: ROOM_BOUNDS.max[2] + .95, y0: ROOF_TOP - .3, y1: ROOF_TOP + 2.2 },
   ...[-1, 1].map((side): Collider => ({ id: `side-frieze-${side}`, kind: 'box', x0: side * ROOM_BOUNDS.max[0] - .08, x1: side * ROOM_BOUNDS.max[0] + .08, z0: ROOM_BOUNDS.min[2], z1: ROOM_BOUNDS.max[2], y0: 3.5, y1: ROOF_TOP })),
+  ...LANTERNS.map(([x, z], i): Collider => {
+    const r = LANTERN.radius + .05, y = lanternCentreY();
+    return { id: 'lantern-' + i, kind: 'box', x0: x - r, x1: x + r, z0: z - r, z1: z + r, y0: y - LANTERN.radius * LANTERN.stretch - .15, y1: BEAM_SOFFIT };
+  }),
 ];
+
+/** Editor obstacles: house parts as boxes with their height span, plus the porch step. */
+interface Block { x0: number; x1: number; z0: number; z1: number; y0: number; y1: number }
+const STRUCTURE: Block[] = [
+  ...houseColliders().map(c => c.kind === 'circle'
+    ? { x0: c.x - c.r, x1: c.x + c.r, z0: c.z - c.r, z1: c.z + c.r, y0: c.y0, y1: c.y1 }
+    : { x0: c.x0, x1: c.x1, z0: c.z0, z1: c.z1, y0: c.y0, y1: c.y1 }),
+  { x0: PORCH_STEP.x0, x1: PORCH_STEP.x1, z0: PORCH_STEP.z0, z1: PORCH_STEP.z1, y0: ground, y1: PORCH_STEP.y },
+  ...LANTERNS.map(([x, z]) => ({ x0: x - LANTERN.radius, x1: x + LANTERN.radius, z0: z - LANTERN.radius, z1: z + LANTERN.radius, y0: lanternCentreY() - LANTERN.radius * LANTERN.stretch - .1, y1: BEAM_SOFFIT })),
+];
+const GAP = .02, TOUCH = 1e-3;
+const overlaps = (b: Bounds, o: Block) => b.min[0] < o.x1 - TOUCH && b.max[0] > o.x0 + TOUCH && b.min[2] < o.z1 - TOUCH && b.max[2] > o.z0 + TOUCH && b.min[1] < o.y1 - TOUCH && b.max[1] > o.y0 + TOUCH;
+/** Resting on the house floor while partly sticking out over the lawn (that part would hang in the air). */
+const straddles = (b: Bounds) => {
+  const onPlatform = b.min[0] < platform.x && b.max[0] > -platform.x && b.min[2] < platform.z && b.max[2] > -platform.z;
+  const inside = b.min[0] >= -platform.x - TOUCH && b.max[0] <= platform.x + TOUCH && b.min[2] >= -platform.z - TOUCH && b.max[2] <= platform.z + TOUCH;
+  return onPlatform && !inside && b.min[1] <= indoor + .02;
+};
+
+/** Which fixed part a placement runs into, if any (the editor outlines it red). */
+export function placementConflict(b: Bounds): string | null {
+  if (straddles(b)) return '物品跨在台基边缘，一部分会悬空';
+  return STRUCTURE.some(o => overlaps(b, o)) ? '物品碰到了柱子、墙体或台阶' : null;
+}
+
+const shortest = (...shifts: number[]) => shifts.reduce((a, b) => Math.abs(b) < Math.abs(a) ? b : a);
+/**
+ * Smallest horizontal move that clears the house structure and the platform edge. Moving
+ * on or off the platform also moves the item to that floor. Null when no clear spot is near.
+ */
+export function settlePlacement(start: Bounds): [number, number, number] | null {
+  let b: Bounds = { min: [...start.min], max: [...start.max] };
+  const move = (dx: number, dz: number) => {
+    const floorBefore = roomPlacementFloor(b);
+    const next: Bounds = { min: [b.min[0] + dx, b.min[1], b.min[2] + dz], max: [b.max[0] + dx, b.max[1], b.max[2] + dz] };
+    // An item resting on (or sunk into) its floor lands on the floor it ends up over.
+    const dy = b.min[1] <= floorBefore + .02 ? roomPlacementFloor(next) - b.min[1] : 0;
+    next.min[1] += dy; next.max[1] += dy;
+    b = next;
+  };
+  for (let step = 0; step < 8; step++) {
+    if (straddles(b)) {
+      const px = platform.x, pz = platform.z;
+      const inX = b.min[0] < -px ? -px - b.min[0] : b.max[0] > px ? px - b.max[0] : 0;
+      const inZ = b.min[2] < -pz ? -pz - b.min[2] : b.max[2] > pz ? pz - b.max[2] : 0;
+      const width = b.max[0] - b.min[0], depth = b.max[2] - b.min[2];
+      const fits = width <= 2 * px && depth <= 2 * pz;
+      const outX = shortest(px - b.min[0] + GAP, -px - b.max[0] - GAP), outZ = shortest(pz - b.min[2] + GAP, -pz - b.max[2] - GAP);
+      const options: [number, number][] = [[outX, 0], [0, outZ]];
+      if (fits) options.push([inX, inZ]);
+      const [dx, dz] = options.reduce((a, o) => Math.hypot(...o) < Math.hypot(...a) ? o : a);
+      move(dx, dz);
+      continue;
+    }
+    const hit = STRUCTURE.find(o => overlaps(b, o));
+    if (!hit) {
+      const outside = b.min[0] < ROOM_COURTYARD_BOUNDS.min[0] - 1e-6 || b.max[0] > ROOM_COURTYARD_BOUNDS.max[0] + 1e-6
+        || b.min[2] < ROOM_COURTYARD_BOUNDS.min[2] - 1e-6 || b.max[2] > ROOM_COURTYARD_BOUNDS.max[2] + 1e-6;
+      return outside ? null : [b.min[0] - start.min[0], b.min[1] - start.min[1], b.min[2] - start.min[2]];
+    }
+    const dx = shortest(hit.x1 - b.min[0] + GAP, hit.x0 - b.max[0] - GAP), dz = shortest(hit.z1 - b.min[2] + GAP, hit.z0 - b.max[2] - GAP);
+    if (Math.abs(dx) <= Math.abs(dz)) move(dx, 0); else move(0, dz);
+  }
+  return null;
+}

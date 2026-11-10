@@ -269,9 +269,11 @@ export async function registerCurationRoutes(app:FastifyInstance,{pool,config,se
  });
  app.delete('/api/v1/admin/assets/:id',async(request,reply)=>{
   const s=await admin(request,true),id=uuid((request.params as {id:string}).id);if(request.body!==undefined&&request.body!==null)exactFields(inputObject(request.body),[]);
-  return send(reply,request,await requestWrite(pool,{actor:s.user.id,method:'DELETE',path:path(request),key:request.headers['idempotency-key'],body:{},secret:config.appDataKey,authorize:async c=>{
-   await reauthorize(c,s,true);const a=await lockAsset(c,id);if(!a||a.state!=='ready')fail(404,'NOT_FOUND','未找到该资产');
-  }},async c=>riskDelete(c,id)));
+  // The asset lock comes after the receipt lookup: a retry of a delete whose response was lost replays its receipt.
+  return send(reply,request,await requestWrite(pool,{actor:s.user.id,method:'DELETE',path:path(request),key:request.headers['idempotency-key'],body:{},secret:config.appDataKey,authorize:c=>reauthorize(c,s,true)},async c=>{
+   const a=await lockAsset(c,id);if(!a||a.state!=='ready')fail(404,'NOT_FOUND','未找到该资产');
+   const {status,data}=await riskDelete(c,id);return {status,data};
+  }));
  });
 
  // ---- Users and today's quota (F12) ----
@@ -314,10 +316,10 @@ export async function registerCurationRoutes(app:FastifyInstance,{pool,config,se
  */
 export async function riskDelete(c:pg.PoolClient,id:string){
  const asset=(await c.query('SELECT * FROM assets WHERE id=$1',[id])).rows[0];
- const rooms=(await c.query(`SELECT r.id,r.layout_version FROM rooms r JOIN room_versions v ON v.room_id=r.id AND v.version=r.layout_version
+ const rooms=(await c.query(`SELECT r.id,r.owner_id,r.layout_version FROM rooms r JOIN room_versions v ON v.room_id=r.id AND v.version=r.layout_version
   WHERE EXISTS(SELECT 1 FROM jsonb_array_elements(v.placements_json) p WHERE p->>'assetId'=$1) ORDER BY r.id FOR UPDATE OF r`,[id])).rows;
- let placementsRemoved=0;
- for(const r of rooms) placementsRemoved+=(await removeRoomAsset(c,r,id)).placementsRemoved;
+ let placementsRemoved=0;const roomChanges:{ownerId:string;previousVersion:number;roomVersion:number;placementsRemoved:number}[]=[];
+ for(const r of rooms){const change=await removeRoomAsset(c,r,id);placementsRemoved+=change.placementsRemoved;roomChanges.push({ownerId:r.owner_id,...change});}
  await c.query('DELETE FROM asset_collections WHERE asset_id=$1',[id]);
  // Risk content is not kept as readable public text anywhere: submission snapshots, the official import
  // metadata and every gallery version's detail entry are redacted (versions keep only their slot layout).
@@ -343,5 +345,5 @@ export async function riskDelete(c:pg.PoolClient,id:string){
   const r=(await c.query("UPDATE files SET state='deleted' WHERE id=$1 AND state<>'deleted' AND NOT EXISTS(SELECT 1 FROM assets a WHERE a.state='ready' AND a.id<>$2 AND (a.model_file_id=$1 OR a.original_image_id=$1)) RETURNING object_key",[f,id])).rows[0];
   if(r)await c.query('INSERT INTO cleanup_jobs(asset_id,file_id,object_key) VALUES($1,$2,$3) ON CONFLICT (object_key) DO NOTHING',[id,f,r.object_key]);
  }
- return {status:200,data:{deleted:true,roomsUpdated:rooms.length,placementsRemoved,submissionsClosed:submissions,candidateRemoved:Boolean(candidate),slotNo,galleryVersion}};
+ return {status:200,data:{deleted:true,roomsUpdated:rooms.length,placementsRemoved,submissionsClosed:submissions,candidateRemoved:Boolean(candidate),slotNo,galleryVersion},roomChanges};
 }

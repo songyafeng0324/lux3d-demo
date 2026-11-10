@@ -1,8 +1,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent } from 'react';
-import { DEFAULT_DAILY_QUOTA, type CollectedAsset, type CollectionRemoval } from '@aholo/contracts';
+import { DEFAULT_DAILY_QUOTA, type AssetDeletion, type CollectedAsset, type CollectionRemoval } from '@aholo/contracts';
 import ModelPreview from './ModelPreview.js';
 import AssetThumbnail, { type ThumbnailCache } from './AssetThumbnail.js';
-import PasswordField, { credentialError } from './PasswordField.js';
+import PasswordField, { credentialError, passwordChangeError } from './PasswordField.js';
 import { api, ApiError, submissionLabel, type Asset, type GenerationTask, type Me, type Page, type Submission } from './backpack-api.js';
 import './backpack.css';
 
@@ -49,9 +49,11 @@ interface DrawerProps {
   beforeSessionEnd?: () => boolean;
   thumbnailCache?: ThumbnailCache;
   onCollectionRemoved?: (item: CollectedAsset, result: CollectionRemoval) => void;
+  /** The owner deleted one of their generated assets (rooms, collections and the gallery were cleaned server-side). */
+  onAssetDeleted?: (assetId: string, result: AssetDeletion) => void;
 }
 
-export default function Backpack({ open, close, kind = 'backpack', onAccountChange, beforeSessionEnd, beforeLogin, thumbnailCache: sharedThumbnailCache, onCollectionRemoved }: DrawerProps) {
+export default function Backpack({ open, close, kind = 'backpack', onAccountChange, beforeSessionEnd, beforeLogin, thumbnailCache: sharedThumbnailCache, onCollectionRemoved, onAssetDeleted }: DrawerProps) {
   const account = kind === 'account';
   const title = account ? '账号设置' : '背包';
   const closeLabel = '关闭' + title;
@@ -59,6 +61,8 @@ export default function Backpack({ open, close, kind = 'backpack', onAccountChan
   accountChanged.current = onAccountChange;
   const collectionRemoved = useRef(onCollectionRemoved);
   collectionRemoved.current = onCollectionRemoved;
+  const assetDeleted = useRef(onAssetDeleted);
+  assetDeleted.current = onAssetDeleted;
   const active = useRef(open); active.current = open;
   const drawer = useRef<HTMLDivElement>(null);
   const previewPanel = useRef<HTMLElement>(null);
@@ -76,6 +80,7 @@ export default function Backpack({ open, close, kind = 'backpack', onAccountChan
   const [collectionCursor, setCollectionCursor] = useState<string | null>(null);
   const [selectedCollection, setSelectedCollection] = useState<string | null>(null);
   const [renameId, setRenameId] = useState<string | null>(null);
+  const [deleteId, setDeleteId] = useState<string | null>(null);
   const [tasks, setTasks] = useState<GenerationTask[]>([]);
   const [taskCursor, setTaskCursor] = useState<string | null>(null);
   const [selected, setSelected] = useState<string | null>(null);
@@ -131,7 +136,7 @@ export default function Backpack({ open, close, kind = 'backpack', onAccountChan
     pageDepth.current = { assets: 1, tasks: 1, collections: 1 };
     listRevision.current.assets++; listRevision.current.tasks++; listRevision.current.collections++;
     setAssets([]); setTasks([]); setCollections([]); setAssetCursor(null); setTaskCursor(null); setCollectionCursor(null);
-    closePreview(); setRenameId(null);
+    closePreview(); setRenameId(null); setDeleteId(null);
     setSubmissionId(''); setSubmissionChoice(null); setHistory([]);
   }, [closePreview]);
   const reload = useCallback(async (silent = false, collectionsOnly = false) => {
@@ -250,7 +255,7 @@ export default function Backpack({ open, close, kind = 'backpack', onAccountChan
     return () => window.clearInterval(timer);
   }, [account, me?.user.id, open, reload, tab, group]);
   useEffect(() => {
-    if (!open) { closePreview(); setRenameId(null); return; }
+    if (!open) { closePreview(); setRenameId(null); setDeleteId(null); return; }
     setSubmissionChoice(null);
     setLoading(true);
     void reload();
@@ -280,6 +285,7 @@ export default function Backpack({ open, close, kind = 'backpack', onAccountChan
       if (event.key === 'Escape') {
         event.preventDefault(); event.stopPropagation();
         if (document.activeElement?.closest('.bag-card-rename')) setRenameId(null);
+        else if (document.activeElement?.closest('.bag-card-delete')) setDeleteId(null);
         else if (previewPanel.current) closePreview();
         else close();
         return;
@@ -382,11 +388,11 @@ export default function Backpack({ open, close, kind = 'backpack', onAccountChan
       if (next === 'assets') void reload(true);
     }
     setTab(next);
-    closePreview(); setRenameId(null);
+    closePreview(); setRenameId(null); setDeleteId(null);
   }
   function changeGroup(next: 'assets' | 'collections') {
     if (next === group) return;
-    setGroup(next); closePreview(); setRenameId(null);
+    setGroup(next); closePreview(); setRenameId(null); setDeleteId(null);
     if (next === 'collections') void reload(true, true);
   }
   function rename(event: FormEvent<HTMLFormElement>, item: Asset) {
@@ -398,6 +404,19 @@ export default function Backpack({ open, close, kind = 'backpack', onAccountChan
       await reload();
       setMessage('藏品名称已保存。');
     }, 'PATCH');
+  }
+  function deleteAsset(item: Asset) {
+    write(`/assets/${item.id}`, {}, '重试删除藏品', async (result: AssetDeletion) => {
+      setDeleteId(null);
+      listRevision.current.assets++;
+      setAssets(items => items.filter(row => row.id !== item.id));
+      if (selectedRef.current === item.id) closePreview();
+      if (submissionId === item.id) { setSubmissionId(''); setSubmissionChoice(null); }
+      thumbnailCache.delete(item.modelFileId);
+      assetDeleted.current?.(item.id, result);
+      setMessage(`已删除「${item.name}」${result.placementsRemoved ? `，并从 ${result.roomsUpdated} 间小屋撤下 ${result.placementsRemoved} 处摆放` : ''}${result.slotNo ? `，藏宝阁展位 ${result.slotNo} 已空出` : ''}。`);
+      await reload(true);
+    }, 'DELETE');
   }
   function uncollect(item: CollectedAsset) {
     write(`/collections/${item.collectionId}`, {}, '重试取消收藏', (result: CollectionRemoval) => {
@@ -445,13 +464,20 @@ export default function Backpack({ open, close, kind = 'backpack', onAccountChan
         }}>
           <h3>个人资料</h3><p className="bag-muted">用户名：{me.user.username}</p><label>昵称<input name="nickname" required maxLength={40} defaultValue={me.user.nickname} disabled={locked} /></label><button type="submit" disabled={locked}>保存昵称</button>
         </form>
-        <form className="bag-form" onSubmit={event => {
+        <form className="bag-form" noValidate onChange={() => { if (!locked && error) setError(''); }} onSubmit={event => {
           event.preventDefault();
-          if (beforeSessionEnd && !beforeSessionEnd()) return;
           const values = new FormData(event.currentTarget);
-          write('/me/password', { oldPassword: String(values.get('oldPassword')), newPassword: String(values.get('newPassword')), confirmPassword: String(values.get('confirmPassword')) }, '重试修改密码', () => endSession('密码已修改，请重新登录。'));
+          const oldPassword = String(values.get('oldPassword')), newPassword = String(values.get('newPassword')), confirmPassword = String(values.get('confirmPassword'));
+          const invalid = passwordChangeError(oldPassword, newPassword, confirmPassword);
+          if (invalid) { setError(invalid); return; }
+          if (beforeSessionEnd && !beforeSessionEnd()) return;
+          write('/me/password', { oldPassword, newPassword, confirmPassword }, '重试修改密码', () => endSession('密码已修改，请重新登录。'));
         }}>
-          <h3>修改密码</h3><label>原密码<input name="oldPassword" type="password" autoComplete="current-password" required minLength={12} maxLength={128} disabled={locked} /></label><label>新密码<input name="newPassword" type="password" autoComplete="new-password" required minLength={12} maxLength={128} disabled={locked} /></label><label>确认新密码<input name="confirmPassword" type="password" autoComplete="new-password" required minLength={12} maxLength={128} disabled={locked} /></label><button type="submit" disabled={locked}>修改并重新登录</button>
+          <h3>修改密码</h3>
+          <PasswordField name="oldPassword" label="原密码" autoComplete="current-password" disabled={locked} active={open} />
+          <PasswordField name="newPassword" label="新密码" autoComplete="new-password" disabled={locked} active={open} placeholder="12–128 个字符" />
+          <PasswordField name="confirmPassword" label="确认新密码" autoComplete="new-password" disabled={locked} active={open} />
+          <button type="submit" disabled={locked}>修改并重新登录</button>
         </form>
         <button type="button" disabled={locked} onClick={() => {
           if (beforeSessionEnd && !beforeSessionEnd()) return;
@@ -480,13 +506,20 @@ export default function Backpack({ open, close, kind = 'backpack', onAccountChan
             {assets.length ? <div className="bag-grid">{assets.map(item => <article className={`bag-asset-card${item.submissionApproved ? ' approved' : ''}`} key={item.id}>
               <button type="button" className="bag-card-cover" aria-label={`预览模型：${item.name}`} tabIndex={-1} onClick={() => void openAsset(item.id)}><AssetThumbnail asset={item} cache={thumbnailCache} /></button>
               {item.submissionApproved && <span className="bag-approved">已通过</span>}
-              {renameId === item.id ? <form className="bag-form bag-card-rename" onSubmit={event => rename(event, item)}>
+              {deleteId === item.id ? <div className="bag-card-delete" role="group" aria-label={`确认删除：${item.name}`}>
+                <p>删除「{item.name}」？</p>
+                <small>会一并撤下藏宝阁展位、精品库与投稿，并从所有人的收藏和小屋中移除，不能恢复。</small>
+                <div><button type="button" className="bag-danger" disabled={locked} onClick={() => deleteAsset(item)}>{busy ? '正在删除…' : '确认删除'}</button><button type="button" autoFocus disabled={locked} onClick={() => setDeleteId(null)}>取消</button></div>
+              </div> : renameId === item.id ? <form className="bag-form bag-card-rename" onSubmit={event => rename(event, item)}>
                 <input name="name" aria-label="藏品名称" defaultValue={item.name} autoFocus required maxLength={80} disabled={locked} />
                 <div><button type="submit" disabled={locked}>保存名称</button><button type="button" disabled={locked} onClick={() => setRenameId(null)}>取消</button></div>
               </form> : <div className="bag-card-title">
                 <button type="button" className="bag-card-name" title={item.name} onClick={() => void openAsset(item.id)}>{item.name}</button>
-                <button type="button" className="bag-card-pencil" aria-label={`修改名称：${item.name}`} title="修改名称" disabled={locked} onClick={() => setRenameId(item.id)}>
+                <button type="button" className="bag-card-pencil" aria-label={`修改名称：${item.name}`} title="修改名称" disabled={locked} onClick={() => { setDeleteId(null); setRenameId(item.id); }}>
                   <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="m14 6 4 4M4 20l4.5-1 11-11a2.8 2.8 0 0 0-4-4l-11 11L4 20Z" /></svg>
+                </button>
+                <button type="button" className="bag-card-pencil bag-card-trash" aria-label={`删除藏品：${item.name}`} title="删除藏品" disabled={locked} onClick={() => { setRenameId(null); setDeleteId(item.id); }}>
+                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M4 7h16M10 11v6m4-6v6M6 7l1 13h10l1-13M9 7V4h6v3" /></svg>
                 </button>
               </div>}
             </article>)}</div> : <div className="bag-empty"><span className="t10-seal">囊</span><p>还没有生成的藏品</p><small>到「生成任务」上传图片，生成的藏品会在这里出现。</small></div>}
@@ -503,7 +536,7 @@ export default function Backpack({ open, close, kind = 'backpack', onAccountChan
         {tab === 'tasks' && <section className="bag-task-list" aria-label="生成任务列表">
           <div className="bag-section-heading"><h3>生成任务</h3><button type="button" className="bag-text-button" disabled={busy} onClick={() => void reload()}>刷新</button></div>
           {!tasks.length && <p className="bag-muted">还没有生成记录。</p>}
-          {tasks.map(task => <article className="bag-task" key={task.id}><div><strong>{taskLabel[task.status]}</strong><time>{new Date(task.createdAt).toLocaleString('zh-CN', { hour12: false })}</time></div><small>{task.status === 'processing' ? '正在制作并检查模型，完成后自动入包。' : task.status === 'succeeded' ? '模型已进入个人背包，可旋转、缩放查看。' : failureLabel[task.errorCode ?? ''] ?? '未完成模型交付，已返还原提交日次数。'}</small>{task.status === 'succeeded' && task.assetId && <button type="button" className="bag-text-button" onClick={() => void openAsset(task.assetId!)}>查看藏品 →</button>}</article>)}
+          {tasks.map(task => <article className="bag-task" key={task.id}><div><strong>{taskLabel[task.status]}</strong><time>{new Date(task.createdAt).toLocaleString('zh-CN', { hour12: false })}</time></div><small>{task.status === 'processing' ? '正在制作并检查模型，完成后自动入包。' : task.status === 'succeeded' ? task.assetDeleted ? '这件藏品已由你删除。' : '模型已进入个人背包，可旋转、缩放查看。' : failureLabel[task.errorCode ?? ''] ?? '未完成模型交付，已返还原提交日次数。'}</small>{task.status === 'succeeded' && task.assetId && <button type="button" className="bag-text-button" onClick={() => void openAsset(task.assetId!)}>查看藏品 →</button>}</article>)}
           {taskCursor && <button type="button" disabled={busy || loadingMore} onClick={() => void loadMore('tasks')}>加载更多任务</button>}
         </section>}
         {tab === 'submissions' && <>
@@ -524,7 +557,7 @@ export default function Backpack({ open, close, kind = 'backpack', onAccountChan
             <p className="bag-muted">申请通过后进入候选库，由管理员安排展位。</p>
             {!history.length && <p className="bag-muted">还没有投稿。</p>}
             {history.map(item => <article className="bag-task" key={item.id}><div><strong>{submissionLabel[item.status]}</strong><time>{new Date(item.submittedAt).toLocaleString('zh-CN', { hour12: false })}</time></div>
-              <small>{item.publicSnapshot?.name ?? '（模型已按风险规则删除）'}{item.status === 'approved' ? (item.slotNo ? ` · 正在展位 ${item.slotNo} 公开展出` : ' · 等待安排展位') : ''}</small>
+              <small>{item.publicSnapshot?.name ?? '（模型已删除）'}{item.status === 'approved' ? (item.slotNo ? ` · 正在展位 ${item.slotNo} 公开展出` : ' · 等待安排展位') : ''}</small>
               {item.status === 'rejected' && <small className="bag-reason">驳回原因：{item.rejectionReason}</small>}
               {item.status !== 'deleted' && <div className="bag-history-actions">
                 <button type="button" className="bag-text-button" disabled={locked} onClick={() => { chooseSubmission(item.assetId); submissionSelect.current?.focus(); }}>管理该藏品的投稿 →</button>

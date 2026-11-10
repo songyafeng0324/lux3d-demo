@@ -8,16 +8,17 @@ import { MOVE_KEYS, playerOverlaps, stepFirstPerson, supportAt, type FirstPerson
 import { AvatarRig } from '../game/avatar.js';
 import type { AvatarPrefs, ViewMode } from '../game/avatar-prefs.js';
 import { boomLength, clampFollowPitch, easeBoom, FOLLOW, viewDirection, type Vec3 } from '../game/follow-camera.js';
-import { architecture, disposeResources, enableMeshShadows } from '../scene/assets.js';
-import { courtyardGround, courtyardPlants, courtyardSky, horizonColor } from './courtyard.js';
-import { buildRoomWorld, ROOM_CAMERA_BLOCKERS, ROOM_EYE_HEIGHT, roomEntrance } from './navigation.js';
+import { disposeResources, enableMeshShadows } from '../scene/assets.js';
+import { courtyardGround, courtyardSky, horizonColor } from './courtyard.js';
+import { roomHouse } from './house.js';
+import { buildRoomWorld, placementConflict, ROOM_CAMERA_BLOCKERS, ROOM_EYE_HEIGHT, roomEntrance, settlePlacement } from './navigation.js';
 export type RoomMode = 'edit' | 'visit' | 'share';
 export type RoomTool = 'translate' | 'rotate' | 'scale';
 interface Hooks { select: (id: string | null) => void; edit: (placement: RoomPlacement) => void; notice: (message: string) => void }
 export class RoomEngine {
   readonly renderer: T.WebGLRenderer;
   readonly scene = new T.Scene();
-  readonly camera = new T.PerspectiveCamera(45, 1, .05, 150);
+  readonly camera = new T.PerspectiveCamera(45, 1, .05, 220);
   readonly orbit: OrbitControls;
   readonly transform: TransformControls;
   readonly templates = new Map<string, T.Group>();
@@ -34,7 +35,8 @@ export class RoomEngine {
   private sun = new T.DirectionalLight(0xffe1b1, 1.55);
   private mode: RoomMode;
   private placements: RoomPlacement[] = [];
-  private world = buildRoomWorld([], this.bounds);
+  private walkThrough = new Set<string>();
+  private world = buildRoomWorld([], this.bounds, this.walkThrough);
   private player: FirstPerson = roomEntrance(this.world);
   private input?: RoomPlacement[];
   private selected: string | null = null;
@@ -71,28 +73,27 @@ export class RoomEngine {
     this.environment = pmrem.fromScene(room, .04); room.dispose(); pmrem.dispose();
     this.scene.environment = this.environment.texture;
     this.scene.environmentIntensity = .36;
-    this.scene.fog = new T.Fog(horizonColor, 38, 105);
+    this.scene.fog = new T.Fog(horizonColor, 60, 170);
     this.scene.add(new T.HemisphereLight(0xc4dcf1, 0x504238, .83));
-    this.sun.position.set(-7, 12, 8);
+    // The shadow box covers the whole fenced 3×3 grounds (T17).
+    this.sun.position.set(-7, 12, 8).setLength(40);
     this.sun.castShadow = true;
-    this.sun.shadow.mapSize.set(2048, 2048);
-    Object.assign(this.sun.shadow.camera, { left: -14, right: 14, top: 13, bottom: -13, near: .3, far: 42 });
+    this.sun.shadow.mapSize.set(4096, 4096);
+    const reach = Math.hypot(ROOM_COURTYARD_BOUNDS.max[0], ROOM_COURTYARD_BOUNDS.max[2]) + 1;
+    Object.assign(this.sun.shadow.camera, { left: -reach, right: reach, top: reach, bottom: -reach, near: 1, far: 40 + reach + 8 });
     this.sun.shadow.camera.updateProjectionMatrix();
     this.sun.shadow.bias = -.00018;
     this.sun.shadow.normalBias = .018;
     this.sun.shadow.intensity = .9;
     this.scene.add(this.sun, this.sun.target);
 
-    const shell = architecture(false, {
-      floor: [0x606e76, 0x56636b, 0x65717a, 0x59666e],
-      base: 0x454e52, wall: 0xa69b88, wood: 0x663d30, trim: 0x986a42,
-    });
+    const shell = roomHouse();
     enableMeshShadows(shell.group);
     this.roof = shell.roof;
-    this.scene.add(shell.group, courtyardGround(), this.sky, courtyardPlants());
+    this.scene.add(shell.group, courtyardGround(), this.sky);
     this.avatar = new AvatarRig(this.scene);
     this.orbit = new OrbitControls(this.camera, this.renderer.domElement);
-    this.orbit.enableDamping = true; this.orbit.maxPolarAngle = Math.PI * .46; this.orbit.minDistance = 2; this.orbit.maxDistance = 35;
+    this.orbit.enableDamping = true; this.orbit.maxPolarAngle = Math.PI * .46; this.orbit.minDistance = 2; this.orbit.maxDistance = 60;
     this.transform = new TransformControls(this.camera, this.renderer.domElement);
     this.transform.setSize(.85); this.scene.add(this.transform.getHelper()); this.outline.visible = false; this.scene.add(this.outline);
     this.transform.addEventListener('dragging-changed', event => { this.moving = Boolean(event.value); this.orbit.enabled = !this.moving && this.mode === 'edit'; });
@@ -113,15 +114,24 @@ export class RoomEngine {
       }
       this.renderer.shadowMap.needsUpdate = true;
       this.outline.box.setFromObject(object);
-      (this.outline.material as T.LineBasicMaterial).color.set(validateRoomLayout('校验', [this.readPlacement(this.selected)], this.bounds) ? 0xc33d32 : 0xbe8c45);
+      const moving = this.readPlacement(this.selected);
+      const blocked = validateRoomLayout('校验', [moving], this.bounds) || placementConflict(roomPlacementBounds(moving, this.bounds.get(moving.assetId)!));
+      (this.outline.material as T.LineBasicMaterial).color.set(blocked ? 0xc33d32 : 0xbe8c45);
     });
     this.transform.addEventListener('mouseUp', () => {
       if (!this.original || !this.selected) return;
-      const placement = this.readPlacement(this.selected);
-      if (validateRoomLayout('校验', [placement], this.bounds)) {
+      let placement = this.readPlacement(this.selected);
+      const conflict = validateRoomLayout('校验', [placement], this.bounds) ? null : placementConflict(roomPlacementBounds(placement, this.bounds.get(placement.assetId)!));
+      // Push the item clear of posts, walls, the step and the platform edge (editor only; saving does not depend on it).
+      const shift = conflict ? settlePlacement(roomPlacementBounds(placement, this.bounds.get(placement.assetId)!)) : [0, 0, 0];
+      if (shift) placement = { ...placement, position: [placement.position[0] + shift[0], placement.position[1] + shift[1], placement.position[2] + shift[2]] };
+      if (!shift || validateRoomLayout('校验', [placement], this.bounds)) {
         this.apply(this.instances.get(placement.id)!, this.original);
-        this.hooks.notice('物品超出房屋可用边界，已恢复操作前的位置。');
-      } else { this.placements = this.placements.map(p => p.id === placement.id ? placement : p); this.hooks.edit(placement); }
+        this.hooks.notice(shift ? '物品超出小屋及庭院可用边界，已恢复操作前的位置。' : '这里放不下：物品会碰到柱子、墙体或悬在台基边缘，已恢复操作前的位置。');
+      } else {
+        if (conflict) { this.apply(this.instances.get(placement.id)!, placement); this.hooks.notice(conflict + '，已自动挪到旁边。'); }
+        this.placements = this.placements.map(p => p.id === placement.id ? placement : p); this.hooks.edit(placement);
+      }
       this.original = undefined; this.refreshOutline();
     });
     this.observer = new ResizeObserver(() => {
@@ -134,7 +144,7 @@ export class RoomEngine {
     window.addEventListener('keydown', this.keyDown); window.addEventListener('keyup', this.keyUp); window.addEventListener('blur', this.blur); document.addEventListener('pointerlockchange', this.lockChange);
     this.setMode(this.mode); this.renderer.setAnimationLoop(this.frame);
   }
-  setCatalog(models: RoomModel[]) { for (const model of models) { this.profiles.set(model.id, model); this.bounds.set(model.id, model.bounds); } }
+  setCatalog(models: RoomModel[]) { for (const model of models) { this.profiles.set(model.id, model); this.bounds.set(model.id, model.bounds); if (model.walkThrough) this.walkThrough.add(model.id); else this.walkThrough.delete(model.id); } }
   async loadModels(models: RoomModel[]) {
     this.setCatalog(models);
     // Bound simultaneous decodes without limiting how many placements are retained.
@@ -179,7 +189,7 @@ export class RoomEngine {
     }
     if (this.selected && !ids.has(this.selected)) this.select(null);
     else if (!this.moving) this.select(this.selected);
-    this.world = buildRoomWorld(this.placements, this.bounds);
+    this.world = buildRoomWorld(this.placements, this.bounds, this.walkThrough);
     if (this.mode !== 'edit' && playerOverlaps(this.world.colliders, this.player)) this.home();
   }
   private apply(object: T.Group, placement: RoomPlacement) { object.position.fromArray(placement.position); object.rotation.set(...placement.rotation, 'XYZ'); object.scale.setScalar(placement.scale); object.updateMatrixWorld(true); this.renderer.shadowMap.needsUpdate = true; }
