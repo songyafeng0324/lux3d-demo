@@ -161,3 +161,59 @@ export function settlePlacement(start: Bounds): [number, number, number] | null 
   }
   return null;
 }
+
+/**
+ * T19: other placements as the editor sees them (world boxes, the same ones walking collides
+ * with). Walk-through ground cover such as grass neither blocks nor holds anything up.
+ */
+export interface ItemBlock { id: string; box: Bounds }
+export function itemBlocks(placements: readonly RoomPlacement[], bounds: ReadonlyMap<string, Bounds>, walkThrough: ReadonlySet<string>, exclude: ReadonlySet<string> = new Set()): ItemBlock[] {
+  const blocks: ItemBlock[] = [];
+  for (const placement of placements) {
+    const asset = bounds.get(placement.assetId);
+    if (asset && !walkThrough.has(placement.assetId) && !exclude.has(placement.id)) blocks.push({ id: placement.id, box: roomPlacementBounds(placement, asset) });
+  }
+  return blocks;
+}
+
+/** An item counts as resting on what is under it when its bottom is within this of the top. */
+export const REST_GAP = .02;
+const area = (b: Bounds) => (b.max[0] - b.min[0]) * (b.max[2] - b.min[2]);
+const centreOver = (b: Bounds, under: Bounds) => {
+  const x = (b.min[0] + b.max[0]) / 2, z = (b.min[2] + b.max[2]) / 2;
+  return x > under.min[0] && x < under.max[0] && z > under.min[2] && z < under.max[2];
+};
+/** `under` can hold `b` up: b's centre is over it and it is at least as large in plan. */
+const holds = (under: Bounds, b: Bounds) => centreOver(b, under) && area(under) >= area(b) - 1e-9;
+
+/**
+ * What the item would stand on at its current spot: the top of the highest item under its centre
+ * that is at least as large in plan (a vase on a table, not a table on a vase), else the floor.
+ */
+export function supportUnder(b: Bounds, items: readonly ItemBlock[]): { y: number; id: string | null } {
+  let best: { y: number; id: string | null } = { y: roomPlacementFloor(b), id: null };
+  for (const item of items) if (item.box.max[1] > best.y && holds(item.box, b)) best = { y: item.box.max[1], id: item.id };
+  return best;
+}
+
+/** Items resting on `base` and, layer by layer, on those — they move together with it. Lowest first. */
+export function ridersOf(base: ItemBlock, items: readonly ItemBlock[]): string[] {
+  const riders: ItemBlock[] = [], queue = [base];
+  for (let i = 0; i < queue.length; i++) {
+    const under = queue[i];
+    for (const item of items) {
+      if (item.id === base.id || riders.includes(item)) continue;
+      if (Math.abs(item.box.min[1] - under.box.max[1]) <= REST_GAP && holds(under.box, item.box)) { riders.push(item); queue.push(item); }
+    }
+  }
+  return riders.map(r => r.id);
+}
+
+/** The first other item the box runs into; sitting exactly on top or side by side does not count. */
+export function itemConflict(b: Bounds, items: readonly ItemBlock[]): string | null {
+  for (const item of items) {
+    const o = item.box;
+    if (overlaps(b, { x0: o.min[0], x1: o.max[0], z0: o.min[2], z1: o.max[2], y0: o.min[1], y1: o.max[1] })) return item.id;
+  }
+  return null;
+}

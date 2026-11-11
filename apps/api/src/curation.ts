@@ -23,6 +23,14 @@ function cursorOf(request:FastifyRequest){const raw=(request.query as Record<str
 function page<T>(rows:Record<string,any>[],limit:number,dto:(r:Record<string,any>)=>T){const items=rows.slice(0,limit),last=items.at(-1);return {items:items.map(dto),nextCursor:rows.length>limit&&last?Buffer.from(JSON.stringify([last.cursor_at,last.id])).toString('base64url'):null};}
 function query(request:FastifyRequest,name:string,max=80){const v=(request.query as Record<string,unknown>)[name];if(v===undefined||v==='')return null;if(typeof v!=='string'||v.length>max)fail(422,'INVALID_INPUT','查询条件不正确');return v as string;}
 
+/** Imports from before T20 kept only the error code; they say so instead of guessing a reason. */
+const UNRECORDED_FAILURE={reason:'UNRECORDED',message:'这是早期记录，当时只保存了错误码、没有保存具体原因；重新上传同一文件即可看到原因'};
+function importDto(r:Record<string,any>){
+ const status=r.state==='succeeded'?'succeeded':r.state==='failed'?'failed':'processing',detail=r.error_detail;
+ return {id:r.id as string,name:(r.name??r.asset_name??'（未命名）') as string,sourceType:r.source_type as 'furniture'|'official_candidate',status,createdAt:iso(r.created_at),updatedAt:iso(r.updated_at),byteSize:Number(r.byte_size),
+  assetId:r.asset_state==='ready'?r.result_asset_id as string:null,assetDeleted:r.asset_state==='deleted',errorCode:(r.error_code??null) as string|null,
+  failure:status!=='failed'?null:detail?{reason:String(detail.reason),message:String(detail.message)}:UNRECORDED_FAILURE};
+}
 function submissionDto(r:Record<string,any>){return {id:r.id,assetId:r.asset_id,status:r.status as string,submittedAt:iso(r.submitted_at),reviewedAt:iso(r.reviewed_at),rejectionReason:r.rejection_reason??null,publicSnapshot:r.public_snapshot?.redacted?null:r.public_snapshot as PublicDetails,assetName:r.asset_name??null,candidateId:r.candidate_id??null,slotNo:r.slot_no??null};}
 async function quotaOf(c:Db,userId:string){const day=beijingDay();const r=(await c.query('SELECT override_total,used_net FROM quota_days WHERE user_id=$1 AND quota_day=$2',[userId,day])).rows[0];const total=r?.override_total??DEFAULT_DAILY_QUOTA,used=r?.used_net??0;return {day,total,used,available:Math.max(0,total-used),adjusted:r?.override_total!=null};}
 
@@ -238,6 +246,19 @@ export async function registerCurationRoutes(app:FastifyInstance,{pool,config,se
    if (!deleted.rowCount) return fail(404,'NOT_FOUND','该收藏已不存在，请刷新背包');
    return {status:200,data:await removeRoomAsset(c,room,collection.asset_id)};
   }));
+ });
+
+ // ---- Administrator upload history (T20): each official-item / public-collection import, its outcome and readable reason ----
+ const importSelect=`SELECT i.id,i.source_type,i.state,i.error_code,i.error_detail,i.result_asset_id,i.created_at,i.updated_at,${cursorAt('i.created_at')},i.metadata_snapshot->>'name' AS name,a.name AS asset_name,a.state AS asset_state,f.byte_size FROM asset_imports i JOIN files f ON f.id=i.input_file_id LEFT JOIN assets a ON a.id=i.result_asset_id`;
+ app.get('/api/v1/admin/imports',async request=>{
+  await admin(request);const source=query(request,'source'),cursor=cursorOf(request);if(source&&!['furniture','official_candidate'].includes(source))fail(422,'INVALID_INPUT','类型筛选不正确');
+  const args:unknown[]=[source];let where='($1::text IS NULL OR i.source_type=$1)';
+  if(cursor){args.push(cursor.at,cursor.id);where+=' AND (i.created_at,i.id)<($2::timestamptz,$3::uuid)';}
+  return ok(request,page((await pool.query(`${importSelect} WHERE ${where} ORDER BY i.created_at DESC,i.id DESC LIMIT 31`,args)).rows,30,importDto));
+ });
+ app.get('/api/v1/admin/imports/:id',async request=>{
+  await admin(request);const row=(await pool.query(`${importSelect} WHERE i.id=$1`,[uuid((request.params as {id:string}).id)])).rows[0];if(!row)fail(404,'NOT_FOUND','未找到该导入任务');
+  return ok(request,importDto(row));
  });
 
  // ---- Administrator asset maintenance (F11) and risk deletion (F13) ----

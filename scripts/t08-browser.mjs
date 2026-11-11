@@ -104,8 +104,12 @@ try{
   }finally{await adminRoom.close();}
  });
  await step('admin arranges slots 1/2/19 from more candidates and publishes one gallery version',async()=>{
-  await ap.getByRole('button',{name:'候选与展位'}).click();await ap.locator('.adm-slot').first().waitFor();
-  for(const [slot,name] of [[0,'紫檀靠背椅'],[1,'明式长案'],[18,'双门陈列柜']]){await ap.locator('.adm-slot').nth(slot).click();await ap.locator('.adm-cand',{hasText:name}).click();}
+  // T21: candidate first — select it on the left, open the slot panel, choose the slot; publish once at the end.
+  await ap.getByRole('button',{name:'候选与展位'}).click();await ap.locator('.adm-gallery .adm-row[aria-pressed=true]').waitFor();
+  for(const [slot,name] of [[1,'紫檀靠背椅'],[2,'明式长案'],[19,'双门陈列柜']]){await ap.locator('.adm-gallery .adm-row',{hasText:name}).click();await ap.locator('.adm-detail h2',{hasText:name}).waitFor();
+   await ap.getByRole('button',{name:/安排展位|调整展位/}).click();await ap.getByRole('dialog',{name:/选择展位/}).locator('.adm-slot').filter({has:ap.locator('small',{hasText:new RegExp(`^${slot} · `)})}).click();
+   await ap.locator('.adm-gallery .adm-row',{hasText:name}).locator('small',{hasText:`展位 ${slot}`}).waitFor();}
+  await ap.locator('.adm-unsaved',{hasText:'未保存 3 处'}).waitFor();
   await ap.screenshot({path:path.join(out,'03-admin-gallery.png')});await ap.getByRole('button',{name:'保存并发布'}).click();await ap.getByText(/已发布展陈第 1 版/).waitFor();
  });
  let oldVisitorExhibits;

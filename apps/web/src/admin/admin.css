@@ -47,3 +47,32 @@
 .adm-table{display:grid;gap:4px}.adm-table div{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px;padding:6px 8px;border-bottom:1px solid rgba(214,176,104,.12);font-size:12px}
 @media (max-width:900px){.adm-split{grid-template-columns:1fr}.adm-detail{position:static;max-height:none}.adm-media{grid-template-columns:1fr}.adm-main{padding:16px}.adm-top{padding:12px 16px}}
 .adm .adm-link{align-self:flex-start;padding:2px 0;border:0;background:none;color:var(--gold);font-size:12px}
+/* T20 upload history: one line per upload; a failure reads as a sentence under a thin cinnabar rule. */
+.adm-history{display:flex;flex-direction:column;gap:8px;padding-bottom:16px;margin-bottom:6px;border-bottom:1px solid var(--line)}
+.adm-history .adm-list-head select{padding:5px 8px;font-size:12px}
+.adm-imports{list-style:none;margin:0;padding:0 4px 0 0;display:flex;flex-direction:column;gap:6px;max-height:560px;overflow:auto}
+.adm-import{display:flex;flex-direction:column;gap:3px;padding:9px 12px;border:1px solid rgba(214,176,104,.18);border-radius:5px;background:rgba(214,176,104,.04)}
+.adm-import-head{display:flex;justify-content:space-between;align-items:center;gap:10px}
+.adm-import-head strong{font-weight:500;font-size:13px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.adm-import small{color:var(--muted);font-size:11px;line-height:1.6}
+.adm-status{flex:none;border:1px solid var(--line);border-radius:999px;padding:1px 9px;font-size:11px;color:var(--muted)}
+.adm-status[data-status=processing]{border-style:dashed;border-color:var(--gold);color:var(--gold)}
+.adm-status[data-status=succeeded]{border-color:var(--gold);color:var(--gold);background:rgba(214,176,104,.10)}
+.adm-status[data-status=failed]{border-color:#a46a49;color:#f0c3a4;background:rgba(142,44,34,.25)}
+.adm-import-reason{margin:3px 0 0;padding-left:9px;border-left:2px solid #a46a49;color:#f0c3a4;font-size:12px;line-height:1.7;overflow-wrap:anywhere}
+/* T21 candidate-first gallery: a publish bar on top, candidates left, the chosen one previewed right. */
+.adm-gallery-bar{position:sticky;top:71px;z-index:1;display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;padding:10px 14px;border:1px solid var(--line);border-radius:8px;background:rgba(15,12,10,.94);backdrop-filter:blur(6px)}
+.adm-gallery-bar p{display:flex;gap:14px;align-items:baseline;flex-wrap:wrap;margin:0;font-size:13px;color:var(--muted)}
+.adm-gallery-bar strong{font-family:"Songti SC","Noto Serif SC","STSong",serif;font-weight:600;font-size:17px;color:var(--paper)}
+.adm-unsaved{color:var(--gold)!important;border:1px dashed var(--gold);border-radius:999px;padding:1px 9px;font-size:12px}
+.adm-list .adm-row[data-changed=true]{border-style:dashed;border-color:var(--gold)}
+.adm-row small.adm-on-show{color:var(--gold)}
+.adm-detail-head>.bag-primary{flex:none}
+.adm-slot-picker{display:flex;flex-direction:column;gap:10px;padding:12px;border:1px solid var(--gold);border-radius:6px;background:rgba(214,176,104,.05)}
+.adm-tier h3{margin:0 0 6px;font-size:14px}.adm-tier h3 small{font-family:ui-sans-serif,-apple-system,"PingFang SC",sans-serif;font-size:11px;font-weight:400;color:var(--muted);margin-left:6px}
+.adm-slot-picker .adm-slots{grid-template-columns:repeat(auto-fill,minmax(128px,1fr))}
+.adm-slot-picker .adm-slot{min-height:64px;padding:7px 9px!important}
+.adm-slot-picker .adm-slot span{color:#f0c3a4}
+.adm .adm-slot[aria-current=true]{opacity:1;color:var(--gold);border-color:var(--gold);background:rgba(214,176,104,.12)}
+.adm-gallery .adm-detail{top:140px;max-height:calc(100dvh - 160px)}
+@media (max-width:900px){.adm-gallery-bar{position:static}.adm-gallery .adm-detail{position:static;max-height:none}}

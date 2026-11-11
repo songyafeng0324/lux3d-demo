@@ -136,7 +136,6 @@ export async function registerBusinessRoutes(app:FastifyInstance,{pool,store,con
     if(source==='official_candidate')Object.assign(metadata,publicFieldsInput(fields),{sourceNickname:'官方馆藏'});
     const hash=createHash('sha256').update(file).digest('hex');return sendWrite(reply,request,await write(request,s,{sourceType:source,metadata,sha256:hash},async c=>{const input=await upload(c,s.user.id,file,'model/gltf-binary','model');const id=randomUUID();await c.query("INSERT INTO asset_imports(id,admin_id,input_file_id,source_type,metadata_snapshot,policy_version) VALUES($1,$2,$3,$4,$5,'t06-v1')",[id,s.user.id,input,source,JSON.stringify(metadata)]);await c.query("INSERT INTO jobs(kind,ref_id) VALUES('import',$1)",[id]);return {status:202,data:{id,status:'processing',assetId:null}};},true));
   });
-  app.get('/api/v1/admin/imports/:id',async request=>{const s=await session(request);if(s.user.role!=='admin')fail(403,'FORBIDDEN','没有管理权限');const row=(await pool.query('SELECT * FROM asset_imports WHERE id=$1',[uuid((request.params as {id:string}).id)])).rows[0];if(!row)fail(404,'NOT_FOUND','未找到该导入任务');return ok(request,{id:row.id,status:row.state==='succeeded'?'succeeded':row.state==='failed'?'failed':'processing',assetId:row.result_asset_id,errorCode:row.error_code});});
   await registerRoomRoutes(app,{pool,config,session,reauthorize});
   await registerCurationRoutes(app,{pool,config,session,reauthorize});
 }

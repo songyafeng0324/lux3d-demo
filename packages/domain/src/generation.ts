@@ -7,11 +7,13 @@ import {LocalFileStore} from './storage.js';
 import {transaction,type Config} from './index.js';
 import {Lux3dCnClient,Lux3dTransportError,type Lux3dTask} from './lux3d.js';
 import {readLux3dCnKey} from './credentials.js';
-import {sha256,validateImage,validateModel,MODEL_LIMIT} from './resources.js';
+import {sha256,validateImage,validateModel,MODEL_LIMIT,ModelRejection} from './resources.js';
 export const GENERATION_POLICY='t06-v1';
 export const GENERATION_PARAMS={version:'G1-Turbo' as const,faceCount:50000,outputFormat:['glb' as const],enablePbr:true,aiPredictSize:false};
 export const generationRequestHash=(inputSha256:string)=>sha256(JSON.stringify({inputSha256,policyVersion:GENERATION_POLICY,...GENERATION_PARAMS}));
-type Job={id:string;kind:string;ref_id:string;fence:string};
+type Job={id:string;kind:string;ref_id:string;fence:string;attempts?:number};
+/** Environment faults (Chrome, storage) retry this many attempts before the import is closed as a validator error. */
+export const IMPORT_VALIDATOR_ATTEMPTS=3;
 export interface GenerationProvider {
  quoteImageTask(params:any):Promise<{quoteId:string;credits:number;expiresAt:string}>;
  uploadFile(file:string):Promise<{url:string}>;
@@ -148,7 +150,15 @@ export class GenerationWorker {
  private async importModel(job:Job){
   const row=(await this.pool.query('SELECT i.*,f.object_key,f.sha256 AS file_sha256,f.state AS file_state FROM asset_imports i JOIN files f ON f.id=i.input_file_id WHERE i.id=$1',[job.ref_id])).rows[0];if(!row)throw new Error('IMPORT_MISSING');
   if(row.state==='succeeded'||row.state==='failed'){await transaction(this.pool,async c=>{if(await this.owns(c,job))await this.finishJob(c,job,row.state==='succeeded');});return;}
-  let verified;try{const bytes=await this.bytes(row.object_key);if(row.file_state!=='committed'||sha256(bytes)!==row.file_sha256)throw new Error('IMPORT_CHECKSUM');verified=await (this.options.validate??validateModel)(bytes);if(verified.sha256!==row.file_sha256)throw new Error('IMPORT_VALIDATION_CHECKSUM');}catch{await transaction(this.pool,async c=>{if(!await this.owns(c,job))return;await c.query("UPDATE asset_imports SET state='failed',error_code='MODEL_INVALID',updated_at=now() WHERE id=$1 AND state NOT IN ('succeeded','failed')",[row.id]);await this.finishJob(c,job,false);});return;}
+  let verified;try{const bytes=await this.bytes(row.object_key);if(row.file_state!=='committed'||sha256(bytes)!==row.file_sha256)throw new ModelRejection('IMPORT_CHECKSUM','服务器保存的文件与上传时的校验值不一致（存储损坏），请重新上传');verified=await (this.options.validate??validateModel)(bytes);if(verified.sha256!==row.file_sha256)throw new ModelRejection('IMPORT_CHECKSUM','校验时读到的文件与上传时不一致，请重新上传');}
+  catch(error){
+   // The readable reason is persisted with the import; only the model's own faults close it at once.
+   let code='MODEL_INVALID',detail:Record<string,unknown>;
+   const retriesLeft=Number(job.attempts??IMPORT_VALIDATOR_ATTEMPTS)<IMPORT_VALIDATOR_ATTEMPTS;
+   if(error instanceof ModelRejection){if(error.retryable&&retriesLeft)throw error;detail={reason:error.code,message:error.reason,...error.detail};}
+   else{if(retriesLeft)throw error;code='VALIDATOR_ERROR';detail={reason:'VALIDATOR_ERROR',message:`服务器校验环境出错，重试 ${IMPORT_VALIDATOR_ATTEMPTS} 次仍未完成（不是模型本身的问题）：请确认本机 Chrome 与存储正常后重新上传`};console.error(`模型导入 ${row.id} 校验环境出错：`,error);}
+   if(code==='MODEL_INVALID')console.warn(`模型导入 ${row.id} 未通过校验：${String(detail.reason)} ${String(detail.message)}`);
+   await transaction(this.pool,async c=>{if(!await this.owns(c,job))return;await c.query("UPDATE asset_imports SET state='failed',error_code=$2,error_detail=$3,updated_at=now() WHERE id=$1 AND state NOT IN ('succeeded','failed')",[row.id,code,detail]);await this.finishJob(c,job,false);});return;}
   await transaction(this.pool,async c=>{await c.query('SELECT id FROM users WHERE id=$1 FOR UPDATE',[row.admin_id]);const i=(await c.query('SELECT * FROM asset_imports WHERE id=$1 FOR UPDATE',[row.id])).rows[0];if(!await this.owns(c,job)||i.state==='failed'||i.state==='succeeded')return;
    const id=randomUUID(),meta=i.metadata_snapshot;
    await c.query('INSERT INTO assets(id,source_type,import_id,model_file_id,name,description,normalization,bounds) VALUES($1,$2,$3,$4,$5,$6,$7,$8)',[id,i.source_type,i.id,i.input_file_id,meta.name,meta.description??'',verified.normalization,verified.bounds]);

@@ -155,12 +155,15 @@ export default function Room({ shareToken }: { shareToken?: string }) {
       await instance.ensureModel(assetId);
       if (instance !== engine.current || sequence !== catalogSequence.current || !profile.current || !current.current) return;
       const n = current.current.placements.length;
-      const placement: RoomPlacement = { id: crypto.randomUUID(), assetId, position: [((n % 5) - 2) * 1.5, 0, (Math.floor(n / 5) % 3 - 1) * 1.5], rotation: [0, 0, 0], scale: 1 };
-      if (validateRoomLayout(current.current.name, [placement], instance.bounds)) placement.position = [0, 0, 0];
+      const preferred: [number, number] = [((n % 5) - 2) * 1.5, (Math.floor(n / 5) % 3 - 1) * 1.5];
+      // T19: start clear of the house and of other items; with no free spot left it may overlap and the owner moves it.
+      const spot = instance.freeSpot(assetId, preferred);
+      const placement: RoomPlacement = { id: crypto.randomUUID(), assetId, position: spot ?? [preferred[0], 0, preferred[1]], rotation: [0, 0, 0], scale: 1 };
+      if (!spot && validateRoomLayout(current.current.name, [placement], instance.bounds)) placement.position = [0, 0, 0];
       const error = validateRoomLayout(current.current.name, [placement], instance.bounds);
       if (error) throw new Error('这个模型当前尺寸无法放入小屋。');
       edit(current.current.name, [...current.current.placements, placement]); instance.select(placement.id);
-      setNotice('已添加一件独立摆放，可用移动、旋转、等比缩放工具布置。');
+      setNotice(spot ? '已添加一件独立摆放，可用移动、旋转、等比缩放工具布置。' : '已添加，但附近没有空位，它和其他物品有重叠，请挪开。');
     } catch (error) { if (instance === engine.current) setNotice(error instanceof Error ? error.message : '添加失败，请重试。'); }
     finally { if (instance === engine.current) setLoadingModel(false); }
   };
@@ -173,7 +176,7 @@ export default function Room({ shareToken }: { shareToken?: string }) {
     setLoadError(''); setLoginRequired(false); setMode(visitor ? 'share' : 'edit'); setTool('translate'); setRoom(null); current.current = null; setSave({ status: 'loading', version: 0, sequence: 0, message: '' });
     let instance: RoomEngine;
     try {
-      instance = new RoomEngine(host.current, { select: setSelected, edit: placement => { const value = current.current; if (value) latest.current.edit(value.name, value.placements.map(p => p.id === placement.id ? placement : p)); }, notice: setNotice }, (): Record<string, string> => { const grant = snapshot.current?.grant; return visitor && grant ? { Authorization: 'Bearer ' + grant.token, 'X-Snapshot-Grant': grant.id } : {}; }, visitor);
+      instance = new RoomEngine(host.current, { select: setSelected, edit: changed => { const value = current.current; if (!value) return; const byId = new Map(changed.map(p => [p.id, p])); latest.current.edit(value.name, value.placements.map(p => byId.get(p.id) ?? p)); }, notice: setNotice }, (): Record<string, string> => { const grant = snapshot.current?.grant; return visitor && grant ? { Authorization: 'Bearer ' + grant.token, 'X-Snapshot-Grant': grant.id } : {}; }, visitor);
     } catch { setLoadError('浏览器暂时无法创建小屋场景，请使用最新版 Chrome。'); return; }
     engine.current = instance;
     instance.setAvatar(avatarRef.current, avatarFailed);

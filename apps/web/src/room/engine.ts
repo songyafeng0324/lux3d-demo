@@ -11,10 +11,10 @@ import { boomLength, clampFollowPitch, easeBoom, FOLLOW, viewDirection, type Vec
 import { disposeResources, enableMeshShadows } from '../scene/assets.js';
 import { courtyardGround, courtyardSky, horizonColor } from './courtyard.js';
 import { roomHouse } from './house.js';
-import { buildRoomWorld, placementConflict, ROOM_CAMERA_BLOCKERS, ROOM_EYE_HEIGHT, roomEntrance, settlePlacement } from './navigation.js';
+import { buildRoomWorld, itemBlocks, itemConflict, placementConflict, REST_GAP, ridersOf, ROOM_CAMERA_BLOCKERS, ROOM_EYE_HEIGHT, roomEntrance, settlePlacement, supportUnder, type ItemBlock } from './navigation.js';
 export type RoomMode = 'edit' | 'visit' | 'share';
 export type RoomTool = 'translate' | 'rotate' | 'scale';
-interface Hooks { select: (id: string | null) => void; edit: (placement: RoomPlacement) => void; notice: (message: string) => void }
+interface Hooks { select: (id: string | null) => void; edit: (changed: RoomPlacement[]) => void; notice: (message: string) => void }
 export class RoomEngine {
   readonly renderer: T.WebGLRenderer;
   readonly scene = new T.Scene();
@@ -41,6 +41,9 @@ export class RoomEngine {
   private input?: RoomPlacement[];
   private selected: string | null = null;
   private original?: RoomPlacement;
+  /** T19: items stacked on the dragged one (lowest first, positions before the drag) and every other item it may run into. */
+  private riders: RoomPlacement[] = [];
+  private others: ItemBlock[] = [];
   private moving = false;
   private down = [0, 0];
   private keys = new Set<string>();
@@ -97,7 +100,7 @@ export class RoomEngine {
     this.transform = new TransformControls(this.camera, this.renderer.domElement);
     this.transform.setSize(.85); this.scene.add(this.transform.getHelper()); this.outline.visible = false; this.scene.add(this.outline);
     this.transform.addEventListener('dragging-changed', event => { this.moving = Boolean(event.value); this.orbit.enabled = !this.moving && this.mode === 'edit'; });
-    this.transform.addEventListener('mouseDown', () => { const current = this.placements.find(p => p.id === this.selected); this.original = current ? structuredClone(current) : undefined; });
+    this.transform.addEventListener('mouseDown', () => this.beginDrag());
     this.transform.addEventListener('objectChange', () => {
       const object = this.transform.object;
       if (!object || !this.original || !this.selected) return;
@@ -107,33 +110,14 @@ export class RoomEngine {
         object.scale.setScalar(scalar);
       }
       if (this.transform.mode === 'translate' && ['X', 'Z', 'XZ'].includes(this.transform.axis ?? '')) {
-        const bounds = this.bounds.get(this.original.assetId)!;
-        const oldFloor = roomPlacementFloor(roomPlacementBounds(this.original, bounds));
-        const floor = roomPlacementFloor(roomPlacementBounds(this.readPlacement(this.selected), bounds));
-        object.position.y = this.original.position[1] + floor - oldFloor;
+        object.position.y = this.restingY(this.original, this.readPlacement(this.selected)); object.updateMatrixWorld(true);
       }
+      this.moveRiders();
       this.renderer.shadowMap.needsUpdate = true;
       this.outline.box.setFromObject(object);
-      const moving = this.readPlacement(this.selected);
-      const blocked = validateRoomLayout('校验', [moving], this.bounds) || placementConflict(roomPlacementBounds(moving, this.bounds.get(moving.assetId)!));
-      (this.outline.material as T.LineBasicMaterial).color.set(blocked ? 0xc33d32 : 0xbe8c45);
+      (this.outline.material as T.LineBasicMaterial).color.set(this.groupProblem() ? 0xc33d32 : 0xbe8c45);
     });
-    this.transform.addEventListener('mouseUp', () => {
-      if (!this.original || !this.selected) return;
-      let placement = this.readPlacement(this.selected);
-      const conflict = validateRoomLayout('校验', [placement], this.bounds) ? null : placementConflict(roomPlacementBounds(placement, this.bounds.get(placement.assetId)!));
-      // Push the item clear of posts, walls, the step and the platform edge (editor only; saving does not depend on it).
-      const shift = conflict ? settlePlacement(roomPlacementBounds(placement, this.bounds.get(placement.assetId)!)) : [0, 0, 0];
-      if (shift) placement = { ...placement, position: [placement.position[0] + shift[0], placement.position[1] + shift[1], placement.position[2] + shift[2]] };
-      if (!shift || validateRoomLayout('校验', [placement], this.bounds)) {
-        this.apply(this.instances.get(placement.id)!, this.original);
-        this.hooks.notice(shift ? '物品超出小屋及庭院可用边界，已恢复操作前的位置。' : '这里放不下：物品会碰到柱子、墙体或悬在台基边缘，已恢复操作前的位置。');
-      } else {
-        if (conflict) { this.apply(this.instances.get(placement.id)!, placement); this.hooks.notice(conflict + '，已自动挪到旁边。'); }
-        this.placements = this.placements.map(p => p.id === placement.id ? placement : p); this.hooks.edit(placement);
-      }
-      this.original = undefined; this.refreshOutline();
-    });
+    this.transform.addEventListener('mouseUp', () => this.endDrag());
     this.observer = new ResizeObserver(() => {
       const w = host.clientWidth, h = host.clientHeight;
       if (!w || !h) return;
@@ -185,7 +169,7 @@ export class RoomEngine {
         object = template.clone(true); object.userData.placementId = placement.id; object.userData.assetId = placement.assetId;
         this.instances.set(placement.id, object); this.scene.add(object);
       }
-      if (!(this.moving && this.selected === placement.id)) this.apply(object, placement);
+      if (!(this.moving && (this.selected === placement.id || this.riders.some(r => r.id === placement.id)))) this.apply(object, placement);
     }
     if (this.selected && !ids.has(this.selected)) this.select(null);
     else if (!this.moving) this.select(this.selected);
@@ -193,6 +177,112 @@ export class RoomEngine {
     if (this.mode !== 'edit' && playerOverlaps(this.world.colliders, this.player)) this.home();
   }
   private apply(object: T.Group, placement: RoomPlacement) { object.position.fromArray(placement.position); object.rotation.set(...placement.rotation, 'XYZ'); object.scale.setScalar(placement.scale); object.updateMatrixWorld(true); this.renderer.shadowMap.needsUpdate = true; }
+  private boxOf(placement: RoomPlacement) { return roomPlacementBounds(placement, this.bounds.get(placement.assetId)!); }
+  /** T19: the dragged item carries whatever is stacked on it; grass neither collides with items nor carries any. */
+  private beginDrag() {
+    const current = this.placements.find(p => p.id === this.selected);
+    this.original = current ? structuredClone(current) : undefined;
+    this.riders = []; this.others = [];
+    if (!current || this.walkThrough.has(current.assetId)) return;
+    const all = itemBlocks(this.placements, this.bounds, this.walkThrough);
+    const riders = ridersOf({ id: current.id, box: this.boxOf(current) }, all);
+    this.riders = riders.map(id => structuredClone(this.placements.find(p => p.id === id)!));
+    this.others = all.filter(b => b.id !== current.id && !riders.includes(b.id));
+  }
+  /**
+   * Height after a sideways drag: an item resting on the floor or on another item lands on
+   * whatever is under its new spot (stacking); one lifted on purpose keeps its height above it.
+   */
+  private restingY(original: RoomPlacement, now: RoomPlacement) {
+    const before = this.boxOf(original), from = supportUnder(before, this.others), offset = before.min[1] - from.y;
+    const after = this.boxOf({ ...now, position: [now.position[0], original.position[1], now.position[2]] }), to = supportUnder(after, this.others);
+    // Floor to floor keeps the old offset (T17 behaviour, e.g. grass sunk into the lawn); onto or off an item it sits exactly on top.
+    const lift = offset <= REST_GAP && (from.id || to.id) ? 0 : offset;
+    return original.position[1] + to.y + lift - before.min[1];
+  }
+  /** Stacked items follow the leader's move, then each settles on the leader or a lower rider (or falls to the floor). */
+  private moveRiders() {
+    if (!this.riders.length || !this.original || !this.selected) return;
+    const leader = this.readPlacement(this.selected), d = [0, 1, 2].map(i => leader.position[i] - this.original!.position[i]);
+    const below: ItemBlock[] = [{ id: leader.id, box: this.boxOf(leader) }];
+    for (const rider of this.riders) {
+      const object = this.instances.get(rider.id); if (!object) continue;
+      object.position.set(rider.position[0] + d[0], rider.position[1] + d[1], rider.position[2] + d[2]); object.updateMatrixWorld(true);
+      const box = this.boxOf(this.readPlacement(rider.id));
+      object.position.y += supportUnder(box, below).y - box.min[1]; object.updateMatrixWorld(true);
+      below.push({ id: rider.id, box: this.boxOf(this.readPlacement(rider.id)) });
+    }
+  }
+  private group() { return [this.selected!, ...this.riders.map(r => r.id)].filter(id => this.instances.has(id)).map(id => this.readPlacement(id)); }
+  /** Why the dragged group cannot stay where it is now, if anything. */
+  private groupProblem(): string | null {
+    const members = this.group();
+    if (!members.length) return null;
+    for (const p of members) {
+      if (validateRoomLayout('校验', [p], this.bounds)) return '物品超出小屋及庭院可用边界';
+      const box = this.boxOf(p), structure = placementConflict(box);
+      if (structure) return structure;
+      if (itemConflict(box, this.others)) return '物品会和其他物品重叠';
+    }
+    // Riders come lowest layer first, so each is checked against the leader and every rider placed before it.
+    const below: ItemBlock[] = [{ id: members[0].id, box: this.boxOf(members[0]) }];
+    for (const p of members.slice(1)) {
+      const box = this.boxOf(p);
+      if (itemConflict(box, below)) return '叠放的物品会互相重叠';
+      below.push({ id: p.id, box });
+    }
+    return null;
+  }
+  private endDrag() {
+    if (!this.original || !this.selected || !this.instances.has(this.selected)) return;
+    const object = this.instances.get(this.selected)!, placement = this.readPlacement(this.selected);
+    // A click on the gizmo without moving changes nothing: old layouts that already overlap must not bounce.
+    const same = (a: number[], b: number[]) => a.every((v, i) => Math.abs(v - b[i]) < 1e-9);
+    if (same(placement.position, this.original.position) && same(placement.rotation, this.original.rotation) && Math.abs(placement.scale - this.original.scale) < 1e-9) {
+      this.original = undefined; this.riders = []; this.others = []; this.refreshOutline(); return;
+    }
+    let notice = '';
+    let problem = validateRoomLayout('校验', [placement], this.bounds) ? '物品超出小屋及庭院可用边界' : null;
+    const conflict = problem ? null : placementConflict(this.boxOf(placement));
+    if (conflict) {
+      // Push the item clear of posts, walls, the step and the platform edge (editor only; saving does not depend on it).
+      const before = this.boxOf(placement), resting = before.min[1] - supportUnder(before, this.others).y <= REST_GAP;
+      const shift = settlePlacement(before);
+      if (!shift) problem = '物品会碰到柱子、墙体或悬在台基边缘';
+      else {
+        object.position.add(new T.Vector3(...shift)); object.updateMatrixWorld(true);
+        if (resting) { const box = this.boxOf(this.readPlacement(this.selected)); object.position.y += supportUnder(box, this.others).y - box.min[1]; object.updateMatrixWorld(true); }
+        this.moveRiders(); notice = conflict + '，已自动挪到旁边。';
+      }
+    }
+    problem ??= this.groupProblem();
+    if (problem) {
+      // Overlapping another item (or nowhere to go): the whole group bounces back to where it was.
+      this.apply(object, this.original);
+      for (const rider of this.riders) { const o = this.instances.get(rider.id); if (o) this.apply(o, rider); }
+      this.hooks.notice(`这里放不下：${problem}，已弹回操作前的位置。`);
+    } else {
+      if (notice) this.hooks.notice(notice);
+      const changed = this.group(), byId = new Map(changed.map(p => [p.id, p]));
+      this.placements = this.placements.map(p => byId.get(p.id) ?? p); this.hooks.edit(changed);
+    }
+    this.original = undefined; this.riders = []; this.others = []; this.refreshOutline();
+  }
+  /** T19: where a newly added item can stand on the floor clear of the house and other items, nearest the preferred spot first. */
+  freeSpot(assetId: string, preferred: [number, number]): Vec3 | null {
+    if (!this.bounds.has(assetId)) return null;
+    const items = this.walkThrough.has(assetId) ? [] : itemBlocks(this.placements, this.bounds, this.walkThrough);
+    const grid: [number, number][] = [];
+    for (let x = Math.ceil(ROOM_COURTYARD_BOUNDS.min[0]); x <= ROOM_COURTYARD_BOUNDS.max[0]; x++) for (let z = Math.ceil(ROOM_COURTYARD_BOUNDS.min[2]); z <= ROOM_COURTYARD_BOUNDS.max[2]; z++) grid.push([x, z]);
+    grid.sort((a, b) => Math.hypot(...a) - Math.hypot(...b));
+    for (const [x, z] of [preferred, ...grid]) {
+      const probe: RoomPlacement = { id: 'probe', assetId, position: [x, 0, z], rotation: [0, 0, 0], scale: 1 };
+      const raw = this.boxOf(probe); probe.position[1] = roomPlacementFloor(raw) - raw.min[1];
+      const box = this.boxOf(probe);
+      if (!validateRoomLayout('校验', [probe], this.bounds) && !placementConflict(box) && !itemConflict(box, items)) return probe.position;
+    }
+    return null;
+  }
   private readPlacement(id: string): RoomPlacement { const placement = this.placements.find(p => p.id === id)!, object = this.instances.get(id)!; return { ...placement, position: object.position.toArray(), rotation: [object.rotation.x, object.rotation.y, object.rotation.z], scale: object.scale.x }; }
   private refreshOutline() { const object = this.selected ? this.instances.get(this.selected) : undefined; if (object) this.outline.box.setFromObject(object); (this.outline.material as T.LineBasicMaterial).color.setHex(0xbe8c45); }
   select(id: string | null) { this.selected = id; const object = id ? this.instances.get(id) : undefined; if (object && this.mode === 'edit') { this.transform.attach(object); this.outline.visible = true; this.refreshOutline(); } else { this.transform.detach(); this.outline.visible = false; } this.hooks.select(id); }
@@ -290,7 +380,7 @@ export class RoomEngine {
     this.sky.position.copy(this.camera.position);
     this.renderer.render(this.scene, this.camera);
   };
-  debugTransform(id: string, patch: Partial<RoomPlacement>) { if (this.readOnly || this.mode !== 'edit') return '参观模式不允许编辑'; const original = this.placements.find(p => p.id === id); if (!original) throw new Error('Unknown placement'); const placement = { ...original, ...patch }, error = validateRoomLayout('检查', [placement], this.bounds); if (error) return error; this.placements = this.placements.map(p => p.id === id ? placement : p); this.apply(this.instances.get(id)!, placement); this.hooks.edit(placement); this.refreshOutline(); return null; }
+  debugTransform(id: string, patch: Partial<RoomPlacement>) { if (this.readOnly || this.mode !== 'edit') return '参观模式不允许编辑'; const original = this.placements.find(p => p.id === id); if (!original) throw new Error('Unknown placement'); const placement = { ...original, ...patch }, error = validateRoomLayout('检查', [placement], this.bounds); if (error) return error; this.placements = this.placements.map(p => p.id === id ? placement : p); this.apply(this.instances.get(id)!, placement); this.hooks.edit([placement]); this.refreshOutline(); return null; }
   debug() {
     const rect = this.renderer.domElement.getBoundingClientRect();
     const project = (value: T.Vector3) => { value.project(this.camera); return { x: rect.left + (value.x + 1) * rect.width / 2, y: rect.top + (1 - value.y) * rect.height / 2 }; };

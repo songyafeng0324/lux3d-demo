@@ -14,14 +14,18 @@ interface Candidate { id: string; assetId: string; source: 'user' | 'official'; 
 interface AdminAsset { id: string; sourceType: 'personal' | 'furniture' | 'official_candidate'; name: string; description: string; owner: { id: string; username: string; nickname: string } | null; createdAt: string; modelFileId: string; originalImageId: string | null; publication: { state: 'none' | 'pending' | 'candidate'; candidateId?: string; slotNo?: number | null }; publicSnapshot: PublicDetails | null; editable: boolean }
 interface AdminUser { id: string; username: string; nickname: string; role: string; createdAt: string }
 interface UserDetail { user: AdminUser; quota: { day: string; total: number; used: number; available: number; adjusted: boolean }; counts: { tasks: number; succeeded: number; assets: number }; tasks: Array<{ id: string; status: string; submittedDay: string; createdAt: string; assetId: string | null; errorCode: string | null }>; assets: Array<{ id: string; name: string; createdAt: string }> }
+interface ImportItem { id: string; name: string; sourceType: 'furniture' | 'official_candidate'; status: 'processing' | 'succeeded' | 'failed'; createdAt: string; byteSize: number; assetId: string | null; assetDeleted: boolean; errorCode: string | null; failure: { reason: string; message: string } | null }
 type Pending = { path: string; method: string; body: Record<string, unknown> | FormData; key: string; label: string; done: (data: any) => void | Promise<void> };
 
 const SOURCE = { personal: '用户个人', furniture: '官方物品', official_candidate: '公共藏品（官方）' } as const;
+const IMPORT_KIND = { furniture: '官方物品', official_candidate: '公共藏品' } as const;
+const IMPORT_STATUS = { processing: '处理中', succeeded: '成功', failed: '失败' } as const;
 const STATUS: Record<string, string> = { pending: '待审核', approved: '已通过', rejected: '已驳回', withdrawn: '已撤回', deleted: '模型已删除' };
 const OWNERSHIP = { museum: '博物馆', personal_collection: '个人收藏' } as const;
 const PUBLIC_KEYS = ['name', 'description', 'era', 'material', 'ownershipType', 'holderName', 'location', 'officialUrl'] as const;
-const slotInfo = new Map((layout.exhibitSlots as Array<{ id: string; label: string }>).map(s => [s.id, s]));
+const slotInfo = new Map((layout.exhibitSlots as Array<{ id: string; label: string; tier?: string; fit?: { maxSize: number } }>).map(s => [s.id, s]));
 const slotName = (n: number) => `${slotInfo.get(slotMarker(n))?.label ?? '展位'} · ${n}`;
+const fileSize = (n: number) => n < 1024 * 1024 ? `${Math.max(1, Math.round(n / 1024))} KB` : `${(n / 1024 / 1024).toFixed(1)} MiB`;
 const time = (v: string | null) => v ? new Date(v).toLocaleString('zh-CN', { hour12: false }) : '—';
 
 export default function Admin() {
@@ -35,6 +39,8 @@ export default function Admin() {
   const [message, setMessage] = useState('');
   const [revision, setRevision] = useState(0);
   const refresh = useCallback(() => setRevision(v => v + 1), []);
+  // Unsaved slot changes on the gallery tab; leaving the tab asks first.
+  const [galleryDirty, setGalleryDirty] = useState(false);
 
   const loadMe = useCallback(async () => {
     try { setMe(await api<Me>('/me', { cache: 'no-store' })); }
@@ -87,9 +93,9 @@ export default function Admin() {
   else {
     const props = { write, locked, revision, refresh, setMessage };
     body = <>
-      <nav className="adm-tabs" aria-label="后台栏目">{([['review', '投稿审核'], ['gallery', '候选与展位'], ['assets', '资产与上传'], ['users', '用户与额度']] as const).map(([key, label]) => <button key={key} type="button" aria-pressed={tab === key} onClick={() => { setTab(key); setError(''); setMessage(''); }}>{label}</button>)}</nav>
+      <nav className="adm-tabs" aria-label="后台栏目">{([['review', '投稿审核'], ['gallery', '候选与展位'], ['assets', '资产与上传'], ['users', '用户与额度']] as const).map(([key, label]) => <button key={key} type="button" aria-pressed={tab === key} onClick={() => { if (key === tab) return; if (tab === 'gallery' && galleryDirty && !window.confirm('展位安排还没保存，离开后这些修改会丢失。确定离开吗？')) return; setTab(key); setError(''); setMessage(''); }}>{label}</button>)}</nav>
       {tab === 'review' && <ReviewTab {...props} />}
-      {tab === 'gallery' && <GalleryTab {...props} />}
+      {tab === 'gallery' && <GalleryTab {...props} onDirty={setGalleryDirty} />}
       {tab === 'assets' && <AssetsTab {...props} />}
       {tab === 'users' && <UsersTab {...props} />}
     </>;
@@ -169,36 +175,94 @@ function ReviewTab({ write, locked, revision, refresh, setMessage }: TabProps) {
   </section>;
 }
 
-function GalleryTab({ write, locked, revision, refresh, setMessage }: TabProps) {
+/** Exhibit tiers from the pavilion layout: 镇阁 (S), 甲 (A), 乙 (B), each with its fitted maximum size. */
+const TIER_NAME = { S: '镇阁', A: '甲', B: '乙' } as const;
+const slotTier = (n: number) => { const s = slotInfo.get(slotMarker(n)); const key = (s?.tier ?? 'B') as keyof typeof TIER_NAME; return { key, name: TIER_NAME[key], maxSize: s?.fit?.maxSize ?? 0.8, place: (s?.label ?? '展位').split(' · ')[0] }; };
+const TIERS = (['S', 'A', 'B'] as const).map(key => { const slots = Array.from({ length: GALLERY_SLOT_COUNT }, (_, i) => i + 1).filter(n => slotTier(n).key === key); return { key, name: TIER_NAME[key], maxSize: slots.length ? slotTier(slots[0]).maxSize : 0, slots }; }).filter(t => t.slots.length);
+const slotShort = (n: number) => `${slotTier(n).name} · 展位 ${n}`;
+type GalleryFilter = 'all' | 'free' | 'placed' | 'user' | 'official';
+const GALLERY_FILTERS: Array<[GalleryFilter, string]> = [['all', '全部'], ['free', '未上展'], ['placed', '已上展'], ['user', '用户投稿'], ['official', '官方录入']];
+
+/**
+ * Candidate-first arrangement (T21): pick a candidate on the left, look at it on the right, choose its slot from
+ * the 30-slot panel, and publish all changes as one gallery version.
+ */
+function GalleryTab({ write, locked, revision, refresh, setMessage, onDirty }: TabProps & { onDirty: (dirty: boolean) => void }) {
   const gallery = useLoad<{ version: number; slots: Array<{ slotNo: number; candidateId: string | null }> }>('/admin/gallery', revision);
   const candidates = useLoad<Page<Candidate>>('/admin/candidates', revision);
   const [draft, setDraft] = useState<Array<string | null> | null>(null);
-  const [active, setActive] = useState<number | null>(null);
-  const [filter, setFilter] = useState<'all' | 'user' | 'official' | 'free'>('all');
+  const [selected, setSelected] = useState<string | null>(null);
+  const [picking, setPicking] = useState(false);
+  const [filter, setFilter] = useState<GalleryFilter>('all');
   const draftVersion = useRef<number | null>(null);
-  // Unrelated refreshes keep the unsaved arrangement; a new published version (or explicit reload) replaces it.
+  const picker = useRef<HTMLDivElement>(null), toggle = useRef<HTMLButtonElement>(null);
+  // Unrelated refreshes keep the unsaved arrangement; a new published version (or an explicit reload) replaces it.
   useEffect(() => { if (gallery.data && draftVersion.current !== gallery.data.version) { draftVersion.current = gallery.data.version; setDraft(gallery.data.slots.map(s => s.candidateId)); } }, [gallery.data]);
-  const byId = useMemo(() => new Map((candidates.data?.items ?? []).map(c => [c.id, c])), [candidates.data]);
+  const published = gallery.data?.slots.map(s => s.candidateId) ?? [];
+  const changes = draft ? draft.filter((c, i) => c !== published[i]).length : 0;
+  useEffect(() => { onDirty(changes > 0); }, [changes, onDirty]);
+  useEffect(() => () => onDirty(false), [onDirty]);
+  useEffect(() => {
+    if (!changes) return;
+    const warn = (e: BeforeUnloadEvent) => { e.preventDefault(); };
+    window.addEventListener('beforeunload', warn); return () => window.removeEventListener('beforeunload', warn);
+  }, [changes]);
+  useEffect(() => {
+    if (!picking) return;
+    const close = (e: MouseEvent | KeyboardEvent) => { if (e instanceof KeyboardEvent ? e.key === 'Escape' : !picker.current?.contains(e.target as Node) && !toggle.current?.contains(e.target as Node)) setPicking(false); };
+    window.addEventListener('keydown', close); window.addEventListener('mousedown', close);
+    return () => { window.removeEventListener('keydown', close); window.removeEventListener('mousedown', close); };
+  }, [picking]);
+  const all = candidates.data?.items ?? [];
+  const byId = useMemo(() => new Map(all.map(c => [c.id, c])), [all]);
+  const slotOf = (id: string) => draft ? draft.indexOf(id) + 1 : 0;
+  const list = all.filter(c => filter === 'all' || (filter === 'free' ? !slotOf(c.id) : filter === 'placed' ? slotOf(c.id) > 0 : c.source === filter));
+  // The first candidate is selected by default, and again whenever the filter hides the current one.
+  useEffect(() => { if (list.length && !list.some(c => c.id === selected)) setSelected(list[0].id); }, [list, selected]);
+  useEffect(() => { setPicking(false); }, [selected]);
   if (!draft || !gallery.data) return <p className="adm-muted">{gallery.error || candidates.error || '正在读取展位…'}</p>;
-  const changed = draft.some((c, i) => c !== gallery.data!.slots[i].candidateId);
-  const place = (slotIndex: number, candidateId: string | null) => setDraft(d => d!.map((c, i) => i === slotIndex ? candidateId : c === candidateId && candidateId ? null : c));
-  const list = (candidates.data?.items ?? []).filter(c => filter === 'all' || (filter === 'free' ? !draft.includes(c.id) : c.source === filter));
+  const current = selected ? byId.get(selected) ?? null : null;
+  const at = current ? slotOf(current.id) : 0;
+  /** Moves the candidate to the slot; whatever was there leaves the gallery. */
+  const assign = (slotNo: number, id: string) => { setDraft(d => d!.map((c, i) => i === slotNo - 1 ? id : c === id ? null : c)); setPicking(false); };
+  const remove = (id: string) => { setDraft(d => d!.map(c => c === id ? null : c)); setPicking(false); };
+  const discard = () => { draftVersion.current = null; setDraft(published); refresh(); };
   const save = () => write('/admin/gallery', 'PUT', { baseVersion: gallery.data!.version, slots: draft.map((candidateId, i) => ({ slotNo: i + 1, candidateId })) }, '确认上次发布', (r: { publishedVersion: number }) => {
     setMessage(`已发布展陈第 ${r.publishedVersion} 版。新进入或刷新的参观者看到新安排，已打开页面保持原展陈。`); refresh();
   });
+  const status = (id: string) => { const n = slotOf(id); return n ? slotShort(n) : '未上展'; };
   return <section className="adm-gallery">
-    <div className="adm-list-head"><h2>30 个展位 <small>当前第 {gallery.data.version} 版 · 已安排 {draft.filter(Boolean).length}/{GALLERY_SLOT_COUNT}</small></h2>
-      <div className="adm-actions-inline"><button type="button" disabled={locked} onClick={() => { draftVersion.current = null; refresh(); }}>载入最新安排</button><button type="button" disabled={locked || !changed} onClick={() => setDraft(gallery.data!.slots.map(s => s.candidateId))}>放弃修改</button><button type="button" className="bag-primary" disabled={locked || !changed} onClick={save}>保存并发布</button></div></div>
-    <p className="adm-muted">点选展位，再从候选库选择藏品；系统自动居中并适配大小，没有手动高度/旋转/缩放。同一候选只占一个展位，可以留空。撤下或替换只解除展位关系，不删除模型或用户小屋摆放。</p>
-    <div className="adm-slots">{draft.map((id, i) => { const c = id ? byId.get(id) : null; return <button type="button" key={i} className="adm-slot" aria-pressed={active === i} data-changed={id !== gallery.data!.slots[i].candidateId} onClick={() => setActive(i)}>
-      <small>{slotName(i + 1)}</small><strong>{c ? c.publicSnapshot.name : id ? '（候选不可用）' : '空'}</strong>{c && <span>{c.source === 'official' ? '官方馆藏' : c.publicSnapshot.sourceNickname}</span>}</button>; })}</div>
-    {active !== null && <div className="adm-picker">
-      <div className="adm-list-head"><h3>展位 {slotName(active + 1)}</h3><div className="adm-actions-inline"><select aria-label="候选筛选" value={filter} onChange={e => setFilter(e.target.value as typeof filter)}><option value="all">全部候选（{candidates.data?.items.length ?? 0}）</option><option value="free">未安排</option><option value="user">用户投稿</option><option value="official">官方录入</option></select>
-        <button type="button" disabled={!draft[active]} onClick={() => place(active, null)}>撤下此位</button><button type="button" className="bag-text-button" onClick={() => setActive(null)}>收起</button></div></div>
-      <div className="adm-cands">{list.map(c => { const at = draft.indexOf(c.id); return <button type="button" key={c.id} className="adm-cand" aria-pressed={draft[active] === c.id} onClick={() => place(active, c.id)}>
-        <strong>{c.publicSnapshot.name}</strong><span>{c.source === 'official' ? '官方馆藏' : `投稿 · ${c.publicSnapshot.sourceNickname}`}</span><small>{at >= 0 ? `当前在展位 ${at + 1}${at === active ? '' : '，选择后移到此位'}` : '未安排'}</small></button>; })}
-        {!list.length && <p className="adm-muted">没有符合条件的候选。</p>}</div>
-    </div>}
+    <div className="adm-gallery-bar">
+      <p><strong>展陈第 {gallery.data.version} 版</strong><span>已安排 {draft.filter(Boolean).length}/{GALLERY_SLOT_COUNT}</span>{changes > 0 && <span className="adm-unsaved">未保存 {changes} 处</span>}</p>
+      <div className="adm-actions-inline"><button type="button" disabled={locked} onClick={discard}>{changes ? '放弃修改' : '载入最新安排'}</button><button type="button" className="bag-primary" disabled={locked || !changes} onClick={save}>保存并发布</button></div>
+    </div>
+    <div className="adm-split">
+      <div className="adm-list">
+        <div className="adm-list-head"><h2>候选藏品 <small>{all.length} 件</small></h2>
+          <select aria-label="候选筛选" value={filter} onChange={e => setFilter(e.target.value as GalleryFilter)}>{GALLERY_FILTERS.map(([k, label]) => <option key={k} value={k}>{label}</option>)}</select></div>
+        {list.map(c => <button type="button" key={c.id} className="adm-row" aria-pressed={selected === c.id} data-changed={slotOf(c.id) !== published.indexOf(c.id) + 1} onClick={() => setSelected(c.id)}>
+          <strong>{c.publicSnapshot.name}</strong><span>{c.source === 'official' ? '官方馆藏' : `投稿 · ${c.publicSnapshot.sourceNickname}`}</span><small className={slotOf(c.id) ? 'adm-on-show' : undefined}>{status(c.id)}</small></button>)}
+        {candidates.data && !list.length && <p className="adm-muted">{all.length ? '没有符合条件的候选。' : '候选库还是空的：审核通过的投稿和后台上传的公共藏品会出现在这里。'}</p>}
+      </div>
+      <div className="adm-detail">
+        {!current ? <p className="adm-muted">{candidates.data ? '没有候选藏品。' : '正在读取候选…'}</p> : <>
+          <div className="adm-detail-head">
+            <div><h2>{current.publicSnapshot.name}</h2><p className="adm-muted">{current.source === 'official' ? '官方馆藏' : `投稿 · ${current.publicSnapshot.sourceNickname}${current.applicantUsername ? `（${current.applicantUsername}）` : ''}`} · 当前：{at ? `${slotShort(at)}（${slotTier(at).place}）` : '未上展'}</p></div>
+            <button type="button" ref={toggle} className="bag-primary" aria-expanded={picking} aria-haspopup="dialog" disabled={locked} onClick={() => setPicking(v => !v)}>{at ? '调整展位' : '安排展位'} {picking ? '▴' : '▾'}</button>
+          </div>
+            {picking && <div className="adm-slot-picker" ref={picker} role="dialog" aria-label={`为「${current.publicSnapshot.name}」选择展位`}>
+              {TIERS.map(t => <div key={t.key} className="adm-tier"><h3>{t.name} <small>展位 {t.slots[0]}{t.slots.length > 1 ? `–${t.slots.at(-1)}` : ''} · 最大边 {t.maxSize} m</small></h3>
+                <div className="adm-slots">{t.slots.map(n => { const id = draft[n - 1], occupant = id ? byId.get(id) : null, mine = id === current.id; return <button type="button" key={n} className="adm-slot" aria-current={mine || undefined} disabled={mine} data-changed={id !== published[n - 1]} onClick={() => assign(n, current.id)}>
+                  <small>{n} · {slotTier(n).place}</small><strong>{mine ? '当前位置' : occupant ? occupant.publicSnapshot.name : id ? '（候选不可用）' : '空'}</strong>{!mine && id && <span>替换「{occupant?.publicSnapshot.name ?? '不可用候选'}」</span>}</button>; })}</div></div>)}
+              <div className="adm-actions-inline">{at > 0 && <button type="button" className="adm-danger" onClick={() => remove(current.id)}>撤下展位</button>}<small className="adm-muted">选好后在顶部「保存并发布」；替换只解除展位关系，不删除模型。</small></div>
+            </div>}
+          <ModelPreview key={current.id} fileId={current.model.modelFileId} name={current.publicSnapshot.name} />
+          <p className="adm-desc">简介：{current.publicSnapshot.description}</p>
+          <Facts s={current.publicSnapshot} />
+          <small className="adm-muted">藏品放入展位后自动居中并按档位缩放，没有手动高度、旋转或缩放。</small>
+        </>}
+      </div>
+    </div>
   </section>;
 }
 
@@ -228,19 +292,13 @@ function AssetsTab({ write, locked, revision, refresh, setMessage }: TabProps) {
   // Same cap as the API's multipart fileSize; larger files are refused there, so skip parsing them here.
   const MAX_UPLOAD_BYTES = 100 * 1024 * 1024;
   const pickFile = (file: File | null) => { setUploadFile(file && /\.glb$/i.test(file.name) ? file : null); if (file) setSelected(null); };
-  const [imports, setImports] = useState<Array<{ id: string; name: string; status: string; errorCode?: string | null }>>([]);
-  useEffect(() => {
-    if (!imports.some(i => i.status === 'processing')) return;
-    const timer = setInterval(() => { for (const i of imports.filter(x => x.status === 'processing')) api<{ status: string; errorCode: string | null }>(`/admin/imports/${i.id}`).then(r => { if (r.status !== 'processing') { setImports(list => list.map(x => x.id === i.id ? { ...x, status: r.status, errorCode: r.errorCode } : x)); if (r.status === 'succeeded') refresh(); } }).catch(() => undefined); }, 2000);
-    return () => clearInterval(timer);
-  }, [imports, refresh]);
   function upload(event: FormEvent<HTMLFormElement>) {
     event.preventDefault(); const form = event.currentTarget, d = new FormData(form), file = d.get('file');
     if (!(file instanceof File) || !/\.glb$/i.test(file.name)) { setMessage('请选择 .glb 模型文件。'); return; }
     const body = new FormData(); body.set('sourceType', uploadKind);
     for (const k of uploadKind === 'furniture' ? ['name', 'description'] : PUBLIC_KEYS) body.set(k, String(d.get(k) ?? ''));
     body.set('file', file);
-    write('/admin/assets', 'POST', body, '确认上次上传', (r: { id: string }) => { setImports(list => [{ id: r.id, name: String(d.get('name')), status: 'processing' }, ...list]); setMessage('已受理，正在校验与渲染检查；通过后才会作为可用资产出现。'); form.reset(); setUploadFile(null); });
+    write('/admin/assets', 'POST', body, '确认上次上传', () => { setMessage('已受理，正在校验与渲染检查；结果见下方上传历史，通过后才会作为可用资产出现。'); form.reset(); setUploadFile(null); refresh(); });
   }
   async function more() { if (!cursor) return; const params = new URLSearchParams({ ...(source ? { source } : {}), ...(query ? { q: query } : {}), cursor }); const next = await api<Page<AdminAsset>>(`/admin/assets?${params}`); setExtra(x => [...x, ...next.items]); setCursor(next.nextCursor); }
   return <section className="adm-split">
@@ -253,8 +311,8 @@ function AssetsTab({ write, locked, revision, refresh, setMessage }: TabProps) {
         {uploadKind === 'furniture' ? <><label>名称<input name="name" required maxLength={80} disabled={locked} /></label><label>简介（选填）<textarea name="description" maxLength={2000} rows={2} disabled={locked} /></label></> : <PublicInputs locked={locked} key="official" />}
         <button type="submit" className="bag-primary" disabled={locked}>上传</button>
         <small className="adm-muted">{uploadKind === 'furniture' ? '官方物品成功后供所有用户布置，不需要文物资料。' : '公共藏品成功后直接进入候选库，署名“官方馆藏”，不自动展出、不进入官方物品。'}后台只接收现成模型，没有图片生成入口。</small>
-        {imports.map(i => <p key={i.id} className={i.status === 'failed' ? 'adm-error' : 'adm-muted'}>「{i.name}」{i.status === 'processing' ? '校验中…' : i.status === 'succeeded' ? '已可用' : `未通过校验（${i.errorCode ?? '未知'}），不会成为可用资产`}</p>)}
       </form>
+      <UploadHistory revision={revision} refresh={refresh} />
       <div className="adm-list-head"><h2>全部资产</h2></div>
       <form className="adm-filter" onSubmit={e => { e.preventDefault(); setQuery(q.trim()); }}>
         <select aria-label="来源" value={source} onChange={e => setSource(e.target.value)}><option value="">全部来源</option><option value="personal">用户个人</option><option value="furniture">官方物品</option><option value="official_candidate">公共藏品</option></select>
@@ -295,6 +353,49 @@ function AssetsTab({ write, locked, revision, refresh, setMessage }: TabProps) {
         </div>}
       </>}
     </div>
+  </section>;
+}
+
+/** Every official-item / public-collection upload with its outcome; failures say why in words, not error codes. */
+function UploadHistory({ revision, refresh }: { revision: number; refresh: () => void }) {
+  const [kind, setKind] = useState(''), [poll, setPoll] = useState(0);
+  // Both counters only grow, so their sum changes whenever either asks for a reload.
+  const { data, error } = useLoad<Page<ImportItem>>(`/admin/imports${kind ? `?source=${kind}` : ''}`, revision + poll);
+  const [extra, setExtra] = useState<ImportItem[]>([]), [cursor, setCursor] = useState<string | null>(null);
+  // A new filter or upload starts over; a 2 s status poll only refreshes the first page and keeps what 「加载更多」 added.
+  const listKey = `${kind}|${revision}`, loadedFor = useRef('');
+  useEffect(() => {
+    if (!data) return;
+    if (loadedFor.current !== listKey) { loadedFor.current = listKey; setExtra([]); setCursor(data.nextCursor ?? null); return; }
+    const fresh = new Set(data.items.map(i => i.id));
+    setExtra(x => x.filter(i => !fresh.has(i.id)));
+  }, [data]); // eslint-disable-line react-hooks/exhaustive-deps
+  const items = [...(data?.items ?? []), ...extra];
+  const processing = useRef(new Set<string>());
+  useEffect(() => {
+    if (!data) return;
+    const now = new Set(data.items.filter(i => i.status === 'processing').map(i => i.id));
+    // An upload that just finished successfully adds an asset to the list beside it.
+    if (data.items.some(i => i.status === 'succeeded' && processing.current.has(i.id))) refresh();
+    processing.current = now;
+    if (!now.size) return;
+    const timer = setTimeout(() => setPoll(p => p + 1), 2000);
+    return () => clearTimeout(timer);
+  }, [data, refresh]);
+  async function more() { if (!cursor) return; const params = new URLSearchParams({ ...(kind ? { source: kind } : {}), cursor }); const next = await api<Page<ImportItem>>(`/admin/imports?${params}`); setExtra(x => [...x, ...next.items]); setCursor(next.nextCursor); }
+  return <section className="adm-history" aria-label="上传历史">
+    <div className="adm-list-head"><h2>上传历史</h2>
+      <select aria-label="上传类型" value={kind} onChange={e => setKind(e.target.value)}><option value="">全部类型</option><option value="furniture">官方物品</option><option value="official_candidate">公共藏品</option></select>
+    </div>
+    {error && <p className="adm-error">{error}</p>}
+    {data && !items.length && <p className="adm-muted">还没有上传记录。</p>}
+    <ol className="adm-imports">{items.map(i => <li key={i.id} className="adm-import">
+      <div className="adm-import-head"><strong>{i.name}</strong><span className="adm-status" data-status={i.status}>{IMPORT_STATUS[i.status]}</span></div>
+      <small>{IMPORT_KIND[i.sourceType]} · {time(i.createdAt)} · {fileSize(i.byteSize)}{i.assetDeleted ? ' · 资产已删除' : ''}</small>
+      {i.status === 'processing' && <small>正在校验格式、资源预算并做渲染检查…</small>}
+      {i.failure && <p className="adm-import-reason">{i.failure.message}</p>}
+    </li>)}</ol>
+    {cursor && <button type="button" onClick={() => void more()}>加载更多</button>}
   </section>;
 }
 

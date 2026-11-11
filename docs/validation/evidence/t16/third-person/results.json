@@ -1,14 +1,14 @@
 {
   "base": "http://localhost:5173",
   "browser": "157.0.8103.50",
-  "started": "2026-11-10T16:22:08.432Z",
+  "started": "2026-11-11T09:30:26.400Z",
   "cameraProbe": {
     "views": 27720,
-    "shortened": 8429,
+    "shortened": 8500,
     "hits": []
   },
   "exhibitDetail": {
-    "slot": "T02",
+    "slot": "T03",
     "opened": true
   },
   "characters": [
@@ -25,22 +25,22 @@
     {
       "label": "黄衣牛角人",
       "id": "bull-tpose",
-      "height": 1.5
+      "height": 1.501
     },
     {
       "label": "红衣小丸子",
       "id": "maruko-tpose",
-      "height": 1.5
+      "height": 1.501
     },
     {
       "label": "蜡笔小新",
       "id": "shin-chan",
-      "height": 1.5
+      "height": 1.501
     },
     {
       "label": "拟人橘猫",
       "id": "humanoid-tabby",
-      "height": 1.5
+      "height": 1.501
     }
   ],
   "hints": {
@@ -59,23 +59,23 @@
     ]
   },
   "fps": {
-    "first": 60,
+    "first": 59.8,
     "third": 60.2,
     "note": "headless Chrome; M5 real-device numbers are the acceptance basis"
   },
   "renderInfo": {
-    "calls": 97,
-    "triangles": 1248611
+    "calls": 106,
+    "triangles": 1994175
   },
   "roomSpeed": {
-    "walk": 5.13,
-    "shift": 8.87
+    "walk": 5.15,
+    "shift": 8.63
   },
   "room": {
     "indoorCamera": [
       0,
       2.385741858544196,
-      -0.17010695090803374
+      -0.16958695090802944
     ],
     "indoorBoom": 3.2,
     "sharedCharacter": "pink-shorts-girl",
