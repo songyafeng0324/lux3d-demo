@@ -5,6 +5,7 @@
 // real Chrome and splits every request by when it started: before the intro screen (「进入藏宝阁」)
 // appeared = the first screen, while the intro was showing, and after entering.
 // Usage (repo root, after `npm run build`): node scripts/first-screen-bytes.mjs [--throttle-mbps=10] [--out=path.json]
+//   BASE=https://yafeng.fun measures a deployed site instead (no local server; real network, real gallery).
 //   CHROME_CHANNEL=chrome (set empty to use Playwright's Chromium)
 import { chromium } from 'playwright';
 import http from 'node:http';
@@ -37,8 +38,8 @@ const server = http.createServer(async (req, res) => {
   res.writeHead(200, { 'content-type': TYPES[ext] ?? 'application/octet-stream', 'content-length': body.length, ...(gzip ? { 'content-encoding': 'gzip' } : {}) });
   res.end(body);
 });
-await new Promise(r => server.listen(0, '127.0.0.1', r));
-const base = `http://127.0.0.1:${server.address().port}`;
+if (!process.env.BASE) await new Promise(r => server.listen(0, '127.0.0.1', r));
+const base = process.env.BASE?.replace(/\/$/, '') || `http://127.0.0.1:${server.address().port}`;
 
 const channel = process.env.CHROME_CHANNEL ?? 'chrome';
 const browser = await chromium.launch({ headless: true, ...(channel ? { channel } : {}), args: ['--enable-unsafe-swiftshader'] });
@@ -103,5 +104,5 @@ try {
   }
 } finally {
   await browser.close();
-  server.close();
+  if (server.listening) server.close();
 }
