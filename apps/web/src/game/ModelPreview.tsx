@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, type ReactNode } from 'react';
 import * as T from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { disposeResources } from '../scene/assets.js';
@@ -7,8 +7,9 @@ import { configurePreview, framePreview, parsePreviewModel, previewScene, readPr
 /**
  * `headers` carries a snapshot grant for public exhibits; without it the visitor's own login is used.
  * `file` previews a local GLB instead (the administrator's upload before it is sent).
+ * `notice` is laid over the top of the preview (the public exhibit's AI-generated disclaimer).
  */
-export default function ModelPreview({ fileId, file, name, headers, showHint = true }: { fileId?: string; file?: Blob; name: string; headers?: Record<string, string>; showHint?: boolean }) {
+export default function ModelPreview({ fileId, file, name, headers, showHint = true, notice }: { fileId?: string; file?: Blob; name: string; headers?: Record<string, string>; showHint?: boolean; notice?: ReactNode }) {
   const headerKey = JSON.stringify(headers ?? null);
   const host = useRef<HTMLDivElement>(null);
   const [status, setStatus] = useState('正在载入模型…');
@@ -82,6 +83,7 @@ export default function ModelPreview({ fileId, file, name, headers, showHint = t
   }, [fileId, file, name, headerKey]);
   return <div className="bag-preview-wrap">
     <div className="bag-preview" ref={host} />
+    {notice}
     {status && <p className="bag-preview-status" role={failed ? 'alert' : 'status'}>{status}</p>}
     {!status && showHint && <small className="bag-preview-hint">拖动旋转 · 滚轮缩放</small>}
   </div>;

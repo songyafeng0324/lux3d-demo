@@ -248,7 +248,7 @@ export class RoomEngine {
       // Push the item clear of posts, walls, the step and the platform edge (editor only; saving does not depend on it).
       const before = this.boxOf(placement), resting = before.min[1] - supportUnder(before, this.others).y <= REST_GAP;
       const shift = settlePlacement(before);
-      if (!shift) problem = '物品会碰到柱子、墙体或悬在台基边缘';
+      if (!shift) problem = '物品会碰到柱子、墙体、屋檐或悬在台基边缘';
       else {
         object.position.add(new T.Vector3(...shift)); object.updateMatrixWorld(true);
         if (resting) { const box = this.boxOf(this.readPlacement(this.selected)); object.position.y += supportUnder(box, this.others).y - box.min[1]; object.updateMatrixWorld(true); }

@@ -14,6 +14,8 @@ export async function buildApp(config = loadConfig()) {
   const app = Fastify({
     logger: { redact: ['req.headers.authorization', 'req.headers.cookie', 'res.headers["set-cookie"]'] },
     disableRequestLogging: true,
+    // Behind Nginx request.ip is the visitor from X-Forwarded-For, so per-IP rate limits and the T04 local-only check stay per visitor.
+    trustProxy: config.trustProxy,
   });
 
   app.setErrorHandler((error, request, reply) => {

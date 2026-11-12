@@ -316,7 +316,7 @@ export default function Room({ shareToken }: { shareToken?: string }) {
     <header className="scene-header">
       <a className="brand" href="/"><span className="seal">藏</span><span>个人小屋<small>MY LITTLE COLLECTION</small></span></a>
       <span className="room-identity">{visitor ? '只读参观' : owner?.user.nickname ?? '我的空间'}</span>
-      {visitor ? <nav className="room-header-actions" aria-label="参观菜单">{!sceneBlocked && <CharacterButton onClick={() => openOverlay('character')} />}<a className="service-link" href="/">返回藏宝阁</a></nav> : <nav className="room-header-actions" aria-label="小屋菜单">
+      {visitor ? <nav className="room-header-actions" aria-label="参观菜单">{!sceneBlocked && <CharacterButton onClick={() => openOverlay('character')} />}<a className="service-link" href="/room">返回我的小屋</a><a className="service-link" href="/">返回藏宝阁</a></nav> : <nav className="room-header-actions" aria-label="小屋菜单">
         {mode !== 'edit' && !sceneBlocked && <CharacterButton onClick={() => openOverlay('character')} />}
         {mode === 'edit' && !drawerOpen && <button type="button" onClick={openCatalog}>打开物品库</button>}
         <button type="button" disabled={!owner} onClick={() => openOverlay('discover')}>逛一逛</button>

@@ -289,7 +289,9 @@ export default function Game() {
 function ExhibitInfo({ data, headers, login }: { data: ExhibitDetail; headers?: Record<string, string>; login: () => void }) {
   const url = /^https?:\/\//i.test(data.officialUrl) ? data.officialUrl : '';
   return <div className="t10-exhibit-body">
-    <ModelPreview fileId={data.model.modelFileId} name={data.name} headers={headers} />
+    <ModelPreview fileId={data.model.modelFileId} name={data.name} headers={headers} notice={
+      <p className="t10-ai-notice" role="note"><span>AI 生成</span>与实物可能有偏差，仅供观赏</p>
+    } />
     <div className="t10-exhibit-text">
       <div className="t10-exhibit-title"><h2>{data.name}</h2>{headers && <CollectExhibit key={data.candidateId} candidateId={data.candidateId} headers={headers} login={login} />}</div>
       <p className="t10-exhibit-source">{data.source === 'official' ? '官方馆藏' : `作者：${data.sourceNickname}`}</p>

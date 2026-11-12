@@ -50,6 +50,10 @@ kbd{display:inline-grid;place-items:center;min-width:20px;height:20px;padding:0 
 .t10-exhibit-body{display:grid;grid-template-columns:minmax(0,3fr) minmax(0,1fr);gap:clamp(12px,1.3vw,24px);flex:1;min-height:0}
 .t10-exhibit-body .bag-preview-wrap{margin:0;position:relative;min-height:0;border:1px solid var(--line);border-radius:8px;background:radial-gradient(ellipse at 50% 40%,rgba(214,176,104,.12),rgba(0,0,0,.25));overflow:hidden}
 .t10-exhibit-body .bag-preview{position:absolute;inset:0;height:auto}.t10-exhibit-body .bag-preview canvas{display:block;width:100%;height:100%}
+/* AI 生成提醒：金框小字章 + 一行说明，浮在预览顶部正中，不挡拖动。 */
+.t10-ai-notice{position:absolute;top:clamp(12px,2.2vh,24px);left:50%;transform:translateX(-50%);z-index:1;display:flex;align-items:center;gap:10px;max-width:calc(100% - 24px);margin:0!important;padding:7px 14px 7px 8px;border:1px solid rgba(214,176,104,.42);border-radius:6px;background:rgba(14,10,8,.72);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);color:var(--paper);font-size:13px!important;line-height:1.4!important;letter-spacing:.06em;white-space:nowrap;pointer-events:none}
+.t10-ai-notice span{flex:none;padding:2px 7px;border:1px solid var(--gold);border-radius:3px;color:var(--gold);font-size:12px;font-weight:600;letter-spacing:.14em;box-shadow:inset 0 0 0 2px rgba(14,10,8,.72),inset 0 0 0 3px rgba(214,176,104,.35)}
+@media(max-width:520px){.t10-ai-notice{white-space:normal;font-size:12px!important}}
 .t10-exhibit-text{display:flex;flex-direction:column;gap:10px;min-width:0;min-height:0;overflow:auto;overscroll-behavior:contain;padding-right:8px}.t10-exhibit-text h2{margin:0;font-size:24px}
 .t10-exhibit-title{display:flex;align-items:flex-start;flex-wrap:wrap;gap:8px 12px}
 .t10-exhibit-title h2{overflow-wrap:anywhere}

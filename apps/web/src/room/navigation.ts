@@ -1,6 +1,6 @@
 import { ROOM_BOUNDS, ROOM_COURTYARD_BOUNDS, roomPlacementBounds, roomPlacementFloor, type Bounds, type RoomPlacement } from '@aholo/contracts';
 import { BODY, playerOverlaps, supportAt, type BoxCollider, type CircleCollider, type Collider, type FirstPerson, type WalkingWorld } from '../game/navigation.js';
-import { BEAM_SOFFIT, FENCE, FLOOR_Y, GROUND_Y, HOUSE, LANTERN, LANTERNS, PLATFORM, POST, POSTS, PORCH_STEP, WALL, WALL_TOP, lanternCentreY } from './layout.js';
+import { BEAM_SOFFIT, FENCE, FLOOR_Y, GROUND_Y, HOUSE, LANTERN, LANTERNS, PLATFORM, POST, POSTS, PORCH_STEP, ROOF, WALL, WALL_TOP, lanternCentreY } from './layout.js';
 
 export { PORCH_STEP } from './layout.js';
 const ground = GROUND_Y;
@@ -82,7 +82,7 @@ export function roomEntrance(world: WalkingWorld): FirstPerson {
     }
   }
 
-  // Even if the whole ground is covered, start above the outdoor path and land on the first surface.
+  // Even if the whole ground is covered, start above the tallest item allowed over the path and land on the first surface.
   return { ...path, y: ROOM_COURTYARD_BOUNDS.max[1], velocityY: 0 };
 }
 
@@ -105,6 +105,8 @@ const STRUCTURE: Block[] = [
     : { x0: c.x0, x1: c.x1, z0: c.z0, z1: c.z1, y0: c.y0, y1: c.y1 }),
   { x0: PORCH_STEP.x0, x1: PORCH_STEP.x1, z0: PORCH_STEP.z0, z1: PORCH_STEP.z1, y0: ground, y1: PORCH_STEP.y },
   ...LANTERNS.map(([x, z]) => ({ x0: x - LANTERN.radius, x1: x + LANTERN.radius, z0: z - LANTERN.radius, z1: z + LANTERN.radius, y0: lanternCentreY() - LANTERN.radius * LANTERN.stretch - .1, y1: BEAM_SOFFIT })),
+  // Roof with its eaves: indoor items stop at the beams, so this only stops tall courtyard items poking into the eaves.
+  { x0: -HOUSE.x - ROOF.overhangX, x1: HOUSE.x + ROOF.overhangX, z0: -HOUSE.z - ROOF.overhangZ, z1: HOUSE.z + ROOF.overhangZ, y0: HOUSE.height, y1: HOUSE.height + ROOF.rise + ROOF.curl + .3 },
 ];
 const GAP = .02, TOUCH = 1e-3;
 const overlaps = (b: Bounds, o: Block) => b.min[0] < o.x1 - TOUCH && b.max[0] > o.x0 + TOUCH && b.min[2] < o.z1 - TOUCH && b.max[2] > o.z0 + TOUCH && b.min[1] < o.y1 - TOUCH && b.max[1] > o.y0 + TOUCH;
@@ -118,7 +120,7 @@ const straddles = (b: Bounds) => {
 /** Which fixed part a placement runs into, if any (the editor outlines it red). */
 export function placementConflict(b: Bounds): string | null {
   if (straddles(b)) return '物品跨在台基边缘，一部分会悬空';
-  return STRUCTURE.some(o => overlaps(b, o)) ? '物品碰到了柱子、墙体或台阶' : null;
+  return STRUCTURE.some(o => overlaps(b, o)) ? '物品碰到了柱子、墙体、台阶或屋檐' : null;
 }
 
 const shortest = (...shifts: number[]) => shifts.reduce((a, b) => Math.abs(b) < Math.abs(a) ? b : a);

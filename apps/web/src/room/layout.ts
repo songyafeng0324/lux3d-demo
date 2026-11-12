@@ -1,4 +1,4 @@
-import { ROOM_BOUNDS, ROOM_COURTYARD_BOUNDS, ROOM_PLATFORM_HALF } from '@aholo/contracts';
+import { ROOM_BOUNDS, ROOM_COURTYARD_BOUNDS, ROOM_PLATFORM_HALF, ROOM_ROOF_RISE } from '@aholo/contracts';
 
 /**
  * T17 house and courtyard layout. The scene (house.ts, courtyard.ts) and the walking and
@@ -40,7 +40,7 @@ export const FENCE = {
 } as const;
 
 /** Swept gable roof: height above the posts at |x| (ridge along z). Shared by the roof strips and the purlins. */
-export const ROOF = { overhangX: .9, overhangZ: .75, rise: 1.8, curl: .55, thickness: .13 } as const;
+export const ROOF = { overhangX: .9, overhangZ: .75, rise: ROOM_ROOF_RISE, curl: .55, thickness: .13 } as const;
 export function roofHeight(x: number) {
   const a = Math.min(Math.abs(x) / (HOUSE.x + ROOF.overhangX), 1);
   return HOUSE.height + ROOF.rise * (1 - a) + ROOF.curl * a * a * a;

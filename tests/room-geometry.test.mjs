@@ -15,3 +15,12 @@ test('formal layout uses asset UUID/bounds and checks transformed corners rather
  assert.ok(validateRoomLayout('拒绝',[p,p],all));
 });
 test('formal layout keeps all repeated placements and imposes no item-count ceiling',()=>{const many=Array.from({length:5000},(_,n)=>({...p,id:'placement_'+n}));assert.equal(validateRoomLayout('完整大布局',many,all),null);assert.equal(many.length,5000);});
+test('height limit: under the beams over the house platform, three houses high out in the courtyard',()=>{
+ const tallId='2b0c8f8e-7a59-4a8e-9f3e-6f0d2c1b9a10',tall={min:[-.25,0,-.25],max:[.25,1,.25]},both=new Map([[id,bounds],[tallId,tall]]);
+ const q={id:'tall',assetId:tallId,position:[12,-.4,9],rotation:[0,0,0],scale:20};
+ assert.equal(validateRoomLayout('庭院高物',[q],both),null,'courtyard item well above the roof ridge');
+ assert.equal(validateRoomLayout('庭院上限',[{...q,scale:21}],both),null,'top at 20.6 m = three houses');
+ assert.ok(validateRoomLayout('超出庭院高度',[{...q,scale:21.1}],both));
+ assert.equal(validateRoomLayout('屋内贴梁',[{...p,scale:4.8}],both),null);
+ assert.ok(validateRoomLayout('屋内顶穿房梁',[{...p,scale:4.81}],both));
+});

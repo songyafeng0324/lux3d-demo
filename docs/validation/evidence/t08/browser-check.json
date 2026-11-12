@@ -1,6 +1,6 @@
 {
  "pass": true,
- "chrome": "157.0.8103.50",
+ "chrome": "157.0.8103.78",
  "os": "Darwin 25.6.0 arm64",
  "viewport": [
   1440,
@@ -10,36 +10,36 @@
  "checks": [
   {
    "name": "user submits a backpack model with full public data, withdraws and resubmits",
-   "ms": 2067
+   "ms": 1828
   },
   {
    "name": "admin reviews earliest pending with rotatable model and original, approves into candidates",
-   "ms": 2523
+   "ms": 2351
   },
   {
    "name": "admin arranges slots 1/2/19 from more candidates and publishes one gallery version",
-   "ms": 628
+   "ms": 483
   },
   {
    "name": "visitor sees real exhibits fitted on plinths in the full-viewport pavilion and opens E detail",
-   "ms": 5109
+   "ms": 2779
   },
   {
    "name": "T13 collection preview, current author, room save, share and uncollect",
-   "ms": 35384
+   "ms": 9766
   },
   {
    "name": "admin adjusts only today's quota for the collector",
-   "ms": 305
+   "ms": 210
   },
   {
    "name": "risk delete clears room placement, candidate and slot; open page keeps loaded scene, refresh shows the result",
-   "ms": 3156
+   "ms": 1314
   },
   {
    "name": "T14 room shortcut, porch entrance, signed-in directory and irreversible likes",
-   "ms": 9080
+   "ms": 8454
   }
  ],
- "ms": 61891
+ "ms": 29977
 }

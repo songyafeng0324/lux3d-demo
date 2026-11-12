@@ -24,7 +24,7 @@
 - 用户当前明确指令优先于 Skill、历史记忆和默认偏好；已授权的初始化及必要文档维护直接执行，不重复确认。
 - 只有真正独立、能节省时间或提升质量的工作流才委派；共享状态和连续决策由主 Agent 处理。
 - 网页控制台无 CLI/API 时使用已登录 Chrome；飞书优先 `lark-cli`。
-- 2026-11-05 用户明令：构建、测试、数据库与浏览器验证只在用户 Mac 本机执行，禁止在云端容器跑；需要执行命令时在 Mac 终端运行。
+- 2026-11-05 用户明令：构建、测试、数据库与浏览器验证只在用户 Mac 本机执行，禁止在云端容器跑；需要执行命令时在 Mac 终端运行。部署与线上检查可以在阿里云香港服务器上执行；开发阶段的单元测试和浏览器回归仍在 Mac 本机跑。
 - 2026-11-10 用户确认的检查与提交节奏：
   - 每次改动后都跑单元测试 `npm test`；纯视觉调整没有对应测试时，用截图核对并说明原因。
   - 浏览器回归（`test:t10`、`test:t15`、`test:t08`）和跨模型评审，在用户要求提交 Git 前统一运行；改动明显涉及行走、镜头或展品时，提醒用户可提前跑对应那一项，由用户决定。
@@ -74,7 +74,7 @@
 
 ## 项目边界与产品依据
 - 当前按单一项目边界管理；T02 本地实施基线见 `docs/architecture/MVP技术方案.md`，合同见 `docs/contracts/数据与接口契约.md`，验证项未关闭前不宣称参数全部冻结。
-- 2026-11-04 起先在 MacBook 本地跑通，云资源/区域/预算暂缓；最新范围增量见 `docs/product/2026-11-04-本地优先确认.md`，在对应事项上优先于此前补充。本地资产走私有 LocalFileStore，数据库保持 PostgreSQL，避免换用不同事务语义。
+- 2026-11-04 起先在 MacBook 本地跑通，云资源/区域/预算暂缓；最新范围增量见 `docs/product/2026-11-04-本地优先确认.md`，在对应事项上优先于此前补充。本地资产走私有 LocalFileStore，数据库保持 PostgreSQL，避免换用不同事务语义。2026-11-12 起公开上线：主站部署在阿里云香港轻量服务器（4 核 8 GB），走 https，不限制注册和生成总量；理由见 `flow/decisions.md`。
 - 当前产品基线：`docs/product/藏宝阁与个人小屋-MVP-PRD-v2.0.md` 与 `docs/product/2026-11-03-需求补充确认.md`；后者记录已确认增量并在相应事项上优先。基线不能标为已实现或已通过验收。
 - T12 试玩规则见 `docs/product/2026-11-06-试玩功能调整.md`，对应事项优先。默认生成额度为每天 10 次，实际使用量及管理员当日覆盖继续由 PostgreSQL 结算。
 - T13 展品收藏规则见 `docs/product/2026-11-07-展品收藏与背包改版.md` 与数据契约第 12 节。收藏读取当前获审公共名称和作者昵称，取消收藏原子清理本人小屋的对应摆放并撤销旧分享的该模型权限。
@@ -112,7 +112,7 @@
 - 分享稳定token加密、grant256bit摘要/原版/epoch隔离，文件有grant头就不能回退cookie扩大权限；关闭/重开不复活旧grant。源删除后的完整布局/展陈清理由T08负责。
 - T14 目录纳入全部开启分享的小屋，登录后可浏览。点赞按房间和访客账号唯一且不可撤销，使用会话及当前分享凭证，关分享后下榜并拒绝旧凭证写入。契约见数据契约第 13 节。
 - 官方物品（界面名，接口与 source_type 仍为 furniture）源与 manifest 在 assets/furniture，构建/幂等导入用 scripts/build-furniture.mjs 和 seed-furniture.mjs；清单不再列出的系统物品会被风险删除并移出所有布局。系统来源记录不能登录，不替代正常管理员种子。
-- T17 小屋：九宫格草地（台基为中格）加外圈木栅栏；建筑、庭院、行走和编辑器防穿模共用 `apps/web/src/room/layout.ts`，改几何先改这里；贴图复用 T16 的 CC0 集（`room/textures.ts`）。可穿行物品由资产 `walk_through` 决定。T19 物品间碰撞与叠放只在编辑器（`room/navigation.ts` 的 `supportUnder`/`ridersOf`/`itemConflict`）：中心落在占地不小于它的物品上方即叠放，上层随下层移动，与其他物品重叠整组弹回；服务端不校验重叠，旧布局照常可存。截图核对用 `node scripts/t17-room-shots.mjs`（临时库）。
+- T17 小屋：九宫格草地（台基为中格）加外圈木栅栏；建筑、庭院、行走和编辑器防穿模共用 `apps/web/src/room/layout.ts`，改几何先改这里；贴图复用 T16 的 CC0 集（`room/textures.ts`）。可穿行物品由资产 `walk_through` 决定。T19 物品间碰撞与叠放只在编辑器（`room/navigation.ts` 的 `supportUnder`/`ridersOf`/`itemConflict`）：中心落在占地不小于它的物品上方即叠放，上层随下层移动，与其他物品重叠整组弹回；服务端不校验重叠，旧布局照常可存。截图核对用 `node scripts/t17-room-shots.mjs`（临时库）。高度上限由 `roomPlacementCeiling` 按位置区分：压在台基上的物品以房梁 4.8 m 为顶，纯庭院的物品顶为三座房子高（20.6 m），屋檐算编辑器障碍。改了 `packages/contracts` 的导出，跑 `npm test` 前先 `npm run build:core`。
 
 ## T08 投稿、后台与展陈
 - 实现入口 `apps/api/src/curation.ts`、`apps/web/src/admin/`、首页 `game/Game.tsx`/`engine.ts`；合同第10节，验证见 `docs/validation/后台展陈验证.md`。
