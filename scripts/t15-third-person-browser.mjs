@@ -92,10 +92,19 @@ async function pavilion() {
   });
   if (exhibit) {
     await page.locator('.t10-prompt').waitFor({ timeout: 5000 });
+    // The preview borrows the model the hall already loaded: no second download of the exhibit file.
+    const fetched = [], onRequest = r => { if (r.url().includes('/api/v1/files/')) fetched.push(r.url()); };
+    page.on('request', onRequest);
+    const t0 = Date.now();
     await page.keyboard.press('KeyE');
     await page.locator('.t10-detail').waitFor();
+    await page.locator('.t10-detail canvas').waitFor();
+    await page.waitForFunction(() => !document.querySelector('.t10-detail .bag-preview-status'), null, { timeout: 30000 });
+    const previewMs = Date.now() - t0;
+    page.off('request', onRequest);
     await shot(page, '07-pavilion-exhibit-detail.png');
-    results.exhibitDetail = { slot: exhibit, opened: true };
+    assert.deepEqual(fetched, [], 'E detail downloaded the exhibit file again');
+    results.exhibitDetail = { slot: exhibit, opened: true, previewMs, refetched: fetched.length };
     await page.keyboard.press('Escape');
   } else results.exhibitDetail = { opened: false, reason: 'gallery has no exhibit' };
 

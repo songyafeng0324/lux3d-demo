@@ -226,6 +226,7 @@ test('the runtime pavilion (scripts/compress-t16.mjs) was built from the current
     assert.ok(entry, `no runtime copy of ${f}`);
     assert.equal(entry.sourceSHA256, sha(read(`lightmaps/${f}`)), `${f}: ${stale}`);
     assert.equal(entry.sha256, sha(read(`runtime/lightmaps/${entry.file}`)), entry.file);
+    assert.equal(entry.preview.sha256, sha(read(`runtime/lightmaps/${entry.preview.file}`)), entry.preview.file);
   }
   // The runtime GLB must keep what the web relies on: the lightmap UV set, GPU instances, KTX2, meshopt.
   const glb = read(`runtime/${rt.glb.file}`), json = JSON.parse(glb.subarray(20, 20 + glb.readUInt32LE(12)));
@@ -237,6 +238,14 @@ test('the runtime pavilion (scripts/compress-t16.mjs) was built from the current
     assert.ok(mi >= 0 && prims.length && prims.every(p => 'TEXCOORD_1' in p.attributes), `${name}: TEXCOORD_1 (lightmap UVs) on every primitive`);
   }
   assert.ok(json.images.every(i => i.mimeType === 'image/ktx2'), 'every texture is KTX2');
+  // First screen: the GLB holds small previews only, each named after its full-size file in runtime/textures/.
+  const names = json.images.map(i => i.name);
+  assert.equal(new Set(names).size, names.length, 'preview names are unique (the web maps them to full-size files)');
+  assert.deepEqual(names.slice().sort(), Object.keys(rt.textures).sort(), 'every GLB texture has exactly one full-size file');
+  for (const [name, t] of Object.entries(rt.textures)) assert.equal(t.sha256, sha(read(`runtime/textures/${t.file}`)), name);
+  const previewBytes = json.images.reduce((n, i) => n + json.bufferViews[i.bufferView].byteLength, 0);
+  assert.ok(previewBytes < 600e3, `GLB previews weigh ${previewBytes} bytes`);
+  assert.ok(glb.length < 5e6, `first-screen GLB is ${glb.length} bytes`);
 });
 
 test('standing on a plinth top (a collider, not a walk surface) still walks across it and steps off', () => {

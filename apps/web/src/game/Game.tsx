@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
+import type * as T from 'three';
 import { PavilionEngine, type HudState } from './engine.js';
 import type { ExhibitSlot } from './navigation.js';
 import './game.css';
@@ -29,6 +30,8 @@ export default function Game() {
   const [phase, setPhase] = useState<Phase>('loading');
   const [overlay, setOverlay] = useState<Overlay>(null);
   const [progress, setProgress] = useState(0);
+  /** Full-size textures replacing the first-screen previews (null = not started). */
+  const [detailProgress, setDetailProgress] = useState<number | null>(null);
   const [error, setError] = useState('');
   const [hud, setHud] = useState<HudState>({ floor: 'ground', target: null, fps: 0, calls: 0 });
   const [detail, setDetail] = useState<ExhibitSlot | null>(null);
@@ -53,6 +56,7 @@ export default function Game() {
     try {
       instance = new PavilionEngine(host.current, {
         progress: setProgress,
+        detail: setDetailProgress,
         ready: () => { setPhase('intro'); void loadGallery(instance); },
         failed: message => { setError(message); setPhase('failed'); },
         hud: setHud,
@@ -78,9 +82,10 @@ export default function Game() {
         const view = await api<GalleryView>('/gallery', { cache: 'no-store', credentials: 'omit' });
         if (stopped || seq !== gallerySeq) return;
         grant.current = view.grant; setGallery(view);
-        const result = await target.setExhibits(view.slots, grantHeaders(view.grant));
-        if (!stopped && result.failed) setGalleryNotice(`${result.failed} 件展品暂时无法载入，刷新后重试。`);
+        // Renew from now on, not after the exhibits: they wait for the visitor to enter, however long that takes.
         scheduleRenew();
+        const result = await target.setExhibits(view.slots, () => grantHeaders(grant.current ?? view.grant));
+        if (!stopped && result.failed) setGalleryNotice(`${result.failed} 件展品暂时无法载入，刷新后重试。`);
       } catch { if (!stopped && seq === gallerySeq) setGalleryNotice('展陈暂时无法读取，展位显示为空；刷新后重试。'); }
     }
     function scheduleRenew() {
@@ -201,7 +206,7 @@ export default function Game() {
         {avatarNotice && !overlay && <div className="t10-notice" role="status">{avatarNotice}</div>}
         <footer className="t10-hud-bottom">
           <span>{WALK_HINT}</span>
-          <span className="t10-meta">{gallery ? `展出 ${shown} / 30` : '展陈读取中'} · {hud.fps} FPS</span>
+          <span className="t10-meta">{detailProgress !== null && detailProgress < 1 && `高清贴图 ${Math.floor(detailProgress * 100)}% · `}{gallery ? `展出 ${shown} / 30` : '展陈读取中'} · {hud.fps} FPS</span>
         </footer>
       </>}
 
@@ -224,6 +229,7 @@ export default function Game() {
         <h1>藏宝阁</h1>
         <p className="t10-sub">通高天井 · 三十展位 · 北殿大楼梯可上二层</p>
         <button type="button" className="t10-primary" onClick={play} autoFocus>进入藏宝阁</button>
+        {detailProgress !== null && detailProgress < 1 && <p className="t10-hint" role="status">高清贴图载入中 · {Math.floor(detailProgress * 100)}%（可以先进入）</p>}
         <p className="t10-hint">{WALK_HINT}</p>
         <p className="desktop-input-hint">请使用配有键盘和鼠标的电脑操作 3D 场景。</p>
       </div>}
@@ -276,7 +282,7 @@ export default function Game() {
             <h2>虚位以待</h2>
             <p>此展位尚未陈列藏品。用户投稿经审核、管理员安排展位后，会在这里公开展出。</p>
             <small>Esc 关闭后点击画面继续</small>
-          </> : detailState?.status === 'ready' ? <ExhibitInfo data={detailState.data} headers={grant.current ? grantHeaders(grant.current) : undefined} login={loginForExhibit} />
+          </> : detailState?.status === 'ready' ? <ExhibitInfo data={detailState.data} headers={grant.current ? grantHeaders(grant.current) : undefined} login={loginForExhibit} borrow={fileId => engine.current?.borrowExhibit(fileId) ?? null} />
             : detailState?.status === 'failed' ? <><h2>{detailExhibit.name}</h2><p role="alert">{detailState.message}</p></>
             : <><h2>{detailExhibit.name}</h2><p role="status">正在读取藏品资料…</p></>}
         </section>
@@ -286,10 +292,10 @@ export default function Game() {
 }
 
 /** Public exhibit detail: PRD 7.5 fields, source attribution apart from the holder, independent rotate/zoom preview. */
-function ExhibitInfo({ data, headers, login }: { data: ExhibitDetail; headers?: Record<string, string>; login: () => void }) {
+function ExhibitInfo({ data, headers, login, borrow }: { data: ExhibitDetail; headers?: Record<string, string>; login: () => void; borrow: (fileId: string) => Promise<T.Object3D> | null }) {
   const url = /^https?:\/\//i.test(data.officialUrl) ? data.officialUrl : '';
   return <div className="t10-exhibit-body">
-    <ModelPreview fileId={data.model.modelFileId} name={data.name} headers={headers} notice={
+    <ModelPreview fileId={data.model.modelFileId} name={data.name} headers={headers} borrow={borrow} notice={
       <p className="t10-ai-notice" role="note"><span>AI 生成</span>与实物可能有偏差，仅供观赏</p>
     } />
     <div className="t10-exhibit-text">

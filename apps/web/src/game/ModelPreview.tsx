@@ -8,8 +8,11 @@ import { configurePreview, framePreview, parsePreviewModel, previewScene, readPr
  * `headers` carries a snapshot grant for public exhibits; without it the visitor's own login is used.
  * `file` previews a local GLB instead (the administrator's upload before it is sent).
  * `notice` is laid over the top of the preview (the public exhibit's AI-generated disclaimer).
+ * `borrow` offers a copy of a model the page has already loaded (the pavilion's exhibits): shown without a
+ * second download and never disposed here, since it shares its geometry, materials and textures. When it
+ * offers nothing or fails, the file is fetched as usual.
  */
-export default function ModelPreview({ fileId, file, name, headers, showHint = true, notice }: { fileId?: string; file?: Blob; name: string; headers?: Record<string, string>; showHint?: boolean; notice?: ReactNode }) {
+export default function ModelPreview({ fileId, file, name, headers, showHint = true, notice, borrow }: { fileId?: string; file?: Blob; name: string; headers?: Record<string, string>; showHint?: boolean; notice?: ReactNode; borrow?: (fileId: string) => Promise<T.Object3D> | null }) {
   const headerKey = JSON.stringify(headers ?? null);
   const host = useRef<HTMLDivElement>(null);
   const [status, setStatus] = useState('正在载入模型…');
@@ -22,6 +25,7 @@ export default function ModelPreview({ fileId, file, name, headers, showHint = t
     let controls: OrbitControls | undefined;
     let resize: ResizeObserver | undefined;
     let loaded: T.Object3D | undefined;
+    let shared = false;
     const abort = new AbortController();
     const scene = previewScene();
     const camera = new T.PerspectiveCamera(35, 1, .01, 10000);
@@ -48,10 +52,13 @@ export default function ModelPreview({ fileId, file, name, headers, showHint = t
         ? { headers, credentials: 'omit', cache: 'no-store', signal: abort.signal }
         : { signal: abort.signal };
       const message = headers ? '展品模型已不可查看，请刷新藏宝阁。' : '模型读取失败，请刷新背包或重新登录。';
+      const fetchFile = () => readPreviewModel(fileId!, options, message);
+      const borrowed = !file && fileId ? borrow?.(fileId) ?? null : null;
       const read = file ? file.arrayBuffer().then(bytes => parsePreviewModel(bytes)).catch(() => { throw new Error('无法在本机预览这个 GLB：文件可能损坏、引用了外部贴图，或使用了预览不支持的压缩格式。'); })
-        : fileId ? readPreviewModel(fileId, options, message) : Promise.reject(new Error('没有可预览的模型。'));
+        : borrowed ? borrowed.then(model => { shared = true; return model; }, fetchFile)
+        : fileId ? fetchFile() : Promise.reject(new Error('没有可预览的模型。'));
       void read.then(model => {
-        if (stopped) { disposeResources([model]); return; }
+        if (stopped) { if (!shared) disposeResources([model]); return; }
         loaded = model;
         const radius = framePreview(loaded, camera);
         scene.add(loaded);
@@ -73,13 +80,13 @@ export default function ModelPreview({ fileId, file, name, headers, showHint = t
       resize?.disconnect();
       controls?.dispose();
       renderer?.setAnimationLoop(null);
-      if (loaded) disposeResources([loaded]);
+      if (loaded && !shared) disposeResources([loaded]);
       renderer?.renderLists.dispose();
       renderer?.dispose();
       renderer?.forceContextLoss();
       renderer?.domElement.remove();
     };
-  // eslint-disable-next-line react-hooks/exhaustive-deps -- headerKey is the stable form of headers
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- headerKey is the stable form of headers; borrow is read once per model
   }, [fileId, file, name, headerKey]);
   return <div className="bag-preview-wrap">
     <div className="bag-preview" ref={host} />

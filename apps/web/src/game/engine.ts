@@ -3,6 +3,7 @@ import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { KTX2Loader } from 'three/addons/loaders/KTX2Loader.js';
 import { MeshoptDecoder } from 'three/addons/libs/meshopt_decoder.module.js';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
+import { clone as cloneModel } from 'three/addons/utils/SkeletonUtils.js';
 import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
 import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
 import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
@@ -25,8 +26,11 @@ import { PavilionAtmosphere, type Oculus } from './atmosphere.js';
 
 export interface HudState { floor: ReturnType<typeof floorOf>; target: ExhibitSlot | null; fps: number; calls: number }
 export interface EngineHooks {
+  /** First-screen download (geometry + previews), 0..1. */
   progress(ratio: number): void;
   ready(): void;
+  /** After ready: full-size textures and lightmaps replacing the previews, 0..1 (1 = all done). */
+  detail?(ratio: number): void;
   failed(message: string): void;
   hud(state: HudState): void;
   /** Pointer lock was lost while movement was enabled (user pressed Esc / switched tab). */
@@ -56,8 +60,24 @@ const BLACK = new T.Color(0);
  * real time (the lantern tiers); the GI map adds only what those lanterns and the sky would bounce.
  */
 const LIGHTMAP_URLS = import.meta.glob('../../../../assets/t16/runtime/lightmaps/*.ktx2', { query: '?url', import: 'default', eager: true }) as Record<string, string>;
+const TEXTURE_URLS = import.meta.glob('../../../../assets/t16/runtime/textures/*.ktx2', { query: '?url', import: 'default', eager: true }) as Record<string, string>;
 const LIGHTMAPS = lightmaps as { giScale: number; maps: Record<string, { ao: string; gi: string }> };
-const RUNTIME_MAPS = (runtime as { lightmaps: Record<string, { file: string }> }).lightmaps;
+interface RuntimeFile { file: string; bytes: number }
+/**
+ * First screen (scripts/compress-t16.mjs): the GLB carries small previews of its textures and each lightmap has
+ * a small `-preview` copy; the hall opens on those, then every slot is swapped for its full-size file.
+ */
+const RUNTIME = runtime as unknown as {
+  glb: RuntimeFile;
+  textures: Record<string, RuntimeFile & { slots: string[]; codec: 'etc1s' | 'uastc' }>;
+  lightmaps: Record<string, RuntimeFile & { preview: RuntimeFile }>;
+};
+const lightmapUrl = (file?: string) => LIGHTMAP_URLS[`../../../../assets/t16/runtime/lightmaps/${file}`];
+const textureUrl = (file: string) => TEXTURE_URLS[`../../../../assets/t16/runtime/textures/${file}`];
+/** three's material slots that a glTF texture can land in (metallicRoughness fills two with one texture). */
+const TEXTURE_SLOTS = ['map', 'normalMap', 'roughnessMap', 'metalnessMap', 'emissiveMap', 'aoMap'] as const;
+/** Full-size files in flight at once: enough to keep one connection busy, few enough that early ones land early. */
+const DETAIL_CONCURRENCY = 4;
 /** Served by the Vite plugin in apps/web/vite.config.ts from the installed three, so it never drifts from it. */
 const BASIS_TRANSCODER = `${import.meta.env.BASE_URL}three-basis/`;
 const GI_INTENSITY = 0.9, AO_INTENSITY = 1.0;
@@ -94,6 +114,8 @@ export class PavilionEngine {
   private building = new T.Group();
   private exhibits = new T.Group();
   private exhibitToken = 0;
+  /** The current version's exhibit models as parsed from their files (loaded or loading), by model file id. */
+  private exhibitModels = new Map<string, Promise<T.Object3D>>();
   private player: FirstPerson = { ...this.world.entry, velocityY: null };
   private viewY = this.world.entry.y;
   private yaw = ENTRY_YAW;
@@ -133,8 +155,18 @@ export class PavilionEngine {
   private probeMs: number = RES.probeMs;
   private probing = false;
   private pinnedDpr: number | null = null;
+  /** Shell on screen: the character and the full-size textures only start downloading after this. */
+  private shellReady = false;
+  private character: AvatarPrefs['character'] | null = null;
+  /** Lightmapped materials by name, with the preview maps they carry until the full-size ones arrive. */
+  private baked = new Map<string, T.MeshStandardMaterial>();
+  private detailDone = false;
+  /** Exhibits wait for the first time the visitor enters (they are not needed behind the intro screen). */
+  private entered: Promise<void>;
+  private markEntered!: () => void;
 
   constructor(private host: HTMLElement, private hooks: EngineHooks) {
+    this.entered = new Promise(resolve => { this.markEntered = resolve; });
     this.renderer = new T.WebGLRenderer({ antialias: true, powerPreference: 'high-performance' });
     this.renderer.setPixelRatio(Math.min(devicePixelRatio, RES.max));
     this.renderer.outputColorSpace = T.SRGBColorSpace;
@@ -239,14 +271,16 @@ export class PavilionEngine {
     try {
       const response = await fetch(pavilionUrl, { signal: this.abort.signal });
       if (!response.ok || !response.body) throw new Error(`建筑模型读取失败（HTTP ${response.status}）`);
-      const total = Number(response.headers.get('content-length')) || 0;
+      // The stream yields decoded bytes, so the total is the file's own size from the manifest: behind
+      // gzip (production Nginx) there is no usable Content-Length and the bar would never move.
+      const total = RUNTIME.glb.bytes;
       const reader = response.body.getReader(), chunks: Uint8Array[] = [];
       let received = 0;
       for (;;) {
         const { done, value } = await reader.read();
         if (done) break;
         chunks.push(value); received += value.length;
-        if (total) this.hooks.progress(Math.min(0.95, received / total * 0.95));
+        this.hooks.progress(Math.min(0.95, received / total * 0.95));
       }
       const bytes = new Uint8Array(received);
       let offset = 0;
@@ -258,15 +292,104 @@ export class PavilionEngine {
       this.renderer.shadowMap.needsUpdate = true;
       this.hooks.progress(1);
       this.hooks.ready();
+      // Let the intro screen paint first: nothing below may compete with what the visitor waits for.
+      setTimeout(() => {
+        if (this.closed) return;
+        this.shellReady = true;
+        // The character is on screen the moment the visitor enters (third person): it goes first, alone.
+        void this.loadCharacter().finally(() => { if (!this.closed) void this.loadDetail(); });
+      }, 50);
     } catch (error) {
       if (!this.closed) this.hooks.failed(error instanceof Error ? error.message : String(error));
     }
   }
 
+  /** A full-size KTX2 standing in for `preview` in the same slot (same sampling, UV set and colour space). */
+  private async fullTexture(url: string, preview: T.Texture) {
+    const t = await this.ktx2.loadAsync(url);
+    t.flipY = preview.flipY; t.channel = preview.channel; t.colorSpace = preview.colorSpace;
+    t.wrapS = preview.wrapS; t.wrapT = preview.wrapT; t.magFilter = preview.magFilter; t.minFilter = preview.minFilter; t.anisotropy = preview.anisotropy;
+    t.offset.copy(preview.offset); t.repeat.copy(preview.repeat); t.center.copy(preview.center); t.rotation = preview.rotation;
+    t.name = preview.name;
+    return t;
+  }
+
+  /**
+   * After the hall is on screen: swap every preview (GLB textures and lightmaps) for its full-size file,
+   * lightmaps and colour first, normal maps (the heaviest, least noticed) last. A file that fails keeps its
+   * preview. Same material, same slots: three uploads the new texture, nothing recompiles.
+   */
+  private async loadDetail() {
+    type Job = { url: string; bytes: number; rank: number; apply: (t: T.Texture) => void; preview: T.Texture };
+    const jobs: Job[] = [];
+    try {
+      const swap = (targets: [T.Material, string][], preview: T.Texture) => (t: T.Texture) => {
+        for (const [material, slot] of targets) {
+          (material as unknown as Record<string, T.Texture | null>)[slot] = t;
+          // The bloom pass's black stand-in copied the cut-out map: rebuild it from the new one.
+          const dark = this.dark.get(material);
+          if (dark) { dark.dispose(); this.dark.delete(material); }
+        }
+        preview.dispose();
+      };
+      for (const [name, material] of this.baked) {
+        const m = LIGHTMAPS.maps[name];
+        for (const [file, slot] of [[m.gi, 'lightMap'], [m.ao, 'aoMap']] as const) {
+          const entry = RUNTIME.lightmaps[file], preview = material[slot], url = entry && lightmapUrl(entry.file);
+          // A map no larger than the preview size has identical bytes (one file after the build): nothing to swap.
+          if (preview && url && url !== lightmapUrl(entry.preview.file)) jobs.push({ url, bytes: entry.bytes, rank: 0, preview, apply: swap([[material, slot]], preview) });
+        }
+      }
+      const uses = new Map<T.Texture, [T.Material, string][]>();
+      this.building.traverse(o => {
+        const mesh = o as T.Mesh;
+        if (!mesh.isMesh) return;
+        for (const material of ([] as T.Material[]).concat(mesh.material)) for (const slot of TEXTURE_SLOTS) {
+          const t = (material as unknown as Record<string, T.Texture | null | undefined>)[slot];
+          if (!t || !RUNTIME.textures[t.name]) continue;
+          const list = uses.get(t) ?? [];
+          if (!list.some(([m, s]) => m === material && s === slot)) list.push([material, slot]);
+          uses.set(t, list);
+        }
+      });
+      for (const [preview, targets] of uses) {
+        const entry = RUNTIME.textures[preview.name], url = textureUrl(entry.file);
+        if (url) jobs.push({ url, bytes: entry.bytes, rank: entry.slots.includes('normalTexture') ? 2 : entry.slots.includes('baseColorTexture') ? 0 : 1, preview, apply: swap(targets, preview) });
+      }
+    } catch (error) {
+      // Never leave the visitor with a progress note that cannot finish: the previews simply stay.
+      console.warn('高清贴图无法开始载入，保留预览', error);
+      this.detailDone = true;
+      this.hooks.detail?.(1);
+      return;
+    }
+    jobs.sort((a, b) => a.rank - b.rank || b.bytes - a.bytes);
+    const total = jobs.reduce((s, j) => s + j.bytes, 0) || 1;
+    let done = 0;
+    this.hooks.detail?.(jobs.length ? 0 : 1);
+    await Promise.all(Array.from({ length: Math.min(DETAIL_CONCURRENCY, jobs.length) }, async () => {
+      for (let job; (job = jobs.shift());) {
+        try {
+          const t = await this.fullTexture(job.url, job.preview);
+          if (this.closed) { t.dispose(); return; }
+          job.apply(t);
+        } catch { if (!this.closed) console.warn(`高清贴图 ${job.preview.name || job.url} 读取失败，保留预览`); }
+        done += job.bytes;
+        if (!this.closed) this.hooks.detail?.(Math.min(0.999, done / total));
+      }
+    }));
+    if (this.closed) return;
+    // The reflection probe was taken with the previews: retake it with the real hall.
+    this.captureReflections();
+    this.detailDone = true;
+    this.hooks.detail?.(1);
+  }
+
+  /** First screen: the small `-preview` copy of every lightmap (loadDetail() brings the full ones). */
   private async loadLightmaps() {
     const out = new Map<string, { ao: T.Texture; gi: T.Texture }>();
     const tex = async (file: string, srgb: boolean) => {
-      const url = LIGHTMAP_URLS[`../../../../assets/t16/runtime/lightmaps/${RUNTIME_MAPS[file]?.file}`];
+      const url = lightmapUrl(RUNTIME.lightmaps[file]?.preview.file);
       if (!url) throw new Error(`缺少光照贴图 ${file}`);
       const t = await this.ktx2.loadAsync(url);
       t.flipY = false; t.channel = 1; t.colorSpace = srgb ? T.SRGBColorSpace : T.NoColorSpace;
@@ -365,6 +488,7 @@ export class PavilionEngine {
       Object.assign(material, { aoMap: baked.ao, aoMapIntensity: AO_INTENSITY, lightMap: baked.gi, lightMapIntensity: GI_INTENSITY });
       material.needsUpdate = true;
       lit.add(material);
+      this.baked.set(material.name, material);
       this.lightmapped++;
     }
     // Lightmaps no merged mesh could take (no second UV set) are released here.
@@ -427,6 +551,7 @@ export class PavilionEngine {
   /** Movement and look are only live while no menu/drawer/detail owns input. */
   setEnabled(enabled: boolean) {
     this.enabled = enabled;
+    if (enabled) this.markEntered();
     this.clearKeys();
     if (!enabled) this.releaseLock();
   }
@@ -454,7 +579,13 @@ export class PavilionEngine {
   /** Character and view from the visitor's per-browser preference (T15). */
   setAvatar(prefs: AvatarPrefs) {
     this.setView(prefs.view);
-    this.avatar.setCharacter(prefs.character).catch(error => {
+    this.character = prefs.character;
+    this.loadCharacter();
+  }
+  /** The character (about 2 MB) is not part of the first screen: it starts once the hall is shown. */
+  private loadCharacter(): Promise<void> {
+    if (!this.shellReady || !this.character) return Promise.resolve();
+    return this.avatar.setCharacter(this.character).catch(error => {
       if (this.closed) return;
       this.setView('first');
       this.hooks.avatarFailed?.(error instanceof Error ? error.message : '角色模型读取失败');
@@ -612,10 +743,12 @@ export class PavilionEngine {
   /**
    * Places the published gallery version on its plinths: every model is centred on the plinth axis,
    * rests on the plinth top and is uniformly fitted (PRD 7.7, no manual height/rotation/scale).
-   * Files are read with the snapshot grant only, never with the visitor's login cookie.
+   * Files are read with the snapshot grant only, never with the visitor's login cookie. `headers` is asked for
+   * at each download: the exhibits wait for the visitor to enter, and the grant may have been renewed by then.
    */
-  async setExhibits(slots: GallerySlot[], headers: Record<string, string>): Promise<{ loaded: number; failed: number }> {
+  async setExhibits(slots: GallerySlot[], headers: () => Record<string, string>): Promise<{ loaded: number; failed: number }> {
     const token = ++this.exhibitToken;
+    this.exhibitModels.clear();
     const old = [...this.exhibits.children];
     this.exhibits.clear();
     this.renderer.shadowMap.needsUpdate = true;
@@ -627,10 +760,26 @@ export class PavilionEngine {
     this.atmosphere.setHalos(shown);
     this.clearExhibitColliders();
     let loaded = 0, failed = 0;
+    // Not needed behind the intro screen: wait for the visitor to enter, then always take the slot nearest to
+    // where they stand now, so the plinths around them fill first.
+    await this.entered;
+    if (this.closed || token !== this.exhibitToken) return { loaded, failed };
+    const nearest = () => {
+      const p = this.player;
+      let best = -1, bestD = Infinity;
+      queue.forEach((s, i) => {
+        const [x, y, z] = byMarker.get(slotMarker(s.slotNo))!.position, d = (x - p.x) ** 2 + (z - p.z) ** 2 + (4 * (y - p.y)) ** 2;
+        if (d < bestD) { bestD = d; best = i; }
+      });
+      return best < 0 ? undefined : queue.splice(best, 1)[0];
+    };
     const loadOne = async (slot: GallerySlot) => {
       const model = slot.exhibit!.model, marker = byMarker.get(slotMarker(slot.slotNo))!;
       try {
-        const source = await this.loadModel(model, headers);
+        const id = model.modelFileId, parsed = this.fetchExhibit(id, headers());
+        this.exhibitModels.set(id, parsed);
+        parsed.catch(() => { if (this.exhibitModels.get(id) === parsed) this.exhibitModels.delete(id); });
+        const source = this.normalizeExhibit(await parsed, model);
         if (this.closed || token !== this.exhibitToken) { disposeResources([source]); return; }
         // Each slot's tier sets the largest edge and the height the model rests (floats) at; the
         // model is centred on the slot axis and turned to face the visitor's side.
@@ -652,20 +801,31 @@ export class PavilionEngine {
         loaded++;
       } catch { if (token === this.exhibitToken) failed++; }
     };
-    await Promise.all(Array.from({ length: Math.min(3, queue.length) }, async () => { for (let s; (s = queue.shift());) await loadOne(s); }));
+    await Promise.all(Array.from({ length: Math.min(3, queue.length) }, async () => { for (let s; (s = nearest());) await loadOne(s); }));
     return { loaded, failed };
   }
-  private async loadModel(model: RoomModel, headers: Record<string, string>) {
-    const response = await fetch('/api/v1/files/' + encodeURIComponent(model.modelFileId) + '/content', { headers, credentials: 'omit', cache: 'no-store', signal: this.abort.signal });
+  private async fetchExhibit(fileId: string, headers: Record<string, string>) {
+    const response = await fetch('/api/v1/files/' + encodeURIComponent(fileId) + '/content', { headers, credentials: 'omit', cache: 'no-store', signal: this.abort.signal });
     if (!response.ok) throw new Error('展品读取失败');
     const manager = new T.LoadingManager();
     manager.setURLModifier(url => { if (url.startsWith('blob:') || url.startsWith('data:')) return url; throw new Error('模型包含外部资源。'); });
-    const scene = (await new GLTFLoader(manager).parseAsync(await response.arrayBuffer(), '')).scene;
+    return (await new GLTFLoader(manager).parseAsync(await response.arrayBuffer(), '')).scene;
+  }
+  private normalizeExhibit(scene: T.Object3D, model: RoomModel) {
     const translated = new T.Group(); translated.position.fromArray(model.normalization.translation); translated.add(scene);
     const normalized = new T.Group(); normalized.scale.setScalar(model.normalization.scale); normalized.add(translated);
     return normalized;
   }
   exhibitCount() { return this.exhibits.children.length; }
+  /**
+   * The E detail preview borrows the model the hall already downloaded (each exhibit file is 8-14 MB, half a
+   * minute across the border): a copy sharing its geometry, materials and textures, as soon as it is parsed.
+   * The borrower must not dispose it. null = this file is not part of the loaded version (fetch it yourself).
+   */
+  borrowExhibit(fileId: string): Promise<T.Object3D> | null {
+    const parsed = this.exhibitModels.get(fileId);
+    return parsed ? parsed.then(scene => cloneModel(scene)) : null;
+  }
 
   /**
    * Exhibits are solid: each loaded model's world box (conservative: the AABB of the turned model; it
@@ -694,7 +854,7 @@ export class PavilionEngine {
       player: { x, y, z }, airborne: velocityY !== null, yaw: this.yaw, pitch: this.pitch, enabled: this.enabled, keys: [...this.keys],
       locked: document.pointerLockElement === this.renderer.domElement, ...this.hud(),
       view: this.view, boom: this.boom, camera: this.camera.position.toArray(), avatar: this.avatar.debug(),
-      meshes: this.building.children.length, lightmapped: this.lightmapped, exhibits: this.exhibits.children.map(o => ({ ...o.userData, position: o.position.toArray(), scale: o.userData.fitScale as number, bounds: (b => [b.min.toArray(), b.max.toArray()])(new T.Box3().setFromObject(o)) })),
+      meshes: this.building.children.length, lightmapped: this.lightmapped, detailDone: this.detailDone, exhibits: this.exhibits.children.map(o => ({ ...o.userData, position: o.position.toArray(), scale: o.userData.fitScale as number, bounds: (b => [b.min.toArray(), b.max.toArray()])(new T.Box3().setFromObject(o)) })),
       triangles: this.renderer.info.render.triangles,
       viewport: [this.host.clientWidth, this.host.clientHeight], pixelRatio: this.renderer.getPixelRatio(),
     };
@@ -746,6 +906,7 @@ export class PavilionEngine {
     window.removeEventListener('pointermove', this.pointerMove);
     document.removeEventListener('pointerlockchange', this.lockChange);
     this.exhibitToken++;
+    this.exhibitModels.clear();
     this.avatar.dispose();
     disposeResources([...this.exhibits.children]);
     this.exhibits.clear();

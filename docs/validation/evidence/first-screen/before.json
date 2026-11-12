@@ -1,0 +1,342 @@
+{
+  "measured": "2026-11-12T04:52:31.877Z",
+  "browser": "157.0.8103.78",
+  "throttleMbps": null,
+  "phase": "intro",
+  "introMs": 987,
+  "firstScreenBytes": 22535697,
+  "firstScreenRaw": 25919768,
+  "afterEnterBytes": 0,
+  "afterEnterRaw": 0,
+  "requests": [
+    {
+      "stage": "first-screen",
+      "path": "/assets/pavilion-t16-GuoeZ87i.glb",
+      "bytes": 13381153,
+      "raw": 14563692,
+      "ms": 679
+    },
+    {
+      "stage": "first-screen",
+      "path": "/assets/humanoid-tabby-DXwy-y8S.glb",
+      "bytes": 1984693,
+      "raw": 3004972,
+      "ms": 634
+    },
+    {
+      "stage": "first-screen",
+      "path": "/assets/mountains-JuPswh41.png",
+      "bytes": 1087417,
+      "raw": 1087417,
+      "ms": 455
+    },
+    {
+      "stage": "first-screen",
+      "path": "/assets/isles-DZ4Q7_-Q.png",
+      "bytes": 1026563,
+      "raw": 1026563,
+      "ms": 454
+    },
+    {
+      "stage": "first-screen",
+      "path": "/assets/Lacquer-gi-Dr34d8yk.ktx2",
+      "bytes": 802216,
+      "raw": 802566,
+      "ms": 723
+    },
+    {
+      "stage": "first-screen",
+      "path": "/assets/Lacquer-ao-O5eB4soW.ktx2",
+      "bytes": 669187,
+      "raw": 669484,
+      "ms": 723
+    },
+    {
+      "stage": "first-screen",
+      "path": "/three-basis/basis_transcoder.wasm",
+      "bytes": 259696,
+      "raw": 527333,
+      "ms": 739
+    },
+    {
+      "stage": "first-screen",
+      "path": "/assets/Relief-gi-ePwh35k4.ktx2",
+      "bytes": 243779,
+      "raw": 244212,
+      "ms": 726
+    },
+    {
+      "stage": "first-screen",
+      "path": "/assets/Marble-gi-BL43DwGD.ktx2",
+      "bytes": 231597,
+      "raw": 232079,
+      "ms": 687
+    },
+    {
+      "stage": "first-screen",
+      "path": "/assets/GLTFLoader-CmufvTTx.js",
+      "bytes": 208493,
+      "raw": 704608,
+      "ms": 51
+    },
+    {
+      "stage": "first-screen",
+      "path": "/assets/Ceiling-gi-CIXSMvB-.ktx2",
+      "bytes": 206616,
+      "raw": 207012,
+      "ms": 728
+    },
+    {
+      "stage": "first-screen",
+      "path": "/assets/Gold-ao-De86Xd3C.ktx2",
+      "bytes": 202865,
+      "raw": 203360,
+      "ms": 686
+    },
+    {
+      "stage": "first-screen",
+      "path": "/assets/Relief-ao-BLRnQYy_.ktx2",
+      "bytes": 201250,
+      "raw": 201928,
+      "ms": 724
+    },
+    {
+      "stage": "first-screen",
+      "path": "/assets/Floor-gi-DmKxe9dd.ktx2",
+      "bytes": 194337,
+      "raw": 194785,
+      "ms": 686
+    },
+    {
+      "stage": "first-screen",
+      "path": "/assets/WallWood-gi-CPCkhHtH.ktx2",
+      "bytes": 189050,
+      "raw": 189438,
+      "ms": 688
+    },
+    {
+      "stage": "first-screen",
+      "path": "/assets/Marble-ao-r9Sr0sWp.ktx2",
+      "bytes": 182135,
+      "raw": 182820,
+      "ms": 686
+    },
+    {
+      "stage": "first-screen",
+      "path": "/assets/Ceiling-ao-Bzc_3eXV.ktx2",
+      "bytes": 174862,
+      "raw": 175496,
+      "ms": 728
+    },
+    {
+      "stage": "first-screen",
+      "path": "/assets/Slab-gi-Do5AimoU.ktx2",
+      "bytes": 129301,
+      "raw": 129649,
+      "ms": 728
+    },
+    {
+      "stage": "first-screen",
+      "path": "/assets/WallWood-ao-BH5c_b2t.ktx2",
+      "bytes": 126586,
+      "raw": 127249,
+      "ms": 688
+    },
+    {
+      "stage": "first-screen",
+      "path": "/assets/Stone-ao-ULms6zxa.ktx2",
+      "bytes": 109679,
+      "raw": 110256,
+      "ms": 688
+    },
+    {
+      "stage": "first-screen",
+      "path": "/assets/Floor-ao-C6pNmT9o.ktx2",
+      "bytes": 108272,
+      "raw": 108887,
+      "ms": 686
+    },
+    {
+      "stage": "first-screen",
+      "path": "/assets/Stone-gi-BkbS12b9.ktx2",
+      "bytes": 85195,
+      "raw": 85894,
+      "ms": 688
+    },
+    {
+      "stage": "first-screen",
+      "path": "/assets/index-BTpWA8R-.js",
+      "bytes": 79143,
+      "raw": 223473,
+      "ms": 25
+    },
+    {
+      "stage": "first-screen",
+      "path": "/assets/Slab-ao-2rd4R4DX.ktx2",
+      "bytes": 76119,
+      "raw": 76562,
+      "ms": 724
+    },
+    {
+      "stage": "first-screen",
+      "path": "/assets/Game-3rvGUibT.js",
+      "bytes": 68829,
+      "raw": 174202,
+      "ms": 45
+    },
+    {
+      "stage": "first-screen",
+      "path": "/assets/Caisson-gi-CJL3d3ll.ktx2",
+      "bytes": 67349,
+      "raw": 67732,
+      "ms": 731
+    },
+    {
+      "stage": "first-screen",
+      "path": "/assets/GoldBand-gi-B2CNvGa9.ktx2",
+      "bytes": 62707,
+      "raw": 63436,
+      "ms": 723
+    },
+    {
+      "stage": "first-screen",
+      "path": "/assets/RoofTile-ao-CLUhpM0c.ktx2",
+      "bytes": 55279,
+      "raw": 55725,
+      "ms": 731
+    },
+    {
+      "stage": "first-screen",
+      "path": "/assets/RoofTile-gi-BCRVtHQl.ktx2",
+      "bytes": 53839,
+      "raw": 54292,
+      "ms": 731
+    },
+    {
+      "stage": "first-screen",
+      "path": "/assets/Carpet-gi-cnylL_y5.ktx2",
+      "bytes": 49972,
+      "raw": 50459,
+      "ms": 686
+    },
+    {
+      "stage": "first-screen",
+      "path": "/assets/Caisson-ao-Cb6Qcvlx.ktx2",
+      "bytes": 39289,
+      "raw": 39745,
+      "ms": 731
+    },
+    {
+      "stage": "first-screen",
+      "path": "/assets/GoldBand-ao-D-kLEgP-.ktx2",
+      "bytes": 37586,
+      "raw": 38328,
+      "ms": 716
+    },
+    {
+      "stage": "first-screen",
+      "path": "/assets/Banner2-gi-Bc1WK2gv.ktx2",
+      "bytes": 19833,
+      "raw": 20098,
+      "ms": 736
+    },
+    {
+      "stage": "first-screen",
+      "path": "/assets/Banner1-gi-DXoTDUrW.ktx2",
+      "bytes": 19608,
+      "raw": 19866,
+      "ms": 731
+    },
+    {
+      "stage": "first-screen",
+      "path": "/assets/CharacterPicker-BeyURY8S.js",
+      "bytes": 18581,
+      "raw": 47893,
+      "ms": 51
+    },
+    {
+      "stage": "first-screen",
+      "path": "/three-basis/basis_transcoder.js",
+      "bytes": 17410,
+      "raw": 57529,
+      "ms": 739
+    },
+    {
+      "stage": "first-screen",
+      "path": "/assets/Plaque-gi-CpB11XHT.ktx2",
+      "bytes": 13579,
+      "raw": 13856,
+      "ms": 712
+    },
+    {
+      "stage": "first-screen",
+      "path": "/assets/gallery-z1Zv6Ecr.js",
+      "bytes": 12238,
+      "raw": 75197,
+      "ms": 51
+    },
+    {
+      "stage": "first-screen",
+      "path": "/assets/Door-ao-tXGStGH-.ktx2",
+      "bytes": 11505,
+      "raw": 11774,
+      "ms": 708
+    },
+    {
+      "stage": "first-screen",
+      "path": "/assets/Door-gi-BhYBoTj6.ktx2",
+      "bytes": 10551,
+      "raw": 10821,
+      "ms": 712
+    },
+    {
+      "stage": "first-screen",
+      "path": "/assets/backpack-CF5feeMR.css",
+      "bytes": 6124,
+      "raw": 21900,
+      "ms": 42
+    },
+    {
+      "stage": "first-screen",
+      "path": "/assets/Carpet-ao-DpBavGhT.ktx2",
+      "bytes": 5775,
+      "raw": 6955,
+      "ms": 686
+    },
+    {
+      "stage": "first-screen",
+      "path": "/assets/backpack-BkPg4vpi.js",
+      "bytes": 3341,
+      "raw": 5997,
+      "ms": 51
+    },
+    {
+      "stage": "first-screen",
+      "path": "/assets/RoomEnvironment-H-EoAOga.js",
+      "bytes": 910,
+      "raw": 2040,
+      "ms": 51
+    },
+    {
+      "stage": "first-screen",
+      "path": "/assets/index-C3LvTbrq.css",
+      "bytes": 821,
+      "raw": 1726,
+      "ms": 21
+    },
+    {
+      "stage": "first-screen",
+      "path": "/",
+      "bytes": 326,
+      "raw": 462,
+      "ms": 21
+    },
+    {
+      "stage": "first-screen",
+      "path": "/api/v1/gallery",
+      "bytes": 41,
+      "raw": 0,
+      "ms": 987
+    }
+  ]
+}

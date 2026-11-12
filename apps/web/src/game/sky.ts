@@ -1,6 +1,6 @@
 import * as T from 'three';
-import mountainsUrl from '../../../../assets/t16/sky/mountains.png?url';
-import islesUrl from '../../../../assets/t16/sky/isles.png?url';
+import mountainsUrl from '../../../../assets/t16/sky/mountains.webp?url';
+import islesUrl from '../../../../assets/t16/sky/isles.webp?url';
 
 /**
  * T16 D3 backdrop (concept 06 + 02): a dusk-into-starlight dome with the Milky Way, a sea of cloud
