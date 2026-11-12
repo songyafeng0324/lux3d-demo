@@ -1,7 +1,8 @@
 import * as T from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { TransformControls } from 'three/addons/controls/TransformControls.js';
-import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+import { MODEL_CACHE, modelUrl } from '../game/backpack-api.js';
+import { parsePreviewModel } from '../game/model-preview-scene.js';
 import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
 import { ROOM_COURTYARD_BOUNDS, roomPlacementBounds, roomPlacementFloor, validateRoomLayout, type Bounds, type RoomModel, type RoomPlacement } from '@aholo/contracts';
 import { MOVE_KEYS, playerOverlaps, stepFirstPerson, supportAt, type FirstPerson } from '../game/navigation.js';
@@ -141,11 +142,9 @@ export class RoomEngine {
     const profile = this.profiles.get(id);
     if (!profile) throw new Error('未找到此模型的尺寸资料。');
     const load = (async () => {
-      const response = await fetch('/api/v1/files/' + encodeURIComponent(profile.modelFileId) + '/content', { headers: this.headers(), credentials: 'same-origin', signal: this.abort.signal, cache: 'no-store' });
+      const response = await fetch(modelUrl(profile.modelFileId), { headers: this.headers(), credentials: 'same-origin', signal: this.abort.signal, cache: MODEL_CACHE });
       if (!response.ok) throw new Error(response.status === 403 || response.status === 404 ? '模型访问权限已失效，请重新进入小屋。' : '模型读取失败，请重试。');
-      const manager = new T.LoadingManager();
-      manager.setURLModifier(url => { if (url.startsWith('blob:') || url.startsWith('data:')) return url; throw new Error('模型包含外部资源。'); });
-      const source = (await new GLTFLoader(manager).parseAsync(await response.arrayBuffer(), '')).scene;
+      const source = await parsePreviewModel(await response.arrayBuffer());
       if (this.stopped) { disposeResources([source]); return; }
       enableMeshShadows(source);
       const translated = new T.Group(); translated.position.fromArray(profile.normalization.translation); translated.add(source);

@@ -71,3 +71,4 @@ export * from './generation.js';
 export * from './accounts.js';
 export * from './requests.js';
 export * from './curation.js';
+export * from './web-model.js';

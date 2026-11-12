@@ -83,7 +83,7 @@ async function verifyMain(base) {
     await owner.screenshot({ path: path.join(evidence, 'real-backpack.png') });
     const modelResponse = await owner.request.get(base + '/api/v1/files/' + original.model_file_id + '/content');
     assert.equal(modelResponse.status(), 200);
-    assert.equal(modelResponse.headers()['cache-control'], 'private, no-store');
+    assert.equal(modelResponse.headers()['cache-control'], 'private, no-cache');
     assert.equal(hash(await modelResponse.body()), original.sha256);
     const task = await get(owner, '/generation-tasks/' + demo.taskId);
     assert.equal(task.assetId, original.asset_id);

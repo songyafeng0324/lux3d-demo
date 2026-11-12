@@ -1,6 +1,7 @@
 import * as T from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
-import { fileUrl } from './backpack-api.js';
+import { MeshoptDecoder } from 'three/addons/libs/meshopt_decoder.module.js';
+import { MODEL_CACHE, modelUrl } from './backpack-api.js';
 
 export function previewScene() {
   const scene = new T.Scene();
@@ -61,19 +62,19 @@ export function fitDistance(size: T.Vector3, camera: Pick<T.PerspectiveCamera, '
 }
 
 export async function readPreviewModel(fileId: string, options: RequestInit, message: string) {
-  const response = await fetch(fileUrl(fileId), { credentials: 'same-origin', ...options });
+  const response = await fetch(modelUrl(fileId), { credentials: 'same-origin', ...options, cache: MODEL_CACHE });
   if (!response.ok) throw new Error(message);
   const bytes = await response.arrayBuffer();
   options.signal?.throwIfAborted();
   return parsePreviewModel(bytes);
 }
 
-/** Parses a self-contained GLB (no external resources), e.g. a local file before upload. */
+/** Parses a self-contained GLB (no external resources): a model from the server (its web copy is meshopt-compressed) or a local file before upload. */
 export async function parsePreviewModel(bytes: ArrayBuffer) {
   const manager = new T.LoadingManager();
   manager.setURLModifier(url => {
     if (url.startsWith('blob:') || url.startsWith('data:')) return url;
     throw new Error('模型包含外部资源。');
   });
-  return (await new GLTFLoader(manager).parseAsync(bytes, '')).scene;
+  return (await new GLTFLoader(manager).setMeshoptDecoder(MeshoptDecoder).parseAsync(bytes, '')).scene;
 }

@@ -1,14 +1,16 @@
 import { randomUUID } from 'node:crypto';
 import { hostname } from 'node:os';
-import { loadConfig, createPool, LocalFileStore, GenerationWorker, cleanupTick, expireGrants } from '@aholo/domain';
+import { loadConfig, createPool, LocalFileStore, GenerationWorker, cleanupTick, expireGrants, enqueueWebCopies } from '@aholo/domain';
 const config=loadConfig(),pool=createPool(config.databaseUrl),store=new LocalFileStore(config.dataDir);
 await store.initialize();
 const worker=new GenerationWorker(pool,store,config),workerId=`${hostname()}:${process.pid}:${randomUUID()}`;
-let lastGrantSweep=0,stopping=false,timer:ReturnType<typeof setTimeout>|undefined,running:Promise<void>=Promise.resolve(),lastHealthy:boolean|undefined;
+let lastGrantSweep=0,lastCopySweep=0,stopping=false,timer:ReturnType<typeof setTimeout>|undefined,running:Promise<void>=Promise.resolve(),lastHealthy:boolean|undefined;
 async function step(){
  try{
   await pool.query('INSERT INTO worker_heartbeats(worker_id,last_seen,generation_enabled) VALUES($1,now(),$2) ON CONFLICT(worker_id) DO UPDATE SET last_seen=excluded.last_seen,generation_enabled=excluded.generation_enabled',[workerId,config.generationEnabled&&config.lux3dConfigured]);
   if(lastHealthy!==true)console.log('Worker已连接：持久生成与模型导入队列就绪。');lastHealthy=true;
+  // Every ready model gets a web copy (also the ones from before copies existed); jobs run after generations and imports.
+  if(Date.now()-lastCopySweep>10000){lastCopySweep=Date.now();await enqueueWebCopies(pool);}
   await worker.tick();
   // Risk-deleted files are already unreadable; this only reclaims their bytes, retrying with backoff.
   await cleanupTick(pool,store);

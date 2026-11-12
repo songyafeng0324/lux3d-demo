@@ -225,6 +225,8 @@ test('T08 real PostgreSQL/API: submissions, review races, 30-slot publishing, ga
   const galleryBefore=(await call('GET','/api/v1/gallery')).json().data;const ogh={authorization:'Bearer '+galleryBefore.grant.token,'x-snapshot-grant':galleryBefore.grant.id};
   room=(await call('GET','/api/v1/rooms/me',undefined,alice.headers)).json().data;const staleBase=room.version,staleKey=randomUUID(),staleBody={baseVersion:staleBase,editSequence:9,name:'藏品小屋',placements:[...room.placements,placement(a1.id,'x3',[2,0,2])]};
   assert.equal((await call('DELETE',`/api/v1/admin/assets/${a1.id}`,undefined,alice.headers)).statusCode,403);
+  const a1Copy=await file((await pool.query('SELECT owner_id FROM assets WHERE id=$1',[a1.id])).rows[0].owner_id,'derived',Buffer.from('web-copy-a1'));await pool.query("INSERT INTO model_web_copies(model_file_id,file_id,policy) VALUES($1,$2,'web-v1')",[a1.model,a1Copy]);
+  assert.equal((await call('GET',`/api/v1/files/${a1.model}/content?variant=web`,undefined,alice.headers)).rawPayload.toString(),'web-copy-a1');
   const delKey=randomUUID(),del=await call('DELETE',`/api/v1/admin/assets/${a1.id}`,undefined,{...admin.headers,'idempotency-key':delKey});assert.equal(del.statusCode,200,del.body);
   assert.deepEqual((await call('DELETE',`/api/v1/admin/assets/${a1.id}`,undefined,{...admin.headers,'idempotency-key':delKey})).json().data,del.json().data,'a lost-response retry replays the receipt');
   assert.deepEqual({...del.json().data,galleryVersion:undefined},{deleted:true,roomsUpdated:2,placementsRemoved:4,submissionsClosed:1,candidateRemoved:true,slotNo:1,galleryVersion:undefined});
@@ -236,6 +238,9 @@ test('T08 real PostgreSQL/API: submissions, review races, 30-slot publishing, ga
   assert.equal((await call('GET',`/api/v1/assets/${a1.id}`,undefined,alice.headers)).statusCode,404);
   for(const f of [a1.model,a1.original]){assert.equal((await call('GET',`/api/v1/files/${f}/content`,undefined,alice.headers)).statusCode,404);assert.equal((await call('GET',`/api/v1/files/${f}/content`,undefined,admin.headers)).statusCode,404);}
   assert.equal((await call('GET',`/api/v1/files/${a1.model}/content`,undefined,vh)).statusCode,404,'old share grant cannot fetch the deleted model');
+  assert.equal((await call('GET',`/api/v1/files/${a1.model}/content?variant=web`,undefined,alice.headers)).statusCode,404,'nor its web copy');
+  assert.equal((await pool.query('SELECT state FROM files WHERE id=$1',[a1Copy])).rows[0].state,'deleted','the web copy is deleted with its model');
+  assert.equal((await pool.query('SELECT count(*)::int n FROM cleanup_jobs WHERE file_id=$1',[a1Copy])).rows[0].n,1,'and its bytes are queued for cleanup');
   assert.equal((await call('POST',`/api/v1/snapshots/${visitor.grant.id}/renew`,undefined,vh)).statusCode,404,'old share grant is not renewed');
   assert.equal((await call('GET',`/api/v1/files/${a1.model}/content`,undefined,ogh)).statusCode,404,'old gallery grant cannot fetch it');
   assert.equal((await call('GET',`/api/v1/snapshots/${galleryBefore.grant.id}/details/${c1.id}`,undefined,{authorization:'Bearer '+galleryBefore.grant.token})).statusCode,404);
@@ -254,7 +259,7 @@ test('T08 real PostgreSQL/API: submissions, review races, 30-slot publishing, ga
   await store.openRead(delayed.file_id).then(stream=>stream.destroy());
   assert.equal((await call('GET',`/api/v1/files/${delayed.file_id}/content`,undefined,admin.headers)).statusCode,404);
   await pool.query("UPDATE cleanup_jobs SET run_at=now()-interval '1 second' WHERE asset_id=$1",[a1.id]);
-  while(await cleanupTick(pool,store));await assert.rejects(store.openRead(a1.model));const jobs=(await pool.query('SELECT state FROM cleanup_jobs WHERE asset_id=$1',[a1.id])).rows;assert.equal(jobs.length,2);assert.ok(jobs.every(j=>j.state==='succeeded'));
+  while(await cleanupTick(pool,store));await assert.rejects(store.openRead(a1.model));await assert.rejects(store.openRead(a1Copy),'the web copy bytes are reclaimed too');const jobs=(await pool.query('SELECT state FROM cleanup_jobs WHERE asset_id=$1',[a1.id])).rows;assert.equal(jobs.length,3,'model, original and web copy');assert.ok(jobs.every(j=>j.state==='succeeded'));
   await store.openRead(a3.model).then(s=>s.destroy());
   // Furniture deletion touches every room that uses it.
   const bobRoom=(await call('GET','/api/v1/rooms/me',undefined,bob.headers)).json().data;assert.equal((await call('PUT','/api/v1/rooms/me/layout',{baseVersion:bobRoom.version,editSequence:1,name:'Bob',placements:[placement(furniture,'bf',[1,0,1]),placement(b1.id,'bb')]},bob.headers)).statusCode,200);

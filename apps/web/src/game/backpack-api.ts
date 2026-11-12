@@ -17,6 +17,13 @@ export async function api<T>(path: string, options: RequestInit = {}): Promise<T
   return payload.data as T;
 }
 export const fileUrl = (id: string) => `/api/v1/files/${encodeURIComponent(id)}/content`;
+/**
+ * A ready model as the 3D pages load it: the server's web copy (meshopt geometry, WebP textures) when it has one.
+ * Fetch it with MODEL_CACHE: the browser keeps the file and only asks the server whether this visitor may still
+ * see it (a bodiless 304), so a revoked share or collection stops it at once.
+ */
+export const modelUrl = (id: string) => fileUrl(id) + '?variant=web';
+export const MODEL_CACHE: RequestCache = 'no-cache';
 export interface PublicFields { name: string; description: string; era: string; material: string; ownershipType: 'personal_collection' | 'museum'; holderName: string; location: string; officialUrl: string }
 export interface Submission { id: string; assetId: string; status: 'pending' | 'approved' | 'rejected' | 'withdrawn' | 'deleted'; submittedAt: string; reviewedAt: string | null; rejectionReason: string | null; publicSnapshot: (PublicFields & { sourceNickname: string }) | null; assetName: string | null; candidateId: string | null; slotNo: number | null }
 export const submissionLabel: Record<Submission['status'], string> = { pending: '待审核', approved: '已入候选', rejected: '已驳回', withdrawn: '已撤回', deleted: '模型已删除' };

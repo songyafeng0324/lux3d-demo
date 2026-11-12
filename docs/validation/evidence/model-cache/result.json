@@ -1,0 +1,84 @@
+{
+ "models": [
+  {
+   "original": 13314032,
+   "copy": 2049960
+  },
+  {
+   "original": 18123632,
+   "copy": 3825800
+  }
+ ],
+ "visits": {
+  "roomFirst": {
+   "requests": 2,
+   "bytes": 5876424,
+   "statuses": [
+    200,
+    200
+   ],
+   "urls": [
+    "?variant=web"
+   ]
+  },
+  "roomSecond": {
+   "requests": 2,
+   "bytes": 510,
+   "statuses": [
+    304,
+    304
+   ],
+   "urls": [
+    "?variant=web"
+   ]
+  },
+  "sharedFirst": {
+   "requests": 2,
+   "bytes": 5876424,
+   "statuses": [
+    200,
+    200
+   ],
+   "urls": [
+    "?variant=web"
+   ]
+  },
+  "sharedSecond": {
+   "requests": 2,
+   "bytes": 510,
+   "statuses": [
+    304,
+    304
+   ],
+   "urls": [
+    "?variant=web"
+   ]
+  },
+  "galleryFirst": {
+   "requests": 2,
+   "bytes": 5876424,
+   "statuses": [
+    200,
+    200
+   ],
+   "urls": [
+    "?variant=web"
+   ]
+  },
+  "gallerySecond": {
+   "requests": 2,
+   "bytes": 510,
+   "statuses": [
+    304,
+    304
+   ],
+   "urls": [
+    "?variant=web"
+   ]
+  }
+ },
+ "revoked": 404,
+ "passed": true,
+ "checkedAt": "2026-11-12T07:10:58.570Z",
+ "browser": "157.0.8103.78"
+}

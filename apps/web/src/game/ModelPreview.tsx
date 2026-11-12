@@ -49,7 +49,7 @@ export default function ModelPreview({ fileId, file, name, headers, showHint = t
       resize.observe(element);
       renderer.setAnimationLoop(() => { controls?.update(); renderer?.render(scene, camera); });
       const options: RequestInit = headers
-        ? { headers, credentials: 'omit', cache: 'no-store', signal: abort.signal }
+        ? { headers, credentials: 'omit', signal: abort.signal }
         : { signal: abort.signal };
       const message = headers ? '展品模型已不可查看，请刷新藏宝阁。' : '模型读取失败，请刷新背包或重新登录。';
       const fetchFile = () => readPreviewModel(fileId!, options, message);

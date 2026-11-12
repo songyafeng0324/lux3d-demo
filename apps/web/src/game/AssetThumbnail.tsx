@@ -15,7 +15,7 @@ function modelImage(fileId: string, cache: ThumbnailCache) {
   if (existing) return existing;
   // Only visible cards ask for a render. Serialize decodes and release each WebGL context.
   const next = queue.then(async () => {
-    const model = await readPreviewModel(fileId, { cache: 'no-store' }, '模型缩略图暂不可用。');
+    const model = await readPreviewModel(fileId, {}, '模型缩略图暂不可用。');
     let renderer: T.WebGLRenderer | undefined;
     try {
       renderer = new T.WebGLRenderer({ antialias: true, alpha: true });

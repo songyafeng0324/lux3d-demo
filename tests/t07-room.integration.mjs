@@ -74,7 +74,21 @@ test('T07/T14 real PostgreSQL/API: CAS layouts, scoped shares, ranked discovery 
   assert.deepEqual((await ranking()).map(item=>[item.ownerNickname,item.popularity]),[['room_owner',1],['room_other',1]]);
   assert.equal((await pool.query('SELECT count(*)::int AS n FROM room_likes WHERE room_id=$1',[roomId])).rows[0].n,1);
   assert.deepEqual(snapshot.placements[1].position, outdoor, 'courtyard placement survives server save and shared snapshot');
-  const visible=await getFile(a.modelFile);assert.equal(visible.statusCode,200,visible.body);assert.equal(visible.headers['cache-control'],'private, no-store');assert.deepEqual(visible.rawPayload,a.modelBytes);
+  const visible=await getFile(a.modelFile);assert.equal(visible.statusCode,200,visible.body);assert.equal(visible.headers['cache-control'],'private, no-cache');assert.deepEqual(visible.rawPayload,a.modelBytes);
+  // Browser cache: the ETag is the bytes' SHA-256; a matching If-None-Match gets a bodiless 304 only while the grant still allows the file.
+  const etag=visible.headers.etag;assert.equal(etag,`"${sha(a.modelBytes)}"`);
+  for(const tag of [etag,'W/'+etag,'"other", '+etag]){const cached=await getFile(a.modelFile,{...grantHeaders,'if-none-match':tag});assert.equal(cached.statusCode,304,tag);assert.equal(cached.rawPayload.length,0);}
+  assert.equal((await getFile(a.modelFile,{...grantHeaders,'if-none-match':'"other"'})).statusCode,200);
+  assert.equal((await getFile(b.modelFile,{...grantHeaders,'if-none-match':`"${sha(b.modelBytes)}"`})).statusCode,404,'a cached tag never bypasses the grant scope');
+  // ?variant=web serves the web copy once the worker built one, through the original's permission check; otherwise the original.
+  const webOf=id=>call('GET','/api/v1/files/'+id+'/content?variant=web',undefined,grantHeaders);
+  assert.deepEqual((await webOf(a.modelFile)).rawPayload,a.modelBytes,'no copy yet: the original');
+  const copyBytes=Buffer.from('web-copy-'+a.id),copyFile=await file(owner.user.id,'derived',copyBytes);await pool.query("INSERT INTO model_web_copies(model_file_id,file_id,policy) VALUES($1,$2,'web-v1')",[a.modelFile,copyFile]);
+  const web=await webOf(a.modelFile);assert.equal(web.statusCode,200);assert.deepEqual(web.rawPayload,copyBytes);assert.equal(web.headers.etag,`"${sha(copyBytes)}"`);
+  assert.equal((await call('GET','/api/v1/files/'+copyFile+'/content',undefined,grantHeaders)).statusCode,404,'the copy has no access of its own');
+  assert.equal((await call('GET','/api/v1/files/'+copyFile+'/content',undefined,owner.headers)).statusCode,404);
+  assert.equal((await call('GET','/api/v1/files/'+a.modelFile+'/content?variant=raw',undefined,grantHeaders)).statusCode,404);
+  assert.equal((await call('GET','/api/v1/files/'+b.modelFile+'/content?variant=web',undefined,grantHeaders)).statusCode,404);
   for(const id of [a.original,b.modelFile,foreign.modelFile])assert.equal((await getFile(id,{...grantHeaders,...owner.headers})).statusCode,404);
   assert.equal((await getFile(b.modelFile,{...grantHeaders,range:'bytes=0-2'})).statusCode,404);
   assert.equal((await getFile(a.modelFile,{'x-snapshot-grant':snapshot.grant.id,...owner.headers})).statusCode,403);
@@ -97,6 +111,8 @@ test('T07/T14 real PostgreSQL/API: CAS layouts, scoped shares, ranked discovery 
   assert.deepEqual((await ranking()).map(item=>item.ownerNickname),['room_other']);
   assert.equal((await getFile(a.modelFile)).statusCode,404);assert.equal((await call('POST',renewUrl,undefined,{...grantHeaders,'idempotency-key':renewKey})).statusCode,404);assert.equal((await call('GET','/api/v1/shared-rooms/'+token)).statusCode,404);
   assert.equal((await getFile(a.modelFile,{...grantHeaders,range:'bytes=0-2'})).statusCode,404);
+  assert.equal((await getFile(a.modelFile,{...grantHeaders,'if-none-match':etag})).statusCode,404,'closing the share stops the cached copy too');
+  assert.equal((await call('GET','/api/v1/files/'+a.modelFile+'/content?variant=web',undefined,{...grantHeaders,'if-none-match':`"${sha(copyBytes)}"`})).statusCode,404);
   me=await call('GET','/api/v1/rooms/me',undefined,owner.headers);assert.equal(me.json().data.shareEnabled,false);assert.equal(me.json().data.shareUrl,shareUrl);
   const reopened=await call('PUT','/api/v1/rooms/me/share',{enabled:true},owner.headers);assert.equal(reopened.json().data.shareUrl,shareUrl);assert.equal((await pool.query('SELECT share_epoch FROM rooms WHERE id=$1',[roomId])).rows[0].share_epoch,'3');assert.equal((await getFile(a.modelFile)).statusCode,404);assert.equal((await call('POST',renewUrl,undefined,grantHeaders)).statusCode,404);
   const fresh=(await call('GET','/api/v1/shared-rooms/'+token)).json().data;const freshHeaders={authorization:'Bearer '+fresh.grant.token,'x-snapshot-grant':fresh.grant.id};assert.equal((await getFile(b.modelFile,freshHeaders)).statusCode,200);

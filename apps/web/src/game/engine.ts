@@ -23,6 +23,8 @@ import { exhibitFit, slotMarker, EXHIBIT_FIT, type GallerySlot, type RoomModel }
 import { disposeResources } from '../scene/assets.js';
 import { PavilionSky } from './sky.js';
 import { PavilionAtmosphere, type Oculus } from './atmosphere.js';
+import { MODEL_CACHE, modelUrl } from './backpack-api.js';
+import { parsePreviewModel } from './model-preview-scene.js';
 
 export interface HudState { floor: ReturnType<typeof floorOf>; target: ExhibitSlot | null; fps: number; calls: number }
 export interface EngineHooks {
@@ -805,11 +807,9 @@ export class PavilionEngine {
     return { loaded, failed };
   }
   private async fetchExhibit(fileId: string, headers: Record<string, string>) {
-    const response = await fetch('/api/v1/files/' + encodeURIComponent(fileId) + '/content', { headers, credentials: 'omit', cache: 'no-store', signal: this.abort.signal });
+    const response = await fetch(modelUrl(fileId), { headers, credentials: 'omit', cache: MODEL_CACHE, signal: this.abort.signal });
     if (!response.ok) throw new Error('展品读取失败');
-    const manager = new T.LoadingManager();
-    manager.setURLModifier(url => { if (url.startsWith('blob:') || url.startsWith('data:')) return url; throw new Error('模型包含外部资源。'); });
-    return (await new GLTFLoader(manager).parseAsync(await response.arrayBuffer(), '')).scene;
+    return parsePreviewModel(await response.arrayBuffer());
   }
   private normalizeExhibit(scene: T.Object3D, model: RoomModel) {
     const translated = new T.Group(); translated.position.fromArray(model.normalization.translation); translated.add(scene);

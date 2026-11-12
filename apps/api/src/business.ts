@@ -123,13 +123,26 @@ export async function registerBusinessRoutes(app:FastifyInstance,{pool,store,con
   app.get('/api/v1/furniture',async request=>{await session(request);return list(request,'assets',"source_type='furniture' AND state='ready'",[],assetDto);});
   app.get('/api/v1/files/:id/content',async(request,reply)=>{
     const id=uuid((request.params as {id:string}).id);
-    if(hasSnapshotAuthorization(request)){const row=await snapshotFile(pool,request,id);reply.header('Cache-Control','private, no-store');reply.header('Content-Type',row.mime);reply.header('Content-Length',row.byte_size);reply.header('Content-Disposition','inline');return reply.send(await store.openRead(row.object_key));}
+    const variant=(request.query as {variant?:unknown}|undefined)?.variant;if(variant!==undefined&&variant!=='web')fail(404,'NOT_FOUND','未找到该文件');
+    if(hasSnapshotAuthorization(request))return sendFile(request,reply,await snapshotFile(pool,request,id),variant==='web');
     const s=await session(request);
     const row=(await pool.query(`SELECT f.* FROM files f WHERE f.id=$1 AND f.state='committed' AND (NOT EXISTS(SELECT 1 FROM assets a WHERE a.state='deleted' AND (a.model_file_id=f.id OR a.original_image_id=f.id OR a.generation_task_id IN (SELECT t.id FROM generation_tasks t WHERE t.input_file_id=f.id))) OR EXISTS(SELECT 1 FROM assets r WHERE r.state='ready' AND (r.model_file_id=f.id OR r.original_image_id=f.id))) AND ((f.owner_id=$2 AND (f.purpose='input_image' OR EXISTS(SELECT 1 FROM assets a WHERE a.state='ready' AND a.owner_id=$2 AND (a.model_file_id=f.id OR a.original_image_id=f.id)))) OR EXISTS(SELECT 1 FROM assets a WHERE a.model_file_id=f.id AND a.state='ready' AND a.source_type='furniture')
       OR EXISTS(SELECT 1 FROM asset_collections ac JOIN assets a ON a.id=ac.asset_id AND a.state='ready' WHERE ac.collector_id=$2 AND a.model_file_id=f.id)
       OR ($3='admin' AND (EXISTS(SELECT 1 FROM assets a WHERE a.state='ready' AND (a.model_file_id=f.id OR a.original_image_id=f.id)) OR EXISTS(SELECT 1 FROM asset_imports i WHERE i.input_file_id=f.id AND i.state<>'failed'))))`,[id,s.user.id,s.user.role])).rows[0];
-    if(!row)fail(404,'NOT_FOUND','未找到该文件');reply.header('Cache-Control','private, no-store');reply.header('Content-Type',row.mime);reply.header('Content-Length',row.byte_size);reply.header('Content-Disposition','inline');return reply.send(await store.openRead(row.object_key));
+    if(!row)fail(404,'NOT_FOUND','未找到该文件');return sendFile(request,reply,row,variant==='web');
   });
+  // Browsers keep files but must ask again on every use (no-cache): the permission check above runs each time, and
+  // only when it passes does a matching ETag (the bytes' SHA-256) get a bodiless 304, so revoked access never falls
+  // back to a cached copy. No Vary: each visit carries a fresh grant token and must still hit the same cache entry.
+  // `?variant=web` serves the model's web copy (smaller, same shape) when the worker has built one, else the original.
+  async function sendFile(request:FastifyRequest,reply:FastifyReply,row:Record<string,any>,web:boolean){
+    if(web){const copy=(await pool.query("SELECT f.* FROM model_web_copies w JOIN files f ON f.id=w.file_id AND f.state='committed' WHERE w.model_file_id=$1",[row.id])).rows[0];if(copy)row=copy;}
+    const etag=`"${row.sha256}"`;reply.header('Cache-Control','private, no-cache');reply.header('ETag',etag);
+    // Nginx gzip turns the tag weak (W/"..."): compare weakly, as RFC 9110 prescribes for If-None-Match.
+    const match=request.headers['if-none-match'];
+    if(typeof match==='string'&&match.split(',').some(t=>{t=t.trim();return t==='*'||t.replace(/^W\//,'')===etag;}))return reply.code(304).send();
+    reply.header('Content-Type',row.mime);reply.header('Content-Length',row.byte_size);reply.header('Content-Disposition','inline');return reply.send(await store.openRead(row.object_key));
+  }
   app.post('/api/v1/admin/assets',async(request,reply)=>{
     const s=await session(request,true);if(s.user.role!=='admin')fail(403,'FORBIDDEN','没有管理权限');const {fields,file,filename}=await multipartBody(request);exactFields(fields,['sourceType','source_type','name','description','era','material','ownershipType','holderName','location','officialUrl']);const source=fields.sourceType??fields.source_type;if(!['furniture','official_candidate'].includes(source))fail(422,'INVALID_INPUT','请选择官方物品或官方藏品');if(!/\.glb$/i.test(filename)||file.length>100*1024*1024)fail(422,'INVALID_MODEL','仅支持100MiB以内的GLB模型');
     const metadata:Record<string,string>={name:textField(fields.name,'名称',1,80),description:textField(fields.description??'','简介',source==='official_candidate'?1:0,2000)};

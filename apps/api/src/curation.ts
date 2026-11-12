@@ -364,7 +364,11 @@ export async function riskDelete(c:pg.PoolClient,id:string){
  for(const f of files){
   // A file still used by another ready asset (e.g. the same input image generated twice) stays readable for it.
   const r=(await c.query("UPDATE files SET state='deleted' WHERE id=$1 AND state<>'deleted' AND NOT EXISTS(SELECT 1 FROM assets a WHERE a.state='ready' AND a.id<>$2 AND (a.model_file_id=$1 OR a.original_image_id=$1)) RETURNING object_key",[f,id])).rows[0];
-  if(r)await c.query('INSERT INTO cleanup_jobs(asset_id,file_id,object_key) VALUES($1,$2,$3) ON CONFLICT (object_key) DO NOTHING',[id,f,r.object_key]);
+  if(!r)continue;
+  await c.query('INSERT INTO cleanup_jobs(asset_id,file_id,object_key) VALUES($1,$2,$3) ON CONFLICT (object_key) DO NOTHING',[id,f,r.object_key]);
+  // The model's web copy goes with it (it was only ever readable through the original's permission check).
+  const w=(await c.query("UPDATE files SET state='deleted' WHERE id=(SELECT file_id FROM model_web_copies WHERE model_file_id=$1) AND state<>'deleted' RETURNING id,object_key",[f])).rows[0];
+  if(w)await c.query('INSERT INTO cleanup_jobs(asset_id,file_id,object_key) VALUES($1,$2,$3) ON CONFLICT (object_key) DO NOTHING',[id,w.id,w.object_key]);
  }
  return {status:200,data:{deleted:true,roomsUpdated:rooms.length,placementsRemoved,submissionsClosed:submissions,candidateRemoved:Boolean(candidate),slotNo,galleryVersion},roomChanges};
 }

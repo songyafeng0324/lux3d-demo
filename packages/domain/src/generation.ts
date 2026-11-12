@@ -8,12 +8,24 @@ import {transaction,type Config} from './index.js';
 import {Lux3dCnClient,Lux3dTransportError,type Lux3dTask} from './lux3d.js';
 import {readLux3dCnKey} from './credentials.js';
 import {sha256,validateImage,validateModel,MODEL_LIMIT,ModelRejection} from './resources.js';
+import {buildWebModel,WEB_MODEL_POLICY} from './web-model.js';
 export const GENERATION_POLICY='t06-v1';
 export const GENERATION_PARAMS={version:'G1-Turbo' as const,faceCount:50000,outputFormat:['glb' as const],enablePbr:true,aiPredictSize:false};
 export const generationRequestHash=(inputSha256:string)=>sha256(JSON.stringify({inputSha256,policyVersion:GENERATION_POLICY,...GENERATION_PARAMS}));
 type Job={id:string;kind:string;ref_id:string;fence:string;attempts?:number};
 /** Environment faults (Chrome, storage) retry this many attempts before the import is closed as a validator error. */
 export const IMPORT_VALIDATOR_ATTEMPTS=3;
+/** A web copy that keeps failing is given up after this many attempts: pages then load the original. */
+export const WEB_COPY_ATTEMPTS=3;
+/**
+ * Queues a 'web_copy' job for every committed model of a ready asset that has neither a copy nor a job yet
+ * (new generations, imports, seeded furniture and, once, everything that predates copies). Idempotent.
+ */
+export async function enqueueWebCopies(pool:pg.Pool){
+ // Inside transaction(): writes take the shared maintenance lock, so a backup never sees half a sweep.
+ return transaction(pool,async c=>(await c.query(`INSERT INTO jobs(kind,ref_id) SELECT DISTINCT 'web_copy',a.model_file_id FROM assets a JOIN files f ON f.id=a.model_file_id AND f.state='committed'
+  WHERE a.state='ready' AND NOT EXISTS(SELECT 1 FROM model_web_copies w WHERE w.model_file_id=a.model_file_id) ON CONFLICT (kind,ref_id) DO NOTHING`)).rowCount??0);
+}
 export interface GenerationProvider {
  quoteImageTask(params:any):Promise<{quoteId:string;credits:number;expiresAt:string}>;
  uploadFile(file:string):Promise<{url:string}>;
@@ -30,13 +42,13 @@ export class GenerationWorker {
  private async bytes(key:string){const chunks:Buffer[]=[];for await(const c of await this.store.openRead(key))chunks.push(c as Buffer);return Buffer.concat(chunks);}
  async tick(refId?:string){
   const job=await transaction(this.pool,async c=>{
-   const r=await c.query(`SELECT * FROM jobs WHERE kind IN ('generation','import') AND ($1::uuid IS NULL OR ref_id=$1) AND ((state='queued' AND run_at<=now()) OR (state='running' AND lease_until<now())) ORDER BY run_at,id FOR UPDATE SKIP LOCKED LIMIT 1`,[refId??null]);
+   const r=await c.query(`SELECT * FROM jobs WHERE kind IN ('generation','import','web_copy') AND ($1::uuid IS NULL OR ref_id=$1) AND ((state='queued' AND run_at<=now()) OR (state='running' AND lease_until<now())) ORDER BY kind='web_copy',run_at,id FOR UPDATE SKIP LOCKED LIMIT 1`,[refId??null]);
    if(!r.rowCount)return null;
    return (await c.query(`UPDATE jobs SET state='running',fence=fence+1,attempts=attempts+1,lease_until=now()+interval '120 seconds' WHERE id=$1 RETURNING *`,[r.rows[0].id])).rows[0] as Job;
   });
   if(!job)return false;
   const timer=setInterval(()=>{void this.pool.query("UPDATE jobs SET lease_until=now()+interval '120 seconds' WHERE id=$1 AND fence=$2 AND state='running' AND lease_until>now()",[job.id,job.fence]).catch(()=>{});},15000);
-  try{if(job.kind==='generation')await this.generate(job);else await this.importModel(job);}
+  try{if(job.kind==='generation')await this.generate(job);else if(job.kind==='web_copy')await this.webCopy(job);else await this.importModel(job);}
   catch(error){await this.requeue(job,error instanceof Lux3dTransportError?error.code:'processing_error');}
   finally{clearInterval(timer);}return true;
  }
@@ -146,6 +158,30 @@ export class GenerationWorker {
   const response=await fetch(url,{redirect:'error',signal:AbortSignal.timeout(90000)});if(!response.ok||!response.body)throw new Error('DOWNLOAD_PENDING');
   if(Number(response.headers.get('content-length'))>MODEL_LIMIT)throw new Error('MODEL_SIZE_LIMIT');
   const chunks:Buffer[]=[];let size=0;for await(const chunk of response.body){size+=chunk.byteLength;if(size>MODEL_LIMIT){await response.body.cancel().catch(()=>{});throw new Error('MODEL_SIZE_LIMIT');}chunks.push(Buffer.from(chunk));}return Buffer.concat(chunks);
+ }
+ /** Builds the web copy of model file job.ref_id; a model deleted meanwhile keeps no copy (its row lock orders this against riskDelete). */
+ private async webCopy(job:Job){
+  const finish=(success:boolean)=>transaction(this.pool,async c=>{if(await this.owns(c,job))await this.finishJob(c,job,success);});
+  // A model that kills the process (out of memory in the decoder) never reaches the catch below: stop after the cap here too.
+  if(Number(job.attempts??0)>WEB_COPY_ATTEMPTS){console.error(`模型 ${job.ref_id} 的网页副本反复中断，放弃生成，网页继续加载原文件。`);await finish(false);return;}
+  const f=(await this.pool.query('SELECT * FROM files WHERE id=$1',[job.ref_id])).rows[0];
+  if(!f||f.state!=='committed'||(await this.pool.query('SELECT 1 FROM model_web_copies WHERE model_file_id=$1',[f.id])).rowCount){await finish(true);return;}
+  let copy:Uint8Array|null;
+  try{const bytes=await this.bytes(f.object_key);if(sha256(bytes)!==f.sha256)throw new Error('WEB_COPY_SOURCE_CHECKSUM');copy=await buildWebModel(bytes);}
+  catch(error){if(Number(job.attempts??WEB_COPY_ATTEMPTS)<WEB_COPY_ATTEMPTS)throw error;console.error(`模型 ${f.id} 的网页副本生成失败，网页继续加载原文件：`,error);await finish(false);return;}
+  if(!copy){await finish(true);return;}
+  const id=randomUUID(),hash=sha256(copy);
+  await this.store.commit(await this.store.putStaged(copy),id,hash);
+  // The object is only kept once the transaction that records it has committed.
+  let used=false;
+  try{used=await transaction(this.pool,async c=>{if(!await this.owns(c,job))return false;let recorded=false;
+   const source=(await c.query('SELECT state FROM files WHERE id=$1 FOR UPDATE',[f.id])).rows[0];
+   if(source?.state==='committed'&&!(await c.query('SELECT 1 FROM model_web_copies WHERE model_file_id=$1',[f.id])).rowCount){
+    await c.query("INSERT INTO files(id,owner_id,purpose,object_key,sha256,byte_size,mime,state) VALUES($1::uuid,$2,'derived',$1::text,$3,$4,'model/gltf-binary','committed')",[id,f.owner_id,hash,copy!.byteLength]);
+    await c.query('INSERT INTO model_web_copies(model_file_id,file_id,policy) VALUES($1,$2,$3)',[f.id,id,WEB_MODEL_POLICY]);recorded=true;
+   }
+   await this.finishJob(c,job,true);return recorded;
+  });}finally{if(!used)await this.store.delete(id).catch(()=>{});}
  }
  private async importModel(job:Job){
   const row=(await this.pool.query('SELECT i.*,f.object_key,f.sha256 AS file_sha256,f.state AS file_state FROM asset_imports i JOIN files f ON f.id=i.input_file_id WHERE i.id=$1',[job.ref_id])).rows[0];if(!row)throw new Error('IMPORT_MISSING');

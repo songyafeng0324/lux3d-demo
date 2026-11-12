@@ -98,7 +98,7 @@ test('T06 real API: account, cookie/CSRF, idempotency, quota, authorization and 
   assert.equal((await submitAgain()).json().error.code,'QUOTA_EXHAUSTED');
   assert.equal((await call('GET','/api/v1/generation-tasks/'+task.id,undefined,headers)).json().data.status,'succeeded');
   assert.equal((await pool.query("SELECT count(*)::int n FROM quota_events WHERE user_id=$1 AND kind='reserve' AND quota_day=$2",[uid,day])).rows[0].n,2);
-  const file=await call('GET',`/api/v1/files/${inputFileId}/content`,undefined,headers);assert.equal(file.statusCode,200);assert.equal(file.headers['cache-control'],'private, no-store');assert.deepEqual(file.rawPayload,image);
+  const file=await call('GET',`/api/v1/files/${inputFileId}/content`,undefined,headers);assert.equal(file.statusCode,200);assert.equal(file.headers['cache-control'],'private, no-cache');assert.deepEqual(file.rawPayload,image);
   const other={...account,username:'other_user'};assert.equal((await call('POST','/api/v1/auth/register',other)).statusCode,201);const otherLogin=await call('POST','/api/v1/auth/login',{username:other.username,password:other.password});const otherCookie=otherLogin.headers['set-cookie'].split(';')[0];
   for(const url of [`/api/v1/files/${inputFileId}/content`,`/api/v1/generation-tasks/${task.id}`])assert.equal((await call('GET',url,undefined,{cookie:otherCookie})).statusCode,404);
   assert.equal((await call('GET','/api/v1/assets/'+assetId,undefined,{cookie:otherCookie})).statusCode,404);
