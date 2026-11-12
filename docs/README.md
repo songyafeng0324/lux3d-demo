@@ -17,6 +17,7 @@
 - [沉浸式MVP实施计划](architecture/沉浸式MVP实施计划.md)、[最新场景确认](product/2026-11-04-沉浸场景与建模确认.md)、[Blender/MCP环境准备](validation/Blender与MCP环境准备.md)、[计划与环境评审](reviews/沉浸计划与环境评审.md)：计划与环境已准备，2026-11-05启动T10-A设计，建模/程序改造尚未实施。
 - [场景方案](design/场景与交互方案.md)、[T04实际验证](validation/场景交互验证.md)、[T04代码评审](reviews/T04代码评审.md)：可操作实验页、保存恢复及本机性能通过，正式PG业务待后续接入。
 - [Lux3D接入契约](contracts/Lux3D接入契约.md)、[T03验证结果](validation/Lux3D接入验证.md)、[T03代码评审](reviews/T03代码评审.md)：真实单图及隔离探针闭环已过，正式网站业务待T06。
+- [部署说明](部署说明.md)：线上 https://yafeng.fun（阿里云香港）、一键更新 `scripts/deploy-hk.sh`、服务器布局、备份与 SSH 注意事项。
 - [本地运行](本地运行.md)、[T05实际验证](validation/本地基础工程验证.md)、[T05代码评审](reviews/T05代码评审.md)：已可启动基础工作台，业务仍待后续模块。
 - [本地优先确认](product/2026-11-04-本地优先确认.md)：当前范围增量，云资源与预算暂缓。
 - [MVP 技术方案](architecture/MVP技术方案.md)、[数据与接口契约](contracts/数据与接口契约.md)、[本地验收计划](validation/MVP验收计划.md)：T02 实施基线与本地验收设计，执行结果见 T09。

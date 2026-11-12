@@ -8,6 +8,7 @@
 - 根级 `docs/` — 集中内容层(项目"做出什么"):产品 / 架构 / `contracts/` 跨模块契约 / `modules/` 模块说明 / 评审和产出说明
 - `apps/web/`、`apps/api/`、`apps/worker/` — 网页、HTTP服务、后台进程；`packages/domain/`、`packages/contracts/` — 领域基础与DTO。各模块有局部入口，仍共用根级控制层。
 - `migrations/`、`scripts/`、`tests/` — 版本迁移、环境与运行管理、基础验证。运行入口见 `docs/本地运行.md`；实际结果见 `docs/validation/本地基础工程验证.md`。
+- 线上部署见 `docs/部署说明.md`：`bash scripts/deploy-hk.sh` 在 Mac 构建后 rsync 到服务器（服务器不放源码）；`node scripts/pull-hk.mjs` 把线上数据拉回 Mac（加 `--apply` 才替换本机库）；`bash scripts/stats-hk.sh` 看访问与业务统计。
 - `assets/t16/` — 现行藏宝阁：Blender 源、GLB 与布局/行走数据（由 `scripts/blender/build_t16.py` 导出），`textures/polyhaven/` 为入库的 CC0 贴图（`scripts/fetch-t16-textures.mjs` 下载）；`assets/t10/` 为旧二层阁的历史资产。运行验证在 `docs/validation/`。
 - `DESIGN.md` — 古建筑场景、家具及交互的设计决策入口；具体方案按需放 `docs/design/`。
 - **判据**:协调 / 推进总体项目的 → 根级 `flow/`;需要统一发现的知识和方案 → 根级 `docs/`;代码 → 对应子项目。默认不在子项目重复建 `flow/` 或 `docs/`
@@ -74,7 +75,7 @@
 
 ## 项目边界与产品依据
 - 当前按单一项目边界管理；T02 本地实施基线见 `docs/architecture/MVP技术方案.md`，合同见 `docs/contracts/数据与接口契约.md`，验证项未关闭前不宣称参数全部冻结。
-- 2026-11-04 起先在 MacBook 本地跑通，云资源/区域/预算暂缓；最新范围增量见 `docs/product/2026-11-04-本地优先确认.md`，在对应事项上优先于此前补充。本地资产走私有 LocalFileStore，数据库保持 PostgreSQL，避免换用不同事务语义。2026-11-12 起公开上线：主站部署在阿里云香港轻量服务器（4 核 8 GB），走 https，不限制注册和生成总量；理由见 `flow/decisions.md`。
+- 2026-11-04 起先在 MacBook 本地跑通，云资源/区域/预算暂缓；最新范围增量见 `docs/product/2026-11-04-本地优先确认.md`，在对应事项上优先于此前补充。本地资产走私有 LocalFileStore，数据库保持 PostgreSQL，避免换用不同事务语义。2026-11-12 起公开上线：主站部署在阿里云香港轻量服务器（4 核 8 GB），走 https，不限制注册和生成总量；理由见 `flow/decisions.md`。线上域名 https://yafeng.fun，以服务器数据为准；配置在 `/etc/aholo/aholo.env`，数据在 `/var/lib/aholo/data`，每天 04:30 自动备份、保留 7 天；轻量服务器没有自动快照，大改前在控制台手动拍。SSH 用 `ssh aholo-hk`；Mac 开着 TAG 代理时必须走 `BindInterface en0`，`nc` 显示端口通、`dig` 查到 198.18.x.x 都是代理造成的假象。
 - 当前产品基线：`docs/product/藏宝阁与个人小屋-MVP-PRD-v2.0.md` 与 `docs/product/2026-11-03-需求补充确认.md`；后者记录已确认增量并在相应事项上优先。基线不能标为已实现或已通过验收。
 - T12 试玩规则见 `docs/product/2026-11-06-试玩功能调整.md`，对应事项优先。默认生成额度为每天 10 次，实际使用量及管理员当日覆盖继续由 PostgreSQL 结算。
 - T13 展品收藏规则见 `docs/product/2026-11-07-展品收藏与背包改版.md` 与数据契约第 12 节。收藏读取当前获审公共名称和作者昵称，取消收藏原子清理本人小屋的对应摆放并撤销旧分享的该模型权限。
