@@ -1,0 +1,906 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>藏宝阁与个人小屋 · 项目报告书</title>
+<style>
+  @page { size: 297mm 210mm; margin: 0; }
+  :root {
+    --ink: #0d0a08;
+    --ink-2: #17110d;
+    --ink-3: #221a14;
+    --line: rgba(201, 163, 91, .32);
+    --gold: #cfa95e;
+    --gold-2: #e8cf94;
+    --seal: #a8302a;
+    --paper: #f1e8d6;
+    --mute: #b9ab93;
+    --dim: #8c7f6b;
+    --good: #8fc79b;
+    --serif: "Songti SC", "STSong", "Noto Serif SC", "Source Han Serif SC", serif;
+    --sans: "PingFang SC", "Hiragino Sans GB", "Helvetica Neue", system-ui, sans-serif;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html { background: #050403; }
+  body { font-family: var(--sans); color: var(--paper); font-size: 10pt; line-height: 1.62; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  img { display: block; width: 100%; height: 100%; object-fit: cover; }
+  a { color: var(--gold-2); text-decoration: none; }
+
+  /* ---------- 页面骨架 ---------- */
+  .page { width: 297mm; height: 210mm; margin: 0 auto 8mm; position: relative; overflow: hidden; background:
+      radial-gradient(1200px 520px at 85% -10%, rgba(168, 48, 42, .18), transparent 60%),
+      radial-gradient(900px 600px at -10% 110%, rgba(207, 169, 94, .10), transparent 60%),
+      var(--ink); page-break-after: always; break-after: page; padding: 15mm 16mm 13mm; display: flex; flex-direction: column; }
+  @media print { html { background: none; } .page { margin: 0; } }
+  .run { display: flex; justify-content: space-between; align-items: baseline; font-size: 7.6pt; letter-spacing: .18em; color: var(--dim); border-bottom: 1px solid var(--line); padding-bottom: 2.2mm; margin-bottom: 5mm; }
+  .run > span:first-child { font-family: var(--serif); font-size: 15pt; font-weight: 700; letter-spacing: .12em; color: var(--paper); line-height: 1.2; }
+  .run b { color: var(--gold); font-weight: 700; font-family: var(--sans); font-size: 12pt; margin-right: 2mm; letter-spacing: .08em; }
+  .foot { position: absolute; left: 16mm; right: 16mm; bottom: 6mm; display: flex; justify-content: space-between; font-size: 7pt; color: var(--dim); letter-spacing: .12em; }
+  .main { flex: 1; min-height: 0; display: flex; flex-direction: column; gap: 4.5mm; }
+
+  /* ---------- 排版 ---------- */
+  .kicker { font-size: 8pt; letter-spacing: .3em; color: var(--gold); text-transform: none; }
+  h1, h2, h3 { font-family: var(--serif); font-weight: 700; color: var(--paper); letter-spacing: .04em; }
+  h2 { font-size: 21pt; line-height: 1.25; }
+  h2 small { font-size: 10.5pt; font-weight: 400; color: var(--mute); margin-left: 4mm; letter-spacing: .06em; }
+  h3 { font-size: 11.5pt; color: var(--gold-2); margin-bottom: 1.4mm; }
+  p { color: #e0d6c2; }
+  p + p { margin-top: 1.6mm; }
+  .lead { font-size: 11pt; color: #eadfc9; line-height: 1.75; }
+  .muted { color: var(--mute); }
+  .small { font-size: 8.4pt; line-height: 1.5; }
+  .gold { color: var(--gold-2); }
+  ul.tight { list-style: none; }
+  ul.tight li { position: relative; padding-left: 4mm; margin: 1.1mm 0; color: #e0d6c2; }
+  ul.tight li::before { content: ""; position: absolute; left: 0; top: .62em; width: 1.6mm; height: 1.6mm; background: var(--gold); transform: rotate(45deg); }
+  .row { display: flex; gap: 5mm; min-height: 0; }
+  .col { display: flex; flex-direction: column; gap: 3mm; min-width: 0; min-height: 0; }
+  .grow { flex: 1; }
+  .card { background: linear-gradient(180deg, rgba(34, 26, 20, .92), rgba(23, 17, 13, .92)); border: 1px solid var(--line); border-radius: 2mm; padding: 4mm 4.5mm; }
+  .card.seal { border-color: rgba(168, 48, 42, .65); }
+  .tag { display: inline-block; font-size: 7.4pt; letter-spacing: .12em; color: var(--ink); background: var(--gold); border-radius: 1mm; padding: .3mm 2mm; margin-right: 2mm; vertical-align: 1px; }
+  .tag.red { background: var(--seal); color: #fff3e2; }
+  .tag.line { background: transparent; border: 1px solid var(--gold); color: var(--gold-2); }
+
+  /* ---------- 图片 ---------- */
+  figure { position: relative; min-height: 0; display: flex; flex-direction: column; gap: 1.4mm; }
+  figure .im { flex: 1; min-height: 0; border: 1px solid var(--line); border-radius: 1.6mm; overflow: hidden; background: #000; }
+  figcaption { font-size: 7.8pt; color: var(--mute); line-height: 1.4; }
+  figcaption b { color: var(--gold-2); font-weight: 600; }
+  .badge { position: absolute; top: 2mm; left: 2mm; background: rgba(13, 10, 8, .82); border: 1px solid var(--line); color: var(--gold-2); font-size: 7.2pt; letter-spacing: .1em; padding: .4mm 2mm; border-radius: 1mm; z-index: 2; }
+  .arrow { align-self: center; color: var(--gold); font-size: 15pt; flex: none; }
+
+  /* ---------- 封面 ---------- */
+  .cover { padding: 0; }
+  .cover .bg { position: absolute; inset: 0; }
+  .cover .bg img { filter: saturate(1.05) brightness(.9); }
+  .cover .bg::after { content: ""; position: absolute; inset: 0; background: linear-gradient(90deg, rgba(8, 6, 4, .97) 0%, rgba(8, 6, 4, .86) 36%, rgba(8, 6, 4, .25) 64%, rgba(8, 6, 4, 0) 100%), linear-gradient(0deg, rgba(8, 6, 4, .75), transparent 38%); }
+  .cover .inner { position: relative; z-index: 2; padding: 22mm 20mm 16mm; height: 100%; display: flex; flex-direction: column; justify-content: space-between; width: 62%; }
+  .seal-mark { width: 15mm; height: 15mm; background: var(--seal); color: #fff2dc; font-family: var(--serif); font-size: 21pt; font-weight: 700; display: flex; align-items: center; justify-content: center; border-radius: 1.6mm; box-shadow: 0 0 0 1px rgba(255, 220, 170, .35) inset; }
+  .cover h1 { font-size: 44pt; letter-spacing: .22em; line-height: 1.15; margin: 7mm 0 4mm; }
+  .cover .tagline { font-family: var(--serif); font-size: 15pt; color: var(--gold-2); letter-spacing: .1em; line-height: 1.7; }
+  .cover .chain { margin-top: 7mm; display: flex; flex-wrap: wrap; gap: 2mm 3mm; font-size: 9pt; color: #d8cdb6; }
+  .cover .chain span { border: 1px solid var(--line); background: rgba(13, 10, 8, .55); border-radius: 5mm; padding: .6mm 3.2mm; }
+  .cover .meta { font-size: 8.8pt; line-height: 1.9; color: var(--mute); letter-spacing: .06em; }
+  .cover .meta b { color: var(--paper); font-weight: 600; }
+
+  /* ---------- 数字条 ---------- */
+  .stats { display: grid; grid-template-columns: repeat(6, 1fr); gap: 3mm; }
+  .stat { border-top: 2px solid var(--gold); padding-top: 2mm; }
+  .stat .n { font-family: var(--serif); font-size: 21pt; font-weight: 700; color: var(--gold-2); line-height: 1.1; letter-spacing: .02em; }
+  .stat .n small { font-size: 10pt; margin-left: 1mm; color: var(--gold); font-weight: 400; }
+  .stat .l { font-size: 7.8pt; color: var(--mute); margin-top: 1mm; line-height: 1.4; }
+
+  /* ---------- 流程 ---------- */
+  .flow { display: flex; align-items: stretch; gap: 0; }
+  .step { flex: 1; background: linear-gradient(180deg, rgba(34, 26, 20, .95), rgba(23, 17, 13, .95)); border: 1px solid var(--line); border-radius: 2mm; padding: 3.2mm 3.4mm; position: relative; min-width: 0; }
+  .step + .step { margin-left: 5.5mm; }
+  .step + .step::before { content: "›"; position: absolute; left: -5mm; top: 50%; transform: translateY(-58%); color: var(--gold); font-size: 17pt; width: 4.5mm; text-align: center; }
+  .step .no { font-family: var(--serif); font-size: 15pt; color: var(--gold); line-height: 1; }
+  .step h4 { font-size: 9.6pt; color: var(--gold-2); margin: 1.2mm 0 .8mm; font-weight: 700; }
+  .step p { font-size: 8pt; line-height: 1.45; color: #d3c8b1; }
+
+  /* ---------- 表格 ---------- */
+  table { width: 100%; border-collapse: collapse; font-size: 8.6pt; }
+  th, td { text-align: left; padding: 1.5mm 2.4mm; border-bottom: 1px solid rgba(201, 163, 91, .18); vertical-align: top; }
+  th { color: var(--gold); font-weight: 600; font-size: 8pt; letter-spacing: .1em; border-bottom: 1px solid var(--line); }
+  td.k { color: var(--gold-2); white-space: nowrap; }
+  td .bad { color: #e49a8f; }
+  td .ok { color: var(--good); }
+
+  /* ---------- 对照网格 ---------- */
+  .pairs { display: grid; gap: 1.6mm; }
+  .pair { display: flex; flex-direction: column; gap: .8mm; }
+  .pair .im { border: 1px solid var(--line); border-radius: 1.2mm; overflow: hidden; background: #fff; aspect-ratio: 1; }
+  .pair .lb { font-size: 7.2pt; text-align: center; color: var(--mute); }
+  .pairs .rowlabel { font-size: 7.4pt; letter-spacing: .14em; color: var(--gold); writing-mode: vertical-rl; text-align: center; align-self: center; }
+
+  /* ---------- 条形图 ---------- */
+  .bars { display: flex; flex-direction: column; gap: 3.2mm; }
+  .bar { display: grid; grid-template-columns: 29mm 1fr 27mm; align-items: center; gap: 3mm; }
+  .bar .nm { font-size: 8.4pt; color: var(--mute); text-align: right; }
+  .bar .tr { height: 6mm; background: rgba(255, 255, 255, .05); border-radius: 1mm; position: relative; }
+  .bar .fl { position: absolute; left: 0; top: 0; bottom: 0; border-radius: 1mm; display: flex; align-items: center; padding-left: 2.2mm; font-size: 8.2pt; color: #1a120c; font-weight: 700; white-space: nowrap; }
+  .bar .fl.old { background: #7e6f5d; color: #1a120c; }
+  .bar .fl.new { background: linear-gradient(90deg, var(--gold), var(--gold-2)); }
+  
+  /* ---------- 时间线 ---------- */
+  .tl { display: grid; grid-template-columns: repeat(9, 1fr); gap: 0; position: relative; margin-top: 2mm; }
+  .tl::before { content: ""; position: absolute; left: 2%; right: 2%; top: 3.3mm; height: 1px; background: var(--line); }
+  .tl .d { padding: 0 1.4mm; position: relative; }
+  .tl .d::before { content: ""; display: block; width: 3.2mm; height: 3.2mm; background: var(--gold); transform: rotate(45deg); margin: 1.7mm 0 3mm 0; position: relative; z-index: 1; }
+  .tl .d.hi::before { background: var(--seal); box-shadow: 0 0 0 1px var(--gold) inset; }
+  .tl .dt { font-family: var(--serif); font-size: 11pt; color: var(--gold-2); font-weight: 700; }
+  .tl .tx { font-size: 7.6pt; line-height: 1.45; color: #d3c8b1; margin-top: 1mm; }
+
+  .step-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 3mm; }
+  .step-grid .step { margin-left: 0 !important; }
+  .step-grid .step::before { content: none !important; }
+  .res { margin-top: auto; padding-top: 1.8mm; border-top: 1px dashed var(--line); font-size: 8.4pt; color: var(--gold-2); line-height: 1.5; }
+  .pairs.tall .im { aspect-ratio: 1 / 1.2; }
+  .vl { font-size: 8.8pt; color: var(--gold-2); font-weight: 600; white-space: nowrap; }
+  .mini { display: grid; grid-template-columns: repeat(4, 1fr); gap: 2mm; }
+  .mini div { border: 1px solid var(--line); border-radius: 1.4mm; padding: 1.6mm 2.4mm; font-size: 7.8pt; line-height: 1.4; color: #d3c8b1; background: rgba(34,26,20,.7); }
+  .mini div b { display: block; color: var(--gold-2); font-size: 8.6pt; }
+  .cells { display: grid; grid-template-columns: repeat(3, 1fr); gap: 2.6mm 4mm; }
+  .cell { display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; gap: 1.4mm; }
+  .cell .im { aspect-ratio: 1; border: 1px solid var(--line); border-radius: 1.2mm; overflow: hidden; background: #fff; }
+  .cell .ar { color: var(--gold); font-size: 10pt; }
+  .cell .lb { grid-column: 1 / -1; text-align: center; font-size: 7.4pt; color: var(--mute); margin-top: -.4mm; }
+  .pairs.xl .im { aspect-ratio: 1 / 1.3; }
+  .step-grid.fill { flex: 1; grid-auto-rows: 1fr; }
+  table.dense td, table.dense th { padding: .5mm 1mm; font-size: 7.4pt; line-height: 1.25; }
+  table.dense td.n { text-align: right; font-variant-numeric: tabular-nums; }
+  .quote { font-family: var(--serif); font-size: 13pt; line-height: 1.85; color: var(--paper); border-left: 3px solid var(--seal); padding: 1mm 0 1mm 5mm; letter-spacing: .03em; }
+  .keys { display: grid; grid-template-columns: auto 1fr; gap: 1.2mm 3mm; font-size: 8.6pt; align-items: center; }
+  .key { display: inline-block; min-width: 6.2mm; text-align: center; border: 1px solid var(--gold); color: var(--gold-2); border-radius: 1mm; padding: 0 1.4mm; font-size: 8pt; font-weight: 600; background: rgba(207, 169, 94, .08); }
+</style>
+</head>
+<body>
+
+<!-- ============ 01 封面 ============ -->
+<section class="page cover">
+  <div class="bg"><img src="assets/img/live-hall.jpg" alt="" style="transform:scale(1.14);transform-origin:50% 100%"></div>
+  <div class="inner">
+    <div>
+      <div class="seal-mark">藏</div>
+      <h1>藏宝阁<br>与个人小屋</h1>
+      <p class="tagline">一张图，生成一件藏品；<br>一座阁，展出所有人的宝物。</p>
+      <div class="chain">
+        <span>单图生成 3D</span><span>个人背包</span><span>古建筑小屋布置</span><span>链接分享</span><span>公共藏宝阁</span>
+      </div>
+    </div>
+    <div class="meta">
+      <b>项目报告书</b> · 2026-11-13<br>
+      在线体验　<a href="https://yafeng.fun">https://yafeng.fun</a>（电脑端 Chrome）<br>
+      基于 <b>Aholo Lux3D</b>（中国区）单图生成 3D　·　运行画面均为真实浏览器实拍
+    </div>
+  </div>
+</section>
+
+<!-- ============ 02 一页读懂 ============ -->
+<section class="page">
+  <div class="run"><span><b>01</b>　一页读懂</span><span>藏宝阁与个人小屋 · 项目报告书</span></div>
+  <div class="main">
+    <div class="row" style="gap:7mm;flex:1">
+      <div class="col" style="flex:1.12">
+        <span class="kicker">PROJECT AT A GLANCE</span>
+        <h2>让普通人，把一张图<br>变成能走进去的展品</h2>
+        <p class="lead">用户在浏览器里上传一张图片，几分钟后就得到一件 3D 藏品，进入个人背包；可以把它摆进自己布置的古建筑小屋，把链接分享给朋友参观；好藏品还能投稿，经管理员审核后，陈列到公共的<b class="gold">藏宝阁</b>里——一座要走路、上楼梯、按 E 才能细看的两层大殿。</p>
+        <div class="card">
+          <h3>它做成了什么</h3>
+          <ul class="tight">
+            <li><b>整条链路真的打通</b>：账号、每日额度、异步生成、入包预览、小屋保存、分享、投稿、审核、展位、后台调额，51 项验收标准全部通过。</li>
+            <li><b>已公开上线</b>：https://yafeng.fun，当前藏宝阁已展出 10 / 30 件 AI 生成的藏品。</li>
+            <li><b>每一件摆设都来自一张图</b>：藏品、官方物品、摆件乃至可选角色，都由 AI 参考图经 Lux3D 单图生成，再接入 Blender 与网页引擎。</li>
+          </ul>
+        </div>
+      </div>
+      <figure style="flex:1">
+        <div class="im" style="aspect-ratio:auto"><img src="assets/img/live-lookup.jpg" alt=""></div>
+        <figcaption><b>仰望天井</b>　线上实拍：天窗光柱、藻井、条幅与鎏金巨柱。</figcaption>
+      </figure>
+    </div>
+    <div class="stats">
+      <div class="stat"><div class="n">51<small>/ 51</small></div><div class="l">验收标准 AC01–AC51 全部通过（11-06）</div></div>
+      <div class="stat"><div class="n">9<small>天</small></div><div class="l">从 PRD（11-03）到公开上线（11-12）</div></div>
+      <div class="stat"><div class="n">30</div><div class="l">个展位，分镇阁 / 甲 / 乙三档尺寸</div></div>
+      <div class="stat"><div class="n">53<small>万</small></div><div class="l">三角面的建筑，104 件摆件实例化，约 60 FPS</div></div>
+      <div class="stat"><div class="n">3.55<small>MB</small></div><div class="l">首屏传输量（优化前 22.55 MB）</div></div>
+      <div class="stat"><div class="n">0</div><div class="l">穿模：2.77 万个第三人称机位逐一对照</div></div>
+    </div>
+  </div>
+  <div class="foot"><span>https://yafeng.fun</span><span>02 / 17</span></div>
+</section>
+
+<!-- ============ 03 创意起点 ============ -->
+<section class="page">
+  <div class="run"><span><b>02</b>　创意与问题</span><span>藏宝阁与个人小屋 · 项目报告书</span></div>
+  <div class="main">
+    <div>
+      <span class="kicker">WHERE IT STARTED</span>
+      <h2>没有这个网站时，路有多长<small>创意起点</small></h2>
+    </div>
+    <div class="quote">“我的网站用户直接上传图片，生成模型放入个人背包，然后可以自己编辑房间，以及分享链接。相当于打通了整个链路。”<div class="small muted" style="margin-top:1.5mm;letter-spacing:.06em;font-family:var(--sans)">—— 产品需求原话（PRD v2.0 第 2 节）</div></div>
+    <div class="row" style="gap:6mm">
+      <div class="card col grow" style="gap:2.4mm">
+        <h3>原来：三道坎，每一步都可能劝退普通人</h3>
+        <div class="flow" style="margin-top:1mm">
+          <div class="step"><div class="no">一</div><h4>找 AI 工具</h4><p>先要知道有哪些 3D 生成工具、哪个能用、怎么注册。</p></div>
+          <div class="step"><div class="no">二</div><h4>生成模型</h4><p>学会提交图片、等待、下载文件、处理格式。</p></div>
+          <div class="step"><div class="no">三</div><h4>自己做网站展示</h4><p>得会开发，才能把模型放进可浏览、可分享的页面。</p></div>
+        </div>
+        <h3 style="margin-top:3mm">现在：只做一件事——选一张图</h3>
+        <div class="flow" style="margin-top:1mm">
+          <div class="step"><div class="no">1</div><h4>上传图片</h4><p>不用先写名称简介，也不选参数。</p></div>
+          <div class="step"><div class="no">2</div><h4>生成并入包</h4><p>后台异步生成，进入个人背包即可 3D 预览。</p></div>
+          <div class="step"><div class="no">3</div><h4>布置小屋</h4><p>古建筑里摆家具与藏品，自动保存。</p></div>
+          <div class="step"><div class="no">4</div><h4>分享链接</h4><p>免登录只读参观，可随时关闭再重开。</p></div>
+          <div class="step"><div class="no">5</div><h4>投稿展出</h4><p>审核通过，上藏宝阁公开展位。</p></div>
+        </div>
+        <div style="margin-top:auto;border-left:3px solid var(--gold);padding:1mm 0 1mm 4mm">
+          <p style="font-size:10.2pt;line-height:1.7"><b class="gold">关键转折</b>　Lux3D 把“单张图片 → 带 PBR 材质的 3D 模型”变成一次 API 调用，才让“普通人上传一张图”成为可能；剩下要解决的，是让这个结果<b>可靠地交付、有地方可去、能被别人看见</b>。</p>
+        </div>
+      </div>
+      <div class="col" style="width:78mm">
+        <div class="card seal">
+          <h3>为什么是“藏宝阁 + 小屋”</h3>
+          <p class="small"><b class="gold">公共藏宝阁</b>面向古玩、文物方向，由用户投稿与管理员录入共同供给，是“被认可的展出”。<br><b class="gold">个人小屋</b>留给手办、游戏角色、日常小物，是“属于自己的陈列”。</p>
+          <p class="small" style="margin-top:2mm">两个空间共用同一套背包与行走规则，让“生成的东西”有地方可去，而不只是一个下载链接。</p>
+        </div>
+        <div class="card">
+          <h3>三种角色</h3>
+          <table>
+            <tr><td class="k">游客</td><td>参观公共藏宝阁；通过有效链接只读参观小屋</td></tr>
+            <tr><td class="k">注册用户</td><td>生成、背包、布置小屋、开关分享、投稿与撤回</td></tr>
+            <tr><td class="k">管理员</td><td>审核、安排展位、上传官方资产、查看用户与当天调额</td></tr>
+          </table>
+        </div>
+        <p class="small muted">完成标准刻意定得很实：只有模型<b>真的进入个人背包并能预览</b>，才算生成成功——模拟或供方“成功”都不算。</p>
+      </div>
+    </div>
+  </div>
+  <div class="foot"><span>来源：docs/product/藏宝阁与个人小屋-MVP-PRD-v2.0.md</span><span>03 / 17</span></div>
+</section>
+
+<!-- ============ 04 产品全景 ============ -->
+<section class="page">
+  <div class="run"><span><b>03</b>　产品全景</span><span>藏宝阁与个人小屋 · 项目报告书</span></div>
+  <div class="main">
+    <div>
+      <span class="kicker">PRODUCT TOUR</span>
+      <h2>三个空间，一条主线<small>公共藏宝阁 · 个人小屋 · 管理后台</small></h2>
+    </div>
+    <div class="row grow" style="gap:5mm">
+      <div class="col grow" style="flex:1.35">
+        <figure class="grow"><span class="badge">公共 · 藏宝阁</span><div class="im"><img src="assets/img/live-walk.jpg" alt=""></div>
+          <figcaption><b>线上实拍</b>　红毯尽头是镇阁台上的后母戊鼎，两侧柱间展位陈列着其他藏品；右上角是 角色 / 背包 / 菜单。</figcaption></figure>
+        <div class="card" style="padding:3mm 4mm">
+          <ul class="tight small">
+            <li>两层大殿、30 个分档展位；第三人称行走、奔跑、跳跃，大楼梯真上下楼。</li>
+            <li>对准展台按 <span class="key">E</span> 打开详情：3D 旋转、年代、材质、收藏方、官网，并带“AI 生成”提醒。</li>
+          </ul>
+        </div>
+      </div>
+      <div class="col" style="flex:1">
+        <figure class="grow"><span class="badge">个人 · 小屋</span><div class="im"><img src="assets/img/room-t17-visit.jpg" alt=""></div>
+          <figcaption><b>漫游参观</b>　九宫格草地、木栅栏围起的古建筑小屋，访客可走进屋里。</figcaption></figure>
+        <div class="card" style="padding:3mm 4mm">
+          <ul class="tight small">
+            <li>斜俯视拖拽摆放，移动 / 旋转 / 等比缩放，物品可叠放，自动保存并带版本。</li>
+            <li>一键开启分享链接，对方免登录参观；还可“逛一逛”榜单、一次性点赞。</li>
+          </ul>
+        </div>
+      </div>
+      <div class="col" style="flex:1">
+        <figure class="grow"><span class="badge">后台 · 展陈</span><div class="im"><img src="assets/img/admin-slots.jpg" alt=""></div>
+          <figcaption><b>候选与展位</b>　先选候选藏品，再把它安排到 30 个展位之一，统一“保存并发布”。</figcaption></figure>
+        <div class="card" style="padding:3mm 4mm">
+          <ul class="tight small">
+            <li>投稿审核、官方资产上传、用户与当天额度调整、风险删除。</li>
+            <li>上传历史带中文失败原因，不再只显示一个错误码。</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="foot"><span>藏宝阁画面取自 https://yafeng.fun；小屋与后台取自本机隔离测试库的真实浏览器截图</span><span>04 / 17</span></div>
+</section>
+
+<!-- ============ 05 核心链路 ============ -->
+<section class="page">
+  <div class="run"><span><b>04</b>　核心技术</span><span>藏宝阁与个人小屋 · 项目报告书</span></div>
+  <div class="main">
+    <div>
+      <span class="kicker">FROM ONE IMAGE TO ONE EXHIBIT</span>
+      <h2>一张图，怎样变成可靠交付的藏品<small>Lux3D 接入与生成链路</small></h2>
+    </div>
+    <div class="flow">
+      <div class="step"><div class="no">01</div><h4>上传与额度</h4><p>PNG / JPEG / WebP ≤ 10 MiB；每日额度按北京时间 00:00 换日，占用与结算在同一事务。</p></div>
+      <div class="step"><div class="no">02</div><h4>后台 worker 提交</h4><p>调用 Lux3D 中国区“单图转 3D”（G1-Turbo，GLB，PBR）。提交前先落库并锁定报价。</p></div>
+      <div class="step"><div class="no">03</div><h4>轮询与恢复</h4><p>供方任务 ID 以字符串无损保存；网页关闭、进程重启后由 worker 接力。</p></div>
+      <div class="step"><div class="no">04</div><h4>下载与校验</h4><p>用真实 Chrome 渲染检验，三角面 ≤ 35 万，glTF 扩展白名单，同 SHA 落存。</p></div>
+      <div class="step"><div class="no">05</div><h4>入包与网页副本</h4><p>进入个人背包可预览；worker 另生成约 1/7 体积的网页副本供浏览加载。</p></div>
+    </div>
+    <div class="row grow" style="gap:6mm">
+      <div class="col" style="flex:1.05">
+        <div class="card">
+          <h3>四条守住的底线（都有测试或实测证据）</h3>
+          <ul class="tight">
+            <li><b>不重复扣费</b>：create 不自动重发；遇到未知结果保留 unknown，只凭原任务的精确证据恢复，绝不按“长得像”的历史任务认领。</li>
+            <li><b>失败必退额度</b>：供方成功但本站渲染失败，到期限终结后，原提交日只冲销一次。</li>
+            <li><b>成功以交付为准</b>：模型必须真的入包且能在 Chrome 里渲染出来，GLB 头合格或供方回 success 都不算。</li>
+            <li><b>不合格要说人话</b>：校验失败原因写进后台上传历史，如“三角面超过 35 万”，不是 MODEL_INVALID。</li>
+          </ul>
+        </div>
+        <div class="card">
+          <h3>技术栈</h3>
+          <p class="small">前端 React 19 + Three.js（Vite）· 服务端 Fastify 5 + PostgreSQL · 独立 worker 进程 · 建模 Blender（经 MCP 由 Agent 驱动）· 部署阿里云香港轻量服务器 + Nginx，https://yafeng.fun。</p>
+        </div>
+      </div>
+      <figure style="flex:1">
+        <div class="im"><img src="assets/img/backpack-t06.jpg" alt=""></div>
+        <figcaption><b>我的背包</b>（T06 实拍）　今日可用额度 2 / 3、“选择一张图片”、真实生成的青花瓷瓶模型可拖动旋转预览。</figcaption>
+      </figure>
+    </div>
+  </div>
+  <div class="foot"><span>来源：docs/contracts/Lux3D接入契约.md · docs/validation/账号资产生成验证.md</span><span>05 / 17</span></div>
+</section>
+
+<!-- ============ 06 资产迭代 · 官方物品 ============ -->
+<section class="page">
+  <div class="run"><span><b>05</b>　资产迭代 ①</span><span>藏宝阁与个人小屋 · 项目报告书</span></div>
+  <div class="main">
+    <div>
+      <span class="kicker">ASSET ITERATION · IMAGE → 3D</span>
+      <h2>参考图 → Lux3D 模型：十件小屋官方物品<small>上排 AI 参考图 · 下排 Lux3D 原始 GLB</small></h2>
+    </div>
+    <div class="grow" style="display:flex;flex-direction:column;gap:2.4mm;min-height:0">
+      <div class="pairs xl" style="grid-template-columns:repeat(10,1fr)">
+        <div class="pair"><div class="im"><img src="assets/img/t17-ref-01.jpg" alt=""></div></div>
+        <div class="pair"><div class="im"><img src="assets/img/t17-ref-02.jpg" alt=""></div></div>
+        <div class="pair"><div class="im"><img src="assets/img/t17-ref-03.jpg" alt=""></div></div>
+        <div class="pair"><div class="im"><img src="assets/img/t17-ref-04.jpg" alt=""></div></div>
+        <div class="pair"><div class="im"><img src="assets/img/t17-ref-05.jpg" alt=""></div></div>
+        <div class="pair"><div class="im"><img src="assets/img/t17-ref-06.jpg" alt=""></div></div>
+        <div class="pair"><div class="im"><img src="assets/img/t17-ref-07.jpg" alt=""></div></div>
+        <div class="pair"><div class="im"><img src="assets/img/t17-ref-08.jpg" alt=""></div></div>
+        <div class="pair"><div class="im"><img src="assets/img/t17-ref-09.jpg" alt=""></div></div>
+        <div class="pair"><div class="im"><img src="assets/img/t17-ref-10.jpg" alt=""></div></div>
+      </div>
+      <div style="text-align:center;color:var(--gold);font-size:11pt;letter-spacing:.5em;line-height:1">↓ Lux3D 单图生成 ↓</div>
+      <div class="pairs xl" style="grid-template-columns:repeat(10,1fr)">
+        <div class="pair"><div class="im"><img src="assets/img/t17-model-01.jpg" alt=""></div><div class="lb">八仙桌</div></div>
+        <div class="pair"><div class="im"><img src="assets/img/t17-model-02.jpg" alt=""></div><div class="lb">圈椅</div></div>
+        <div class="pair"><div class="im"><img src="assets/img/t17-model-03.jpg" alt=""></div><div class="lb">博古架</div></div>
+        <div class="pair"><div class="im"><img src="assets/img/t17-model-04.jpg" alt=""></div><div class="lb">四扇屏风</div></div>
+        <div class="pair"><div class="im"><img src="assets/img/t17-model-05.jpg" alt=""></div><div class="lb">落地宫灯</div></div>
+        <div class="pair"><div class="im"><img src="assets/img/t17-model-06.jpg" alt=""></div><div class="lb">铜香炉</div></div>
+        <div class="pair"><div class="im"><img src="assets/img/t17-model-07.jpg" alt=""></div><div class="lb">荷花缸</div></div>
+        <div class="pair"><div class="im"><img src="assets/img/t17-model-08.jpg" alt=""></div><div class="lb">太湖石</div></div>
+        <div class="pair"><div class="im"><img src="assets/img/t17-model-09.jpg" alt=""></div><div class="lb">松树盆景</div></div>
+        <div class="pair"><div class="im"><img src="assets/img/t17-model-10.jpg" alt=""></div><div class="lb">高花几</div></div>
+      </div>
+    </div>
+    <div class="stats" style="grid-template-columns:repeat(4,1fr)">
+      <div class="stat"><div class="n">10<small>/ 10</small></div><div class="l">个任务一次成功，没有重生成</div></div>
+      <div class="stat"><div class="n">10<small>积分</small></div><div class="l">逐件报价 1 积分，合计 10 积分</div></div>
+      <div class="stat"><div class="n">4.4–5.9<small>万面</small></div><div class="l">供方原始三角面（目标 5 万）</div></div>
+      <div class="stat"><div class="n">227<small>MiB</small></div><div class="l">原始交付包，入库前减面定尺寸</div></div>
+    </div>
+    <div class="row" style="gap:5mm">
+      <div class="card grow" style="padding:3mm 4mm"><h3 style="font-size:10pt">做法</h3><p class="small">① 内置 ImageGen 逐件生成 1254×1254 参考图，统一白底居中；② 中国区“极速版”单图生成，目标 5 万三角面，关闭尺寸预测；③ 离线预览逐件核对，再减面、定尺寸、入库为官方物品。</p></div>
+      <div class="card grow" style="padding:3mm 4mm"><h3 style="font-size:10pt">结果</h3><p class="small">10 个任务<b class="gold">全部一次成功</b>，共报价 10 积分，实际 4.4–5.9 万面，带 PBR 材质；材质纹理、木纹与榫卯结构与参考图高度一致。</p></div>
+      <div class="card grow" style="padding:3mm 4mm"><h3 style="font-size:10pt">也看到差异</h3><p class="small">四扇屏风的折角比参考图更深，圈椅座面略窄——逐件目检，转到正面核对四扇完整后才放行。</p></div>
+    </div>
+  </div>
+  <div class="foot"><span>渲染脚本：scripts/report-render-models.mjs · 清单：assets/furniture/references/t17-models/lux3d-delivery.json</span><span>06 / 17</span></div>
+</section>
+
+<!-- ============ 07 资产迭代 · 摆件与藏品 ============ -->
+<section class="page">
+  <div class="run"><span><b>06</b>　资产迭代 ②</span><span>藏宝阁与个人小屋 · 项目报告书</span></div>
+  <div class="main">
+    <div>
+      <span class="kicker">ASSET ITERATION · PROPS &amp; EXHIBITS</span>
+      <h2>从参考图到入场：藏宝阁的 9 件摆件与镇阁之宝<small>生成 → 减面 → 实例化 → 灯下实景</small></h2>
+    </div>
+    <div class="row grow" style="gap:6mm">
+      <div class="col" style="flex:1.2;gap:2.4mm">
+        <div class="small muted" style="margin-bottom:-1mm">左：AI 参考图　→　右：Lux3D 生成的原始模型（渲染）</div>
+        <div class="cells">
+          <div class="cell"><div class="im"><img src="assets/img/prop-ref-B1-stone-lion.jpg" alt=""></div><span class="ar">→</span><div class="im"><img src="assets/img/prop-model-B1-stone-lion.jpg" alt=""></div><div class="lb">石狮</div></div>
+          <div class="cell"><div class="im"><img src="assets/img/prop-ref-B2-stone-lamp.jpg" alt=""></div><span class="ar">→</span><div class="im"><img src="assets/img/prop-model-B2-stone-lamp.jpg" alt=""></div><div class="lb">石灯</div></div>
+          <div class="cell"><div class="im"><img src="assets/img/prop-ref-B3-incense-burner.jpg" alt=""></div><span class="ar">→</span><div class="im"><img src="assets/img/prop-model-B3-incense-burner.jpg" alt=""></div><div class="lb">香炉</div></div>
+          <div class="cell"><div class="im"><img src="assets/img/prop-ref-B4-vase.jpg" alt=""></div><span class="ar">→</span><div class="im"><img src="assets/img/prop-model-B4-vase.jpg" alt=""></div><div class="lb">梅瓶</div></div>
+          <div class="cell"><div class="im"><img src="assets/img/prop-ref-B5-jade-bi.jpg" alt=""></div><span class="ar">→</span><div class="im"><img src="assets/img/prop-model-B5-jade-bi.jpg" alt=""></div><div class="lb">玉璧</div></div>
+          <div class="cell"><div class="im"><img src="assets/img/prop-ref-B6-bronze-jue.jpg" alt=""></div><span class="ar">→</span><div class="im"><img src="assets/img/prop-model-B6-bronze-jue.jpg" alt=""></div><div class="lb">青铜爵</div></div>
+          <div class="cell"><div class="im"><img src="assets/img/prop-ref-B7-ruyi.jpg" alt=""></div><span class="ar">→</span><div class="im"><img src="assets/img/prop-model-B7-ruyi.jpg" alt=""></div><div class="lb">玉如意</div></div>
+          <div class="cell"><div class="im"><img src="assets/img/prop-ref-B8-book-box.jpg" alt=""></div><span class="ar">→</span><div class="im"><img src="assets/img/prop-model-B8-book-box.jpg" alt=""></div><div class="lb">书函</div></div>
+          <div class="cell"><div class="im"><img src="assets/img/prop-ref-B9-jade-mountain.jpg" alt=""></div><span class="ar">→</span><div class="im"><img src="assets/img/prop-model-B9-jade-mountain.jpg" alt=""></div><div class="lb">玉山子</div></div>
+        </div>
+        <div class="card" style="padding:2.2mm 3mm">
+          <table class="dense"><tr><th></th><th style="text-align:right">石狮</th><th style="text-align:right">石灯</th><th style="text-align:right">香炉</th><th style="text-align:right">梅瓶</th><th style="text-align:right">玉璧</th><th style="text-align:right">青铜爵</th><th style="text-align:right">玉如意</th><th style="text-align:right">书函</th><th style="text-align:right">玉山子</th></tr>
+            <tr><td class="k">原始面数</td><td class="n">3.7 万</td><td class="n">3.9 万</td><td class="n">3.5 万</td><td class="n">1.8 万</td><td class="n">1.9 万</td><td class="n">1.8 万</td><td class="n">2.7 万</td><td class="n">1.9 万</td><td class="n">2.2 万</td></tr>
+            <tr><td class="k">入库面数</td><td class="n">1.4 万</td><td class="n">1.0 万</td><td class="n">1.2 万</td><td class="n">0.4 万</td><td class="n">0.4 万</td><td class="n">0.4 万</td><td class="n">0.4 万</td><td class="n">0.4 万</td><td class="n">0.4 万</td></tr>
+            <tr><td class="k">原始 GLB</td><td class="n">8.9 MB</td><td class="n">9.5 MB</td><td class="n">10.8 MB</td><td class="n">7.6 MB</td><td class="n">8.7 MB</td><td class="n">11.2 MB</td><td class="n">9.6 MB</td><td class="n">7.7 MB</td><td class="n">8.7 MB</td></tr>
+            <tr><td class="k">入库 GLB</td><td class="n">0.78 MB</td><td class="n">0.74 MB</td><td class="n">0.82 MB</td><td class="n">0.22 MB</td><td class="n">0.23 MB</td><td class="n">0.26 MB</td><td class="n">0.30 MB</td><td class="n">0.23 MB</td><td class="n">0.28 MB</td></tr>
+          </table>
+          <p class="small muted" style="margin-top:1.2mm">9 个任务一次成功，共 9 积分；原始 82.7 MB → 入库 3.9 MB；整座阁摆件实例 104 件，同款只下载一份。</p>
+        </div>
+      </div>
+      <div class="col" style="flex:1;gap:3mm">
+        <figure style="flex:1.1"><span class="badge">入场 · 石狮与石灯</span><div class="im"><img src="assets/img/d3-lion.jpg" alt=""></div>
+          <figcaption>门外月台的石狮与石灯：同一份 Lux3D 模型，在场景里接上灯光、阴影与夜空。</figcaption></figure>
+        <div class="row" style="gap:3mm;flex:1">
+          <figure style="flex:.8"><div class="im"><img src="assets/img/bronze-ref-ding.jpg" alt="" style="object-position:center 40%"></div><figcaption><b>AI 参考图</b>　青铜方鼎</figcaption></figure>
+          <div class="arrow">→</div>
+          <figure style="flex:1.2"><div class="im"><img src="assets/img/live-detail.jpg" alt="" style="object-fit:contain"></div><figcaption><b>线上展品</b>　后母戊鼎，镇阁之宝（纹饰细节比参考图更简化）</figcaption></figure>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="foot"><span>清单：assets/t16/props/props-manifest.json（任务号、哈希、面数）</span><span>07 / 17</span></div>
+</section>
+
+<!-- ============ 08 场景迭代 · 推翻旧阁 ============ -->
+<section class="page">
+  <div class="run"><span><b>07</b>　场景迭代 ①</span><span>藏宝阁与个人小屋 · 项目报告书</span></div>
+  <div class="main">
+    <div>
+      <span class="kicker">SCENE ITERATION · WHY WE REBUILT</span>
+      <h2>先做出来，再推翻重来<small>11-05 旧阁 → 11-09 全盘否定 → 对标参考图重建</small></h2>
+    </div>
+    <div class="row grow" style="gap:5mm">
+      <div style="flex:1.45;display:grid;grid-template-columns:1fr 1fr;grid-template-rows:1fr 1fr;gap:3mm 3mm;min-height:0">
+        <figure><span class="badge">① 11-05 · AI 概念图</span><div class="im"><img src="assets/img/t10a-concept.jpg" alt=""></div><figcaption><b>想要的样子</b>　首轮设计图：写实木构、天窗、石地。</figcaption></figure>
+        <figure><span class="badge">② 11-05 · 旧阁 v1</span><div class="im"><img src="assets/img/t10-v1-intro.jpg" alt=""></div><figcaption><b>实际做出来的</b>　24×28 m 二层阁，9 种纯色材质，无贴图无光照。</figcaption></figure>
+        <figure><span class="badge">③ 11-09 · 对标参考</span><div class="im"><img src="assets/img/style-ref.jpg" alt=""></div><figcaption><b>用户给出的方向</b>　巨柱、鎏金、朱红绸幔、天光——只学气质，不抄布局。</figcaption></figure>
+        <figure><span class="badge">④ 11-09 · D0 概念图</span><div class="im"><img src="assets/img/concept-entry.jpg" alt=""></div><figcaption><b>新阁概念</b>　一进门就“哇”：通高天井、镇阁之宝、大楼梯与月洞门。</figcaption></figure>
+      </div>
+      <div class="col" style="flex:1;gap:3mm">
+        <div class="card">
+          <h3>旧阁为什么不行——诊断到根因</h3>
+          <table>
+            <tr><th>现象</th><th>根因</th></tr>
+            <tr><td class="k">小家子气、挤</td><td>内部 24×28 m、层高 4.8 m、柱径 0.8 m，二层只是一圈过道</td></tr>
+            <tr><td class="k">宝物比头还小</td><td>展品统一缩到最大边 0.8 m，放在 1.17 m 高的方箱上</td></tr>
+            <tr><td class="k">简陋</td><td>纯色方块：9 种材质，无贴图、无 UV、无烘焙光</td></tr>
+            <tr><td class="k">穿模</td><td>构件互相贯穿；楼梯碰撞是斜坡而模型是台阶；碰撞坐标靠人工抄录</td></tr>
+          </table>
+        </div>
+        <div class="card grow">
+          <h3>新阁的设计合同</h3>
+          <ul class="tight small">
+            <li><b>尺度翻倍</b>：44×60 m 内部、9 m 层高、约 28 m 通高天井、直径 1.6 m 巨柱。</li>
+            <li><b>展品分三档</b>：镇阁 5 m、甲 2.5 m、乙 1.6 m，各有台座与光。</li>
+            <li><b>零穿模</b>：模型与碰撞出自同一份 Blender 源，每次导出自动检查。</li>
+            <li><b>配色</b>：玄色漆木为主，鎏金点缀，朱红绸幔强调；暖金灯火对冷青天光。</li>
+            <li><b>分阶段验收</b>：D1 灰盒 → D2 结构材质 → D3 光照氛围 → D4 收口，每步由用户确认。</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="foot"><span>来源：docs/design/T16-藏宝阁重建设计.md · docs/design/t16/concepts/</span><span>08 / 17</span></div>
+</section>
+
+<!-- ============ 09 场景迭代 · 四阶段 ============ -->
+<section class="page">
+  <div class="run"><span><b>08</b>　场景迭代 ②</span><span>藏宝阁与个人小屋 · 项目报告书</span></div>
+  <div class="main">
+    <div>
+      <span class="kicker">SCENE ITERATION · D0 → D4</span>
+      <h2>同一座阁，四次进化<small>概念 → 结构材质 → 光照氛围 → 线上成品</small></h2>
+    </div>
+    <div class="row grow" style="gap:3mm">
+      <figure style="flex:1"><span class="badge">D0 · 概念</span><div class="im"><img src="assets/img/concept-entry.jpg" alt=""></div>
+        <figcaption><b>AI 概念图</b>　先定气质与构图，再动手建模。</figcaption></figure>
+      <div class="arrow">→</div>
+      <figure style="flex:1"><span class="badge">D2 · 结构与材质</span><div class="im"><img src="assets/img/d2-entry.jpg" alt=""></div>
+        <figcaption><b>5.5 万面</b>　巨柱、斗拱、鎏金带、地毯与 6 套 CC0 贴图；灯光仍是临时的。</figcaption></figure>
+      <div class="arrow">→</div>
+      <figure style="flex:1"><span class="badge">D3 · 光照与氛围</span><div class="im"><img src="assets/img/d3-entry.jpg" alt=""></div>
+        <figcaption><b>53 万面</b>　烘焙 AO / 间接光、选择性辉光、天窗光柱、尘埃、云海天空、9 件 Lux3D 摆件。</figcaption></figure>
+      <div class="arrow">→</div>
+      <figure style="flex:1"><span class="badge">线上成品</span><div class="im"><img src="assets/img/live-hall.jpg" alt=""></div>
+        <figcaption><b>公开上线</b>　KTX2 / meshopt 压缩、自适应分辨率，真实藏品上架。</figcaption></figure>
+    </div>
+    <div class="card" style="padding:3.2mm 4.5mm">
+      <table>
+        <tr><th>阶段</th><th>三角面</th><th>GLB 体积</th><th>这一步解决了什么</th><th>关键检查</th></tr>
+        <tr><td class="k">D1 灰盒</td><td>1.5 万</td><td>0.75 MB</td><td>尺度、动线、镜头；用户实走后移了柱间展位、删 16 根侧殿细柱、镇阁之宝落台</td><td>穿插 0；整圈上下楼实走</td></tr>
+        <tr><td class="k">D2 结构材质</td><td>5.5 万</td><td>10.7 MB</td><td>构件库、23 种材质、云纹浮雕法线、格扇透明裁切</td><td>导出关口：穿插 0、共面 0</td></tr>
+        <tr><td class="k">D3 光照氛围</td><td>53 万</td><td>15.3 MB</td><td>烘焙光照、天空云海、摆件、辉光、全量碰撞审计</td><td>3191 个可走面采样点与 GLB 射线一致</td></tr>
+        <tr><td class="k">D4 收口</td><td>53.9 万</td><td>14.2 MB + KTX2</td><td>贴图显存约 400 → 55 MB；自适应分辨率保 50+ FPS</td><td>2.77 万个第三人称机位，穿模 0</td></tr>
+      </table>
+    </div>
+  </div>
+  <div class="foot"><span>来源：docs/validation/T16藏宝阁重建验证.md（D1–D4 各节）</span><span>09 / 17</span></div>
+</section>
+
+<!-- ============ 10 关键效果 ============ -->
+<section class="page">
+  <div class="run"><span><b>09</b>　关键效果</span><span>藏宝阁与个人小屋 · 项目报告书</span></div>
+  <div class="main">
+    <div>
+      <span class="kicker">KEY VISUAL DETAILS</span>
+      <h2>让“空房子”有了光与气氛<small>几处最能看出差别的细节</small></h2>
+    </div>
+    <div class="row grow" style="gap:4mm">
+      <div class="col" style="flex:1.55;gap:3mm">
+        <div class="row grow" style="gap:3mm">
+          <figure style="flex:1"><span class="badge">D2 · 之前</span><div class="im"><img src="assets/img/d2-atrium.jpg" alt=""></div><figcaption><b>仰望天井（D2）</b>　结构已在，但光线平、没有来处。</figcaption></figure>
+          <div class="arrow">→</div>
+          <figure style="flex:1"><span class="badge">D3 · 之后</span><div class="im"><img src="assets/img/d3-atrium.jpg" alt=""></div><figcaption><b>同一机位（D3）</b>　天窗光柱落在镇阁台，空中浮着灵光尘埃，宫灯有了辉光。</figcaption></figure>
+        </div>
+        <div class="row grow" style="gap:3mm">
+          <figure style="flex:1"><div class="im"><img src="assets/img/d3-sky.jpg" alt=""></div><figcaption><b>门外云海</b>　黄昏转星夜的天穹、两层云海与漂浮岛，由 AI 生图加网页端合成，不进 GLB。</figcaption></figure>
+          <figure style="flex:1"><div class="im"><img src="assets/img/live-detail.jpg" alt="" style="object-fit:contain"></div><figcaption><b>E 键详情</b>　后母戊鼎：3D 可拖拽旋转缩放，并明示“AI 生成，与实物可能有偏差”。</figcaption></figure>
+        </div>
+      </div>
+      <div class="col" style="flex:1">
+        <div class="card grow" style="padding:4mm 4.5mm">
+          <h3>每个“好看”背后，都有一条工程约束</h3>
+          <ul class="tight" style="margin-top:2mm;font-size:8.9pt">
+            <li><b>选择性辉光</b>：第一版整幅泛白、用户反馈“晃眼”。改为只对登记过的发光材质（灯芯、窗光、宫灯纸）单独渲染一层，其余全部压黑；新的发光材质必须登记，不靠调亮度阈值。</li>
+            <li><b>烘焙光照</b>：Blender 里烘焙 AO 与间接光，网页端只加环境反射与少量实时点光；灯光分级后整体压暗，更有层次。</li>
+            <li><b>体积光与粒子</b>：天窗位置从布局数据导出，光柱与镇阁台对齐；900 颗尘埃与灵光粒子；每个有展品的展位带一圈慢转符文光环。</li>
+            <li><b>天空</b>：天穹、银河与星点、两层云海按三维格子取样，从天窗直视也不会在天顶挤成一团。</li>
+            <li><b>展品落台</b>：镇阁之宝最初悬浮 6 m，用户实走后觉得离谱，改为落在 1.2 m 镇阁台上略微浮起。</li>
+          </ul>
+          <div class="stats" style="grid-template-columns:repeat(2,1fr);margin-top:4mm;gap:2.4mm 4mm">
+            <div class="stat"><div class="n" style="font-size:16pt">104</div><div class="l">件摆件实例，同款只下载一份</div></div>
+            <div class="stat"><div class="n" style="font-size:16pt">25</div><div class="l">种材质，含烘焙光照贴图</div></div>
+            <div class="stat"><div class="n" style="font-size:16pt">332</div><div class="l">个碰撞体，全量审计</div></div>
+            <div class="stat"><div class="n" style="font-size:16pt">386</div><div class="l">个仅作用于镜头的遮挡体</div></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="foot"><span>截图：线上实拍与 docs/validation/evidence/t16/ （D2 / D3 同机位对照）</span><span>10 / 17</span></div>
+</section>
+
+<!-- ============ 11 小屋迭代 ============ -->
+<section class="page">
+  <div class="run"><span><b>10</b>　场景迭代 ③</span><span>藏宝阁与个人小屋 · 项目报告书</span></div>
+  <div class="main">
+    <div>
+      <span class="kicker">ROOM ITERATION</span>
+      <h2>小屋：从“几根柱子”到有院有墙的家<small>T11 → T17 → T19</small></h2>
+    </div>
+    <div class="row grow" style="gap:3mm">
+      <div class="col" style="flex:1;gap:3mm">
+        <figure class="grow"><span class="badge">T11 · 11-06</span><div class="im"><img src="assets/img/room-t11.jpg" alt=""></div><figcaption><b>最初的小屋</b>　纯色柱廊、白板地面，官方家具只有三件。</figcaption></figure>
+        <figure class="grow"><span class="badge">T17 · 11-10</span><div class="im"><img src="assets/img/room-t17-overview.jpg" alt=""></div><figcaption><b>台基与院落</b>　九宫格草地、木栅栏、条石甬道；贴图复用藏宝阁的 CC0 集。</figcaption></figure>
+      </div>
+      <div class="col" style="flex:1;gap:3mm">
+        <figure class="grow"><span class="badge">T17 · 外观</span><div class="im"><img src="assets/img/room-t17-visit.jpg" alt=""></div><figcaption><b>梁架与屋面</b>　山墙、瓦顶、灯笼挂杆、后窗格栅，所有构件都接在一起。</figcaption></figure>
+        <figure class="grow"><span class="badge">T17 · 屋内</span><div class="im"><img src="assets/img/room-t17-inside.jpg" alt=""></div><figcaption><b>走进屋里</b>　第三人称参观，栅栏会挡住角色，不能穿出院外。</figcaption></figure>
+      </div>
+      <div class="col" style="flex:1.05;gap:3mm">
+        <figure style="flex:1.2"><span class="badge">T19 · 11-11</span><div class="im"><img src="assets/img/room-t19-stack.jpg" alt=""></div><figcaption><b>物品叠放</b>　拖拽时有三轴控件；物品不能互相穿插，放上别的物品就“叠”上去。</figcaption></figure>
+        <div class="card" style="padding:3mm 4mm">
+          <h3 style="font-size:10pt">摆放规则（都在编辑器里完成）</h3>
+          <ul class="tight small">
+            <li>中心落在占地不小于它的物品上方即视为叠放，上层随下层移动。</li>
+            <li>与其他物品重叠，整组弹回；添加时自动避让。</li>
+            <li>可穿行物品（花草）由资产属性决定，可重复摆放与缩放。</li>
+            <li>高度上限分区：台基上以房梁 4.8 m 封顶，纯庭院 20.6 m。</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="foot"><span>来源：docs/validation/T17小屋美化与扩建验证.md · T19小屋物品碰撞与叠放验证.md</span><span>11 / 17</span></div>
+</section>
+
+<!-- ============ 12 角色 ============ -->
+<section class="page">
+  <div class="run"><span><b>11</b>　角色与操作</span><span>藏宝阁与个人小屋 · 项目报告书</span></div>
+  <div class="main">
+    <div>
+      <span class="kicker">CHARACTER · THIRD PERSON</span>
+      <h2>走进去的人，也来自一张图<small>参考图 → Lux3D 建模绑骨 → 第三人称跟随</small></h2>
+    </div>
+    <div class="row grow" style="gap:4mm">
+      <figure style="flex:.62"><div class="im"><img src="assets/img/cat-reference.jpg" alt="" style="object-position:center 20%"></div><figcaption><b>AI 参考图</b>　拟人橘猫，中式盘扣短衫。</figcaption></figure>
+      <div class="arrow">→</div>
+      <figure style="flex:1.15"><div class="im" style="background:#ece8e0"><img src="assets/img/cat-motion.jpg" alt="" style="object-fit:contain"></div><figcaption><b>Lux3D 模型</b>　绑骨与动作导出后的逐帧核对：待机、跑步、脚部落地、尾巴摆动。</figcaption></figure>
+      <div class="arrow">→</div>
+      <figure style="flex:1.6"><div class="im"><img src="assets/img/live-hall.jpg" alt=""></div><figcaption><b>线上实拍</b>　红毯上奔跑的橘猫，影子落地、镜头跟随，不穿柱。</figcaption></figure>
+    </div>
+    <div class="row" style="gap:5mm">
+      <div class="card" style="flex:1.2">
+        <h3>第三人称怎么做到“不出戏”</h3>
+        <ul class="tight small">
+          <li>6 个可选角色，各自内置贴图、蒙皮与 <b>Idle / Run</b> 两套动作；跑步原地循环，位移由引擎控制，脚不滑步。</li>
+          <li>镜头遮挡按行走合同的碰撞体计算，另加仅作用于镜头的楼板底、屋顶、门楣与灯笼；用真实 GLB 射线对照 <b>2.77 万个机位，穿模 0 处</b>。</li>
+          <li>角色与视角只存本机浏览器，只改变画面表现，行走、跳跃、E 查看的规则不变。</li>
+        </ul>
+      </div>
+      <div class="card" style="flex:.9">
+        <h3>操作速查</h3>
+        <div class="keys">
+          <span><span class="key">W</span><span class="key">A</span><span class="key">S</span><span class="key">D</span></span><span>行走　<span class="key">Shift</span> 快跑</span>
+          <span class="key">空格</span><span>跳跃（可跳上护栏，不会陷进台阶）</span>
+          <span class="key">E</span><span>查看对准的展品</span>
+          <span class="key">V</span><span>第一 / 第三人称</span>
+          <span><span class="key">C</span> <span class="key">B</span> <span class="key">M</span></span><span>选角色 / 背包 / 菜单</span>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="foot"><span>来源：docs/validation/T15第三人称验证.md · assets/characters/</span><span>12 / 17</span></div>
+</section>
+
+<!-- ============ 13 性能 ============ -->
+<section class="page">
+  <div class="run"><span><b>12</b>　工程与性能</span><span>藏宝阁与个人小屋 · 项目报告书</span></div>
+  <div class="main">
+    <div>
+      <span class="kicker">ENGINEERING · PERFORMANCE</span>
+      <h2>好看之后，要让人能打开<small>公网上线后实测并优化</small></h2>
+    </div>
+    <p class="lead" style="font-size:10pt">香港服务器到大陆访客的跨境速度波动很大，13 MB 的 GLB 下载从 0.95 s 到 80 s 不等；上线当天首页第一次打开用了 43 秒。于是把“进入前必须下载的内容”压到最小，并让用户模型走浏览器缓存。</p>
+    <div class="row" style="gap:6mm;align-items:flex-start">
+      <div class="card col" style="flex:1;gap:3.4mm">
+        <h3>首页首屏（5 Mbit/s 限速实测）</h3>
+        <div class="bars">
+          <div class="bar"><div class="nm">传输量 · 优化前</div><div class="tr"><div class="fl old" style="width:100%"></div></div><div class="vl">22.55 MB</div></div>
+          <div class="bar"><div class="nm">传输量 · 优化后</div><div class="tr"><div class="fl new" style="width:15.7%"></div></div><div class="vl">3.55 MB</div></div>
+          <div class="bar"><div class="nm">进场画面 · 优化前</div><div class="tr"><div class="fl old" style="width:100%"></div></div><div class="vl">36.8 s</div></div>
+          <div class="bar"><div class="nm">进场画面 · 优化后</div><div class="tr"><div class="fl new" style="width:17.4%"></div></div><div class="vl">6.4 s</div></div>
+        </div>
+        <p class="small muted">全部内容总量基本不变（22.55 → 21.38 MB），只是调整了先后；再次访问时 /assets/ 带一年缓存，直接读缓存。</p>
+      </div>
+      <div class="card col" style="flex:1;gap:3.4mm">
+        <h3>用户模型：浏览器缓存 + 网页副本</h3>
+        <div class="bars">
+          <div class="bar"><div class="nm">藏宝阁 · 原始</div><div class="tr"><div class="fl old" style="width:100%"></div></div><div class="vl">约 120 MB</div></div>
+          <div class="bar"><div class="nm">藏宝阁 · 第一次</div><div class="tr"><div class="fl new" style="width:16%"></div></div><div class="vl">19.26 MB</div></div>
+          <div class="bar"><div class="nm">藏宝阁 · 再进入</div><div class="tr"><div class="fl new" style="width:.8%"></div></div><div class="vl">2 KB · 10 个 304</div></div>
+          <div class="bar"><div class="nm">小屋 · 优化前</div><div class="tr"><div class="fl old" style="width:100%"></div></div><div class="vl">47.2 MB</div></div>
+          <div class="bar"><div class="nm">小屋 · 优化后</div><div class="tr"><div class="fl new" style="width:12.5%"></div></div><div class="vl">5.9 MB</div></div>
+        </div>
+      </div>
+      <div class="col" style="width:62mm;gap:3mm">
+        <div class="card">
+          <h3>渲染预算</h3>
+          <table>
+            <tr><td class="k">贴图显存</td><td>约 400 → 55 MB</td></tr>
+            <tr><td class="k">KTX2</td><td>光照贴图 JPEG 5.9 → 4.3 MB</td></tr>
+            <tr><td class="k">帧率</td><td>固定 DPR 1.5 下约 52–65 FPS，自适应降到 1.0 保 50+</td></tr>
+            <tr><td class="k">绘制调用</td><td>约 106 次（含辉光第二次渲染）</td></tr>
+          </table>
+        </div>
+      </div>
+    </div>
+    <div class="row grow" style="gap:5mm">
+      <div class="card col grow" style="gap:1.6mm"><span class="tag">办法 1</span><h3>先显示，再变清晰</h3><p class="small">GLB 只带 128 px 预览贴图、光照贴图用 256 px 小图，天空图改 WebP（2.11 → 0.32 MB）；进场画面出现后，才下载原尺寸贴图、角色与展品。展品详情改为直接借用场景里已加载的同一份模型，不再等半分钟。</p></div>
+      <div class="card col grow" style="gap:1.6mm"><span class="tag">办法 2</span><h3>用户模型走缓存，且更小</h3><p class="small">worker 为每个就绪模型生成网页副本（几何量化 + meshopt，贴图转 WebP），约为原文件 1/7，服务器 29 个模型 314.2 → 45.7 MB。撤销权限即失效：每次进入仍走一遍鉴权，只是能看时回 304。</p></div>
+      <div class="card col grow" style="gap:1.6mm"><span class="tag">办法 3</span><h3>让 GPU 少干活</h3><p class="small">贴图转 KTX2，显存约 400 → 55 MB；摆件 GPU 实例化；掉帧时自适应降低像素密度（1.5 → 1.0）。瓶颈其实在像素填充（16 盏实时点光 + 4× MSAA），不在三角面。</p></div>
+      <div class="card seal col grow" style="gap:1.6mm"><span class="tag red">诚实记录</span><h3>数据要经得起复测</h3><p class="small">D4 时曾报告“GPU 帧时减半”，交替复测三轮后确认只是单次测量偶然，已更正为 1–9%，测帧方法写进踩坑记录。</p></div>
+    </div>
+  </div>
+  <div class="foot"><span>来源：docs/validation/首屏下载量验证.md · 模型缓存验证.md · T16 D4 节</span><span>13 / 17</span></div>
+</section>
+
+<!-- ============ 14 质量 ============ -->
+<section class="page">
+  <div class="run"><span><b>13</b>　质量与验证</span><span>藏宝阁与个人小屋 · 项目报告书</span></div>
+  <div class="main">
+    <div>
+      <span class="kicker">QUALITY &amp; VERIFICATION</span>
+      <h2>每一句“做好了”，都有可复现的证据<small>验证分层与跨模型评审</small></h2>
+    </div>
+    <div class="stats">
+      <div class="stat"><div class="n">51<small>/ 51</small></div><div class="l">验收标准 AC01–AC51，逐项留证据（T09）</div></div>
+      <div class="stat"><div class="n">128</div><div class="l">项单元测试（<code>npm test</code>）</div></div>
+      <div class="stat"><div class="n">7</div><div class="l">组 PostgreSQL 集成测试（全部用临时库）</div></div>
+      <div class="stat"><div class="n">3</div><div class="l">套真实 Chrome 回归：test:t08 / t10 / t15</div></div>
+      <div class="stat"><div class="n">0</div><div class="l">构件穿插与同向共面（导出关口）</div></div>
+      <div class="stat"><div class="n">21</div><div class="l">张任务卡 T01–T21，均有验证记录</div></div>
+    </div>
+    <div class="row grow" style="gap:5mm">
+      <div class="col" style="flex:1.25;gap:3mm">
+        <div class="card">
+          <h3>验证怎么分层</h3>
+          <table>
+            <tr><th>层</th><th>做什么</th><th>例子</th></tr>
+            <tr><td class="k">导出关口</td><td>建筑导出前自动检查，任一不为零就不导出</td><td>构件穿插、同向共面、全量碰撞审计（人能碰到的构件必须有碰撞）</td></tr>
+            <tr><td class="k">单元 / 集成</td><td>规则与数据库事务</td><td>1500 次随机行走不离开可走面；额度并发只受理一次；会话过期暂停写入</td></tr>
+            <tr><td class="k">真实键盘实走</td><td>Playwright + 本机 Chrome</td><td>入口 → 大楼梯 → 二层整圈 → 回入口，49 秒；3 千余个可走面采样点与 GLB 射线一致</td></tr>
+            <tr><td class="k">镜头对照</td><td>第三人称机位射线检测</td><td>2.77 万个机位穿模 0；六个角色均能加载</td></tr>
+            <tr><td class="k">跨模型评审</td><td>产出者 ≠ 审稿者</td><td>Claude 与 Codex 交叉：一方产出，另一方（Sonnet / GPT-6 Astra）评审，意见逐条复核再处理</td></tr>
+          </table>
+        </div>
+        <div class="card seal grow" style="padding:3mm 4.5mm">
+          <h3>还没覆盖的边界（如实列出）</h3>
+          <ul class="tight small">
+            <li>真实十人试用、多人跨设备并发：尚未开展。</li>
+            <li>物理休眠中的在途任务恢复（E07）：仅有等价演练。</li>
+            <li>帧率数据来自无头 Chrome，以 M5 真机实走为准；手机端 3D 操作不在本期验收范围。</li>
+          </ul>
+        </div>
+      </div>
+      <div class="col" style="flex:1;gap:3mm">
+        <div class="card">
+          <h3>验证真的拦下了问题：一个完整案例</h3>
+          <p class="small"><b class="gold">发现</b>　第三人称镜头对照 GLB 射线，7 千余个机位里有 <b>211 个穿模</b>。</p>
+          <p class="small"><b class="gold">根因</b>　中间石阶侧面和壁龛小灯没登记为镜头遮挡体。</p>
+          <p class="small"><b class="gold">修复</b>　补登记后穿模为 0，并把 <code>test:t15</code> 改为“穿模必须为 0”，从此是回归门槛。</p>
+          <p class="small muted">同类的还有：栏杆宝顶比立柱宽，被导出关口拦下 28 处穿插；斗拱十字交叉共面，拦下 20 处。</p>
+        </div>
+        <div class="card grow">
+          <h3>评审真的发现了问题（节选）</h3>
+          <ul class="tight small">
+            <li>角色加载竞态；加载失败后界面显示的视角与实际不一致（T15，已修）。</li>
+            <li>自适应分辨率升档失败一次就永不复位，一次卡顿会长期停在低档（D4，已修）。</li>
+            <li>进程被杀时网页副本任务会无限重试；副本事务回滚残留对象（模型缓存，已修）。</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="foot"><span>来源：docs/validation/MVP验收结果.md · docs/reviews/ · flow/踩坑记录.md</span><span>14 / 17</span></div>
+</section>
+
+<!-- ============ 15 时间线与协作 ============ -->
+<section class="page">
+  <div class="run"><span><b>14</b>　过程与协作</span><span>藏宝阁与个人小屋 · 项目报告书</span></div>
+  <div class="main">
+    <div>
+      <span class="kicker">PROCESS · FROM IDEA TO LAUNCH</span>
+      <h2>九天，从一句话到公开上线<small>2026-11-03 → 11-12</small></h2>
+    </div>
+    <div class="tl">
+      <div class="d"><div class="dt">11-03</div><div class="tx">PRD v2.0 定稿：F01–F13、验收标准、额度与权限规则</div></div>
+      <div class="d"><div class="dt">11-04</div><div class="tx">定“本地优先”；<b class="gold">Lux3D 接入首次真实生成</b>（青花瓷瓶）；规划沉浸式前台与 Blender MCP</div></div>
+      <div class="d hi"><div class="dt">11-05</div><div class="tx">旧阁 v1 + 全屏游戏前台；账号 / 额度 / 生成、小屋保存分享、投稿后台相继完成</div></div>
+      <div class="d hi"><div class="dt">11-06</div><div class="tx"><b class="gold">T09 验收：AC01–AC51 全部通过</b>；试玩体验与功能调整</div></div>
+      <div class="d"><div class="dt">11-07</div><div class="tx">展品收藏、背包改版；双场景背包与小屋互访、榜单点赞</div></div>
+      <div class="d"><div class="dt">11-09</div><div class="tx">六角色第三人称；<b class="gold">用户否定旧阁，藏宝阁重建启动</b>，概念图与 D1 灰盒</div></div>
+      <div class="d hi"><div class="dt">11-10</div><div class="tx">重建 D2→D4 一天推进到收口；小屋美化扩建；个人资产删除</div></div>
+      <div class="d"><div class="dt">11-11</div><div class="tx">物品叠放；上传历史与可读失败原因；候选与展位页改版</div></div>
+      <div class="d hi"><div class="dt">11-12</div><div class="tx"><b class="gold">公开上线 yafeng.fun</b>；首屏 22.55 → 3.55 MB；模型走缓存</div></div>
+    </div>
+    <div class="row" style="gap:5mm">
+      <div class="card" style="flex:1">
+        <h3>人与 AI 怎么分工</h3>
+        <ul class="tight small">
+          <li><b>产品拍板 = 用户</b>：每个阶段（D1–D4）都由用户实走、确认，旧阁就是用户一句话否掉的。</li>
+          <li><b>Agent 负责执行</b>：Claude / Codex 经 Blender MCP 建模，写代码、跑验证；ImageGen 画概念图与参考图；Lux3D 把参考图变 3D。</li>
+          <li><b>产出与评审用不同模型</b>：交付前换另一个模型审稿，意见逐条复核。</li>
+        </ul>
+      </div>
+      <div class="card" style="flex:1">
+        <h3>真相写在文件里，不留在对话里</h3>
+        <ul class="tight small">
+          <li>一套根级 <code>flow/</code>：目标、计划（即契约）、进展日志（顶部是交接棒）、决策、踩坑记录、任务卡。</li>
+          <li>产物本身是真相来源；文档只补“看产物看不出的为什么”。</li>
+          <li>31 次提交、21 张任务卡、每一棒都有“做了什么 / 为什么 / 下一步”，换人或换工具也能接得上。</li>
+        </ul>
+      </div>
+      <div class="card" style="flex:1">
+        <h3>为什么这样推进</h3>
+        <ul class="tight small">
+          <li>先打通整条链路（功能完整），再回头抠视觉：旧阁让功能先跑起来，才有后来的重建依据。</li>
+          <li>用真实 Mac Chrome 和真实 Lux3D 结果验收，不以模拟成功代替。</li>
+          <li>解决问题尽量从根上解：碰撞与模型同源，而不是手抄坐标打补丁。</li>
+        </ul>
+      </div>
+    </div>
+    <div class="card grow" style="display:flex;flex-direction:column;gap:2.6mm">
+      <h3>一轮迭代怎么走（以 D4 的“二层地毯被拉长”为例）</h3>
+      <div class="flow">
+        <div class="step"><div class="no">1</div><h4>用户实走反馈</h4><p>二层走廊的地毯花纹被明显拉长，和一楼比例不一致。</p></div>
+        <div class="step"><div class="no">2</div><h4>分析根因</h4><p>二层地毯宽 2.4 m，却沿用一楼 4 m 宽“每 6 m 重复一次”的设置，纵向被拉长约 1.7 倍。</p></div>
+        <div class="step"><div class="no">3</div><h4>从源头修</h4><p>重复长度改为“宽度 × 1.5”；一楼仍 6 m，二层 3.6 m。改的是 Blender 脚本，不是补丁。</p></div>
+        <div class="step"><div class="no">4</div><h4>重导出 · 重烘 · 重压</h4><p>三道导出关口为 0，光照贴图重烘，运行版重压；忘一步单元测试就失败。</p></div>
+        <div class="step"><div class="no">5</div><h4>截图核对 + 记录</h4><p>两层比例一致；写入进展、决策与踩坑记录，提交前再跑回归与跨模型评审。</p></div>
+      </div>
+    </div>
+  </div>
+  <div class="foot"><span>来源：flow/进展.md · flow/plan.md · git log</span><span>15 / 17</span></div>
+</section>
+
+<!-- ============ 16 取舍与踩坑 ============ -->
+<section class="page">
+  <div class="run"><span><b>15</b>　取舍与踩坑</span><span>藏宝阁与个人小屋 · 项目报告书</span></div>
+  <div class="main">
+    <div>
+      <span class="kicker">DECISIONS &amp; LESSONS</span>
+      <h2>做对的几个决定，和踩过的几个坑<small>只保留对结果有影响的</small></h2>
+    </div>
+    <div class="row" style="gap:4mm;flex:1">
+      <div class="card col" style="flex:1;gap:2mm">
+        <span class="tag">决定</span><h3>旧阁整体推翻，而不是修补</h3>
+        <p style="font-size:9pt;line-height:1.6">用户实走后给出一句否定。我们没有在旧方块上叠贴图，而是回到根因（尺度、材质体系、碰撞靠手抄），重写设计合同，分 D1–D4 四关逐关确认。代价是两天的重做。</p>
+        <div class="res">结果　最终 53 万面、25 种材质，导出穿插 0；所有画面和碰撞建在同一份 Blender 源上。</div>
+      </div>
+      <div class="card col" style="flex:1;gap:2mm">
+        <span class="tag">决定</span><h3>碰撞与模型同源</h3>
+        <p style="font-size:9pt;line-height:1.6">Blender 脚本一次导出 GLB 和布局 JSON（可走面、碰撞、镜头遮挡、展位分档），网页只跑规则、不写几何，禁止手抄坐标。忘记重烘或重压，单元测试会直接失败。</p>
+        <div class="res">结果　3 千余个可走面采样点与 GLB 射线 0 不一致；2.77 万个镜头机位 0 穿模。</div>
+      </div>
+      <div class="card col" style="flex:1;gap:2mm">
+        <span class="tag">决定</span><h3>“成功”只认交付</h3>
+        <p style="font-size:9pt;line-height:1.6">供方回 success、GLB 头合格都不算；模型要在真 Chrome 里渲染出来、同 SHA 落存、进入背包可预览才算。失败原因必须是人话，直接显示在后台。</p>
+        <div class="res">结果　AC01–AC51 全部通过；失败任务原提交日只退一次额度。</div>
+      </div>
+    </div>
+    <div class="row" style="gap:4mm;flex:1">
+      <div class="card seal col" style="flex:1;gap:2mm">
+        <span class="tag red">踩坑</span><h3>辉光把整幅画面“晃白”</h3>
+        <p style="font-size:9pt;line-height:1.6">阈值 0.92 时，被灯照到的汉白玉、鎏金、抛光地面一起发光。先抬阈值、再改为“选择性辉光”：只渲染登记过的发光材质，其余压黑。</p>
+        <div class="res">教训　特效要由“谁允许发光”决定，不由亮度决定；新发光材质必须登记。</div>
+      </div>
+      <div class="card seal col" style="flex:1;gap:2mm">
+        <span class="tag red">踩坑</span><h3>首页第一次打开 43 秒</h3>
+        <p style="font-size:9pt;line-height:1.6">首屏 22.55 MB，且香港到大陆速度极不稳定；CDN 因备案暂不可用。办法是先显示再变清晰：128 px 预览贴图先进场，进入后再换原尺寸。</p>
+        <div class="res">结果　首屏 3.55 MB，5 Mbit/s 下 6.4 s 进场画面。</div>
+      </div>
+      <div class="card seal col" style="flex:1;gap:2mm">
+        <span class="tag red">踩坑</span><h3>楼梯上跳，脚陷进台阶 16 cm</h3>
+        <p style="font-size:9pt;line-height:1.6">楼梯碰撞是斜坡而模型是台阶，且侧面能钻进石阶。改为每级台阶一块平面碰撞，可走面视为实心体的顶面，行走和空中移动都不得从侧面进入。</p>
+        <div class="res">结果　1500 次随机行走不离开可走面；跳着上楼梯不再陷入，已加回归用例。</div>
+      </div>
+    </div>
+  </div>
+  <div class="foot"><span>来源：flow/decisions.md · flow/踩坑记录.md</span><span>16 / 17</span></div>
+</section>
+
+<!-- ============ 17 体验与路线 ============ -->
+<section class="page">
+  <div class="run"><span><b>16</b>　为什么值得体验</span><span>藏宝阁与个人小屋 · 项目报告书</span></div>
+  <div class="main">
+    <div>
+      <span class="kicker">TRY IT · 3 MINUTES</span>
+      <h2>三分钟，走一遍从图到阁<small>在电脑端 Chrome 打开 https://yafeng.fun</small></h2>
+    </div>
+    <div class="row" style="gap:5mm;flex:1.3">
+      <div class="col" style="flex:1.1;gap:3mm">
+        <div class="step-grid fill">
+          <div class="step"><div class="no">1</div><h4>进入藏宝阁</h4><p>点“进入藏宝阁”，沿红毯走向镇阁台；抬头看天窗光柱。</p></div>
+          <div class="step"><div class="no">2</div><h4>按 E 细看</h4><p>走近镇阁台，按 E 打开后母戊鼎：旋转、缩放，读年代与收藏方。</p></div>
+          <div class="step"><div class="no">3</div><h4>上二层</h4><p>经北殿大楼梯上楼，从护栏俯瞰全场，找侧殿壁龛的其他藏品。</p></div>
+          <div class="step"><div class="no">4</div><h4>生成一件藏品</h4><p>注册登录，<b>B</b> 打开背包，选一张图片生成，等它入包后预览。</p></div>
+          <div class="step"><div class="no">5</div><h4>布置小屋</h4><p>把新藏品和官方物品摆进自己的古建筑，叠放、旋转、缩放。</p></div>
+          <div class="step"><div class="no">6</div><h4>分享与投稿</h4><p>开启分享链接发给朋友；满意的藏品投稿，等待上阁。</p></div>
+        </div>
+        <div class="card seal" style="padding:3mm 4mm">
+          <p class="small"><b class="gold">请留意</b>　藏品均为 AI 生成，与实物可能有偏差，界面已在详情中明示；仅供观赏。每日生成额度按北京时间 00:00 换日。</p>
+        </div>
+      </div>
+      <figure style="flex:1"><div class="im"><img src="assets/img/live-intro.jpg" alt=""></div>
+        <figcaption><b>入口画面（线上实拍）</b>　“通高天井 · 三十展位 · 北殿大楼梯可上二层”。</figcaption></figure>
+    </div>
+    <div class="row" style="gap:5mm">
+      <div class="card" style="flex:1.2">
+        <h3>四个值得体验的理由</h3>
+        <ul class="tight small">
+          <li><b>真的能走进去</b>：不是展示图，是可奔跑、跳跃、上下楼的两层大殿，60 FPS 级流畅。</li>
+          <li><b>真的从一张图开始</b>：投稿审核页能看到“生成所用原图”，生成任务有完整记录。</li>
+          <li><b>真的完整</b>：账号、额度、审核、后台、分享、榜单，不是只有一个漂亮场景。</li>
+          <li><b>真的可信</b>：51 项验收、跨模型评审，边界如实写明。</li>
+        </ul>
+      </div>
+      <div class="card" style="flex:1">
+        <h3>下一步</h3>
+        <ul class="tight small">
+          <li>邀请真实用户试用（目标 10 人同时在线），补齐多人并发证据。</li>
+          <li>物理休眠中在途任务恢复的实机验证；手机端操作适配。</li>
+          <li>对外长期运营前，复核全部可选角色形象的授权。</li>
+          <li>更多官方物品与藏品，让小屋与藏宝阁越逛越满。</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+  <div class="foot"><span>https://yafeng.fun · 藏宝阁与个人小屋 · 项目报告书 · 2026-11-13</span><span>17 / 17</span></div>
+</section>
+
+</body>
+</html>

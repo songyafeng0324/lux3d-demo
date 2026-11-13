@@ -10,6 +10,7 @@
 - `migrations/`、`scripts/`、`tests/` — 版本迁移、环境与运行管理、基础验证。运行入口见 `docs/本地运行.md`；实际结果见 `docs/validation/本地基础工程验证.md`。
 - 线上部署见 `docs/部署说明.md`：`bash scripts/deploy-hk.sh` 在 Mac 构建后 rsync 到服务器（服务器不放源码）；`node scripts/pull-hk.mjs` 把线上数据拉回 Mac（加 `--apply` 才替换本机库）；`bash scripts/stats-hk.sh` 看访问与业务统计。
 - `assets/t16/` — 现行藏宝阁：Blender 源、GLB 与布局/行走数据（由 `scripts/blender/build_t16.py` 导出），`textures/polyhaven/` 为入库的 CC0 贴图（`scripts/fetch-t16-textures.mjs` 下载）；`assets/t10/` 为旧二层阁的历史资产。运行验证在 `docs/validation/`。
+- `docs/report/` — 项目报告书（赛事提交用）：`项目报告书.html` 为源，`node scripts/build-report.mjs` 出 PDF；素材由 `scripts/report-*.mjs` 生成（Lux3D 原始 GLB 不入库，渲染图已入库），数字只取自验证文档与导出清单。
 - `DESIGN.md` — 古建筑场景、家具及交互的设计决策入口；具体方案按需放 `docs/design/`。
 - **判据**:协调 / 推进总体项目的 → 根级 `flow/`;需要统一发现的知识和方案 → 根级 `docs/`;代码 → 对应子项目。默认不在子项目重复建 `flow/` 或 `docs/`
 
