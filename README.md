@@ -20,4 +20,8 @@ T10进度见 [沉浸式MVP实施计划](docs/architecture/沉浸式MVP实施计�
 
 `flow/` 是唯一控制层，`docs/` 是集中内容层。代码按 apps/web、apps/api、apps/worker 与 packages/domain、packages/contracts 分工，共用根级协作入口。
 
-项目级Hook文件已安装；Codex最终回复前主动自检，Stop静默放行。Git本地main仓库已初始化，依赖由package-lock锁定；当前尚未提交，业务验收未完成。
+## 开源说明与许可证
+- 代码以 [MIT 许可证](LICENSE) 开源。线上体验：https://yafeng.fun 。
+- `.env`、数据库与凭证不在仓库内；复制 `.env.example` 后运行 `npm run local:setup` 生成本机私有配置，生成功能需要自己的 Lux3D API key。
+- 第三方素材：`assets/t16/textures/polyhaven/` 为 Poly Haven 的 CC0 贴图；Lux3D 生成的模型与 `assets/characters/` 下的角色形象（含动漫形象）不属于 MIT 授权范围，版权归各自权利人所有，仅用于参赛演示与学习。权利人如有异议，请通过 Issue 联系，将及时移除。
+- 六角色离线预览（`assets/characters/six-character-preview/`，225 MB）未入库，各角色 GLB 已在 `assets/characters/<id>/`。

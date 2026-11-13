@@ -24,3 +24,6 @@ assets/furniture/references/
 
 # 小红书宣传视频的素材与渲染产物（体积大，只本机保留）
 promo/
+
+# 六角色离线预览（225 MB，内容与各角色 GLB 重复；超过 GitHub 单文件 100 MB 上限，只本机保留）
+assets/characters/six-character-preview/

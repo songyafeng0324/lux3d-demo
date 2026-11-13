@@ -411,3 +411,10 @@
 - 决定：新增本人路由 `DELETE /assets/:id`，与 `DELETE /admin/assets/:id` 共用 `riskDelete` 事务与锁序；回执附本人小屋变化供前端衔接草稿；二次确认做成卡内确认块，不用浏览器原生 confirm。
 - 否决的方案 & 原因：只删本人背包、保留他人收藏（会留下指向已删模型的引用，与“同步删除”要求相悖）；软删除可恢复（用户要的是清除废品，且现有后台删除也不可恢复，两套语义会混淆）。
 
+
+## 2026-11-13 · 开源到 GitHub 的范围与处理方式
+- 背景：用户要把代码推到 GitHub 并开源；历史里有 129.7 MB 的 `six-character-preview/preview.html`，超过 GitHub 单文件 100 MB 上限，推送会被拒。
+- 决定：用改写历史的方式把整个 `assets/characters/six-character-preview/`（225 MB，内容与各角色 GLB 重复）移出全部提交，本机保留并加入 `.gitignore`；许可证用 MIT；提交作者邮箱统一改为 GitHub noreply；角色 GLB 全部保留公开。
+- 风险（用户已知悉并承担）：角色中含蜡笔小新、樱桃小丸子等版权形象，公开后可能收到 DMCA 下架通知。
+- 否决的方案 & 原因：Git LFS（需装 git-lfs，免费额度仅 1 GB）；只删 `preview.html`（整个目录都是重复内容，一并移除更干净）。
+- 前提：此时还没有远端，改写历史不影响他人；改写前先做 bundle 备份。
