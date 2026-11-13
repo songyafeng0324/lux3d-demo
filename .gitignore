@@ -21,3 +21,6 @@ assets/t16/props/source/
 
 # Official item reference images and raw Lux3D downloads (~285 MB; local processing source only, never committed)
 assets/furniture/references/
+
+# 小红书宣传视频的素材与渲染产物（体积大，只本机保留）
+promo/
