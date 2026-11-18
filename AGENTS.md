@@ -9,7 +9,7 @@
 - `apps/web/`、`apps/api/`、`apps/worker/` — 网页、HTTP服务、后台进程；`packages/domain/`、`packages/contracts/` — 领域基础与DTO。各模块有局部入口，仍共用根级控制层。
 - `migrations/`、`scripts/`、`tests/` — 版本迁移、环境与运行管理、基础验证。运行入口见 `docs/本地运行.md`；实际结果见 `docs/validation/本地基础工程验证.md`。
 - 线上部署见 `docs/部署说明.md`：`bash scripts/deploy-hk.sh` 在 Mac 构建后 rsync 到服务器（服务器不放源码）；`node scripts/pull-hk.mjs` 把线上数据拉回 Mac（加 `--apply` 才替换本机库）；`bash scripts/stats-hk.sh` 看访问与业务统计。
-- GitHub 仓库 `songyafeng0324/lux3d-demo`（MIT）只是黑客松的开源交代，2026-11-13 推送一次后不再维护；此后只在本机提交，不再推送。提交身份用仓库内已设的 GitHub noreply 邮箱；若将来要再推，只推 `main`，不要 `--all`，`assets/characters/six-character-preview/` 保持不入库。
+- GitHub 仓库 `songyafeng0324/lux3d-demo`（MIT）只是黑客松的开源交代，2026-11-13 首次推送，2026-11-18 按用户要求补了面向访客的 README 和 About 后再推一次；此后默认只在本机提交，用户明确要求才推送。提交身份用仓库内已设的 GitHub noreply 邮箱；若将来要再推，只推 `main`，不要 `--all`，`assets/characters/six-character-preview/` 保持不入库。
 - `assets/t16/` — 现行藏宝阁：Blender 源、GLB 与布局/行走数据（由 `scripts/blender/build_t16.py` 导出），`textures/polyhaven/` 为入库的 CC0 贴图（`scripts/fetch-t16-textures.mjs` 下载）；`assets/t10/` 为旧二层阁的历史资产。运行验证在 `docs/validation/`。
 - `docs/report/` — 项目报告书（赛事提交用）：`项目报告书.html` 为源，`node scripts/build-report.mjs` 出 PDF；素材由 `scripts/report-*.mjs` 生成（Lux3D 原始 GLB 不入库，渲染图已入库），数字只取自验证文档与导出清单。
 - `promo/` — 宣传视频等大体积素材，已被 git 忽略，只本机保留；小红书相关的进展、决策和踩坑记在 `promo/小红书记录.md`，不进 `flow/`。
